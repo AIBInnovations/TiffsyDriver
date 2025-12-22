@@ -1,0 +1,369 @@
+// src/screens/auth/OTPVerificationScreen.tsx
+import { useState, useRef, useEffect, Fragment } from 'react';
+import {
+  View,
+  Text,
+  TouchableOpacity,
+  StatusBar,
+  TextInput,
+  Image,
+  KeyboardAvoidingView,
+  ScrollView,
+  Platform,
+} from 'react-native';
+import { AuthStackScreenProps } from "../../navigation/types";
+import { CommonActions } from '@react-navigation/native';
+
+type Props = AuthStackScreenProps<'OtpVerify'>;
+
+const OTPVerificationScreen = ({ navigation, route }: Props) => {
+  const { phoneNumber } = route.params;
+  const [otp, setOtp] = useState(['', '', '', '', '', '']);
+  const [timer, setTimer] = useState(30);
+  const [canResend, setCanResend] = useState(false);
+
+  // Refs for input fields
+  const inputRefs = useRef<(TextInput | null)[]>([]);
+
+  useEffect(() => {
+    // Start timer
+    if (timer > 0) {
+      const interval = setInterval(() => {
+        setTimer((prev) => {
+          if (prev <= 1) {
+            setCanResend(true);
+            return 0;
+          }
+          return prev - 1;
+        });
+      }, 1000);
+      return () => clearInterval(interval);
+    }
+  }, [timer]);
+
+  const handleOtpChange = (value: string, index: number) => {
+    const newOtp = [...otp];
+    newOtp[index] = value;
+    setOtp(newOtp);
+
+    // Auto-focus next input
+    if (value && index < 5) {
+      inputRefs.current[index + 1]?.focus();
+    }
+
+    // Check if all fields are filled
+    if (newOtp.every(digit => digit !== '')) {
+      handleVerifyOTP(newOtp.join(''));
+    }
+  };
+
+  const handleKeyPress = (key: string, index: number) => {
+    if (key === 'Backspace' && !otp[index] && index > 0) {
+      inputRefs.current[index - 1]?.focus();
+    }
+  };
+
+  const handleVerifyOTP = (otpCode?: string) => {
+    const code = otpCode || otp.join('');
+    if (code.length === 6) {
+      // Navigate to main app and reset navigation state
+      navigation.dispatch(
+        CommonActions.reset({
+          index: 0,
+          routes: [{ name: 'Main' }],
+        })
+      );
+    }
+  };
+
+  const handleResendOTP = () => {
+    if (canResend) {
+      setTimer(30);
+      setCanResend(false);
+      setOtp(['', '', '', '', '', '']);
+      inputRefs.current[0]?.focus();
+    }
+  };
+
+  const handleGetStarted = () => {
+    // Navigate to main app regardless of OTP validation for demo purposes
+    // In production, you should validate the OTP first
+    navigation.dispatch(
+      CommonActions.reset({
+        index: 0,
+        routes: [{ name: 'Main' }],
+      })
+    );
+  };
+
+  return (
+    <KeyboardAvoidingView
+      style={{ flex: 1, backgroundColor: '#F56B4C' }}
+      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+    >
+      <StatusBar barStyle="light-content" backgroundColor="#F56B4C" />
+      <ScrollView
+        style={{ flex: 1 }}
+        contentContainerStyle={{ flexGrow: 1 }}
+        keyboardShouldPersistTaps="handled"
+        showsVerticalScrollIndicator={false}
+      >
+          {/* Top image / header area */}
+          <View
+            style={{
+              height: 220,
+              backgroundColor: '#F56B4C',
+              paddingHorizontal: 20,
+              paddingTop: 15,
+            }}
+          >
+            {/* Back arrow in circle */}
+            <TouchableOpacity
+              onPress={() => navigation.goBack()}
+              style={{
+                width: 36,
+                height: 36,
+                borderRadius: 18,
+                alignItems: 'center',
+                justifyContent: 'center',
+              }}
+            >
+              <Image
+                source={require('../../../assets/icons/backarrow.png')}
+                style={{ width: 40, height: 40 }}
+                resizeMode="contain"
+              />
+            </TouchableOpacity>
+
+            {/* Illustration placeholder */}
+            <View
+              style={{
+                flex: 1,
+                alignItems: 'center',
+                justifyContent: 'flex-start',
+              }}
+            >
+              {/* Delivery illustration */}
+              <Image
+                source={require('../../../assets/images/pana.png')}
+                style={{
+                  width: 230,
+                  height: 190,
+                  marginTop: -35,
+                }}
+                resizeMode="contain"
+              />
+            </View>
+          </View>
+
+          {/* Bottom white card */}
+          <View
+            style={{
+              flex: 1,
+              backgroundColor: 'white',
+              borderTopLeftRadius: 30,
+              borderTopRightRadius: 30,
+              paddingHorizontal: 20,
+              paddingTop: 20,
+              paddingBottom: 15,
+            }}
+          >
+            {/* Login / Register Switch */}
+            <View
+              style={{
+                backgroundColor: '#F3F4F6',
+                borderRadius: 100,
+                flexDirection: 'row',
+                padding: 4,
+                marginBottom: 20,
+              }}
+            >
+              <View
+                style={{
+                  flex: 1,
+                  backgroundColor: 'white',
+                  borderRadius: 100,
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  paddingVertical: 12,
+                }}
+              >
+                <Text
+                  style={{
+                    color: '#111827',
+                    fontSize: 16,
+                    fontWeight: '600',
+                  }}
+                >
+                  Login
+                </Text>
+              </View>
+              <View
+                style={{
+                  flex: 1,
+                  borderRadius: 100,
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  paddingVertical: 12,
+                }}
+              >
+                <Text
+                  style={{
+                    color: '#9CA3AF',
+                    fontSize: 16,
+                    fontWeight: '500',
+                  }}
+                >
+                  Register
+                </Text>
+              </View>
+            </View>
+
+            {/* Verify OTP title */}
+            <Text
+              style={{
+                fontSize: 24,
+                fontWeight: '700',
+                color: '#111827',
+                marginBottom: 8,
+              }}
+            >
+              Verify OTP
+            </Text>
+
+            {/* Description */}
+            <Text
+              style={{
+                fontSize: 14,
+                color: '#6B7280',
+                marginBottom: 20,
+                lineHeight: 20,
+              }}
+            >
+              Enter the 6-digit code sent to{'\n'}
+              {phoneNumber}
+            </Text>
+
+            {/* OTP Input Fields */}
+            <View
+              style={{
+                flexDirection: 'row',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                marginBottom: 20,
+              }}
+            >
+              {otp.map((digit, index) => (
+                <Fragment key={index}>
+                  <TextInput
+                    ref={(ref) => {
+                      if (ref) {
+                        inputRefs.current[index] = ref;
+                      }
+                    }}
+                    value={digit}
+                    onChangeText={(value) => handleOtpChange(value, index)}
+                    onKeyPress={({ nativeEvent }) => handleKeyPress(nativeEvent.key, index)}
+                    style={{
+                      width: 45,
+                      height: 45,
+                      borderWidth: 1,
+                      borderColor: digit ? 'rgba(55, 200, 127, 1)' : 'rgba(239, 239, 239, 1)',
+                      borderRadius: 10,
+                      textAlign: 'center',
+                      fontSize: 20,
+                      fontWeight: '600',
+                      color: '#111827',
+                      backgroundColor: 'rgba(250, 250, 252, 1)',
+                    }}
+                    keyboardType="number-pad"
+                    maxLength={1}
+                    selectTextOnFocus
+                  />
+                  {index === 2 && (
+                    <Text style={{ color: '#D1D5DB', fontSize: 20, marginHorizontal: 4 }}>-</Text>
+                  )}
+                </Fragment>
+              ))}
+            </View>
+
+            {/* Resend code text */}
+            <Text
+              style={{
+                textAlign: 'center',
+                fontSize: 14,
+                color: '#6B7280',
+                marginBottom: 20,
+              }}
+            >
+              {canResend ? (
+                <Text>
+                  Didn't receive code?{' '}
+                  <Text
+                    onPress={handleResendOTP}
+                    style={{ color: '#F56B4C', fontWeight: '600' }}
+                  >
+                    Resend
+                  </Text>
+                </Text>
+              ) : (
+                <Text>
+                  Re-send code in{' '}
+                  <Text style={{ color: '#F56B4C', fontWeight: '600' }}>
+                    {timer}s
+                  </Text>
+                </Text>
+              )}
+            </Text>
+
+            {/* Get Started button */}
+            <TouchableOpacity
+              activeOpacity={0.8}
+              onPress={handleGetStarted}
+              style={{
+                backgroundColor: '#F56B4C',
+                borderRadius: 100,
+                paddingVertical: 15,
+                alignItems: 'center',
+                justifyContent: 'center',
+                marginBottom: 20,
+                shadowColor: '#000',
+                shadowOffset: { width: 0, height: 2 },
+                shadowOpacity: 0.1,
+                shadowRadius: 4,
+                elevation: 3,
+              }}
+            >
+              <Text
+                style={{ color: 'white', fontSize: 16, fontWeight: '600' }}
+              >
+                Get Started
+              </Text>
+            </TouchableOpacity>
+
+            {/* Footer text */}
+            <Text
+              style={{
+                fontSize: 12,
+                color: '#9CA3AF',
+                textAlign: 'center',
+                lineHeight: 18,
+                marginBottom: 10,
+              }}
+            >
+              By signing in, you agree to{' '}
+              <Text style={{ textDecorationLine: 'underline', color: '#6B7280' }}>
+                Terms of Service
+              </Text>
+              {'\n'}and{' '}
+              <Text style={{ textDecorationLine: 'underline', color: '#6B7280' }}>
+                Privacy Policy
+              </Text>
+            </Text>
+          </View>
+      </ScrollView>
+    </KeyboardAvoidingView>
+  );
+};
+
+export default OTPVerificationScreen;
