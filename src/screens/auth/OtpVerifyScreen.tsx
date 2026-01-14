@@ -10,17 +10,22 @@ import {
   KeyboardAvoidingView,
   ScrollView,
   Platform,
+  Alert,
+  ActivityIndicator,
 } from 'react-native';
+import auth from '@react-native-firebase/auth';
 import { AuthStackScreenProps } from "../../navigation/types";
-import { CommonActions } from '@react-navigation/native';
+import { syncUser, getFirebaseToken } from '../../services/authService';
+import { tokenStorage } from '../../utils/tokenStorage';
 
 type Props = AuthStackScreenProps<'OtpVerify'>;
 
 const OTPVerificationScreen = ({ navigation, route }: Props) => {
-  const { phoneNumber } = route.params;
+  const { phoneNumber, confirmation } = route.params;
   const [otp, setOtp] = useState(['', '', '', '', '', '']);
   const [timer, setTimer] = useState(30);
   const [canResend, setCanResend] = useState(false);
+  const [verifying, setVerifying] = useState(false);
 
   // Refs for input fields
   const inputRefs = useRef<(TextInput | null)[]>([]);
@@ -63,37 +68,171 @@ const OTPVerificationScreen = ({ navigation, route }: Props) => {
     }
   };
 
-  const handleVerifyOTP = (otpCode?: string) => {
+  const handleVerifyOTP = async (otpCode?: string) => {
     const code = otpCode || otp.join('');
     if (code.length === 6) {
-      // Navigate to main app and reset navigation state
-      navigation.dispatch(
-        CommonActions.reset({
-          index: 0,
-          routes: [{ name: 'Main' }],
-        })
-      );
+      setVerifying(true);
+      try {
+        // Step 1: Verify the OTP code with Firebase
+        console.log('🔐 Verifying OTP with Firebase...');
+        const userCredential = await confirmation.confirm(code);
+        console.log('✅ Firebase OTP verified successfully');
+        console.log('👤 User:', userCredential.user.uid);
+
+        // Step 2: Get Firebase ID token
+        console.log('🔑 Getting Firebase ID token...');
+        const idToken = await getFirebaseToken();
+
+        // Step 3: Store the token
+        await tokenStorage.setToken(idToken);
+        console.log('💾 Token stored in AsyncStorage');
+
+        // Step 4: Sync with backend
+        console.log('📡 Syncing user with backend...');
+        const syncResponse = await syncUser();
+
+        console.log('📊 Sync response:', {
+          isNewUser: syncResponse.data.isNewUser,
+          isProfileComplete: syncResponse.data.isProfileComplete,
+          userName: syncResponse.data.user?.name,
+          userRole: syncResponse.data.user?.role
+        });
+
+        // ⚠️ DEBUG: Show full backend response
+        console.log('🔍 FULL BACKEND RESPONSE:', JSON.stringify(syncResponse, null, 2));
+
+        // Step 5: Handle response based on user status
+        if (syncResponse.data.isNewUser) {
+          // New user - navigate to role selection
+          console.log('👤 New user detected, navigating to role selection...');
+          navigation.replace('RoleSelection', { phoneNumber });
+        } else if (syncResponse.data.user?.role !== 'DRIVER') {
+          // User exists but is not a driver
+          Alert.alert(
+            'Access Denied',
+            'This app is only for drivers. Your account has a different role.',
+            [
+              {
+                text: 'OK',
+                onPress: async () => {
+                  await auth().signOut();
+                  await tokenStorage.clearAll();
+                  navigation.goBack();
+                }
+              }
+            ]
+          );
+        } else {
+          // User is a DRIVER - check approval status
+          const { approvalStatus, rejectionReason } = syncResponse.data;
+          console.log('🚗 Driver user, checking approval status:', approvalStatus);
+
+          switch (approvalStatus) {
+            case 'PENDING':
+              console.log('⏳ Driver registration is PENDING approval');
+              navigation.replace('ApprovalWaiting', { phoneNumber });
+              break;
+
+            case 'REJECTED':
+              console.log('❌ Driver registration was REJECTED');
+              navigation.replace('Rejection', {
+                phoneNumber,
+                rejectionReason: rejectionReason || 'No reason provided',
+              });
+              break;
+
+            case 'APPROVED':
+              console.log('✅ Driver is APPROVED, checking profile completion...');
+              if (!syncResponse.data.isProfileComplete) {
+                console.log('📝 Profile incomplete, navigating to profile completion...');
+                navigation.replace('ProfileOnboarding', { phoneNumber });
+              } else {
+                console.log('✅ Profile complete, navigating to main app...');
+                navigation.getParent()?.navigate('Main');
+              }
+              break;
+
+            default:
+              // No approval status (legacy user or not yet registered as driver)
+              console.log('⚠️ No approval status, checking profile completion...');
+              if (!syncResponse.data.isProfileComplete) {
+                console.log('📝 Profile incomplete, navigating to profile completion...');
+                navigation.replace('ProfileOnboarding', { phoneNumber });
+              } else {
+                console.log('✅ Profile complete, navigating to main app...');
+                navigation.getParent()?.navigate('Main');
+              }
+          }
+        }
+
+      } catch (error: any) {
+        console.error('❌ Error during OTP verification:', error);
+
+        // Check if it's a Firebase OTP error or backend error
+        if (error.code?.includes('auth/')) {
+          Alert.alert(
+            'Invalid OTP',
+            'The code you entered is incorrect. Please try again.'
+          );
+        } else {
+          // Backend connection error
+          let errorMessage = error.message || 'Failed to connect to server.';
+
+          if (error.message?.includes('non-JSON response') || error.message?.includes('JSON Parse error')) {
+            errorMessage = 'Cannot connect to backend server.\n\nPlease check:\n1. Backend server is running\n2. Backend URL is correct in src/config/api.ts\n3. Network connection is stable\n\nSee console logs for details.';
+          }
+
+          Alert.alert('Backend Connection Error', errorMessage);
+        }
+
+        // Clear OTP fields on error
+        setOtp(['', '', '', '', '', '']);
+        inputRefs.current[0]?.focus();
+      } finally {
+        setVerifying(false);
+      }
     }
   };
 
-  const handleResendOTP = () => {
+  const handleResendOTP = async () => {
     if (canResend) {
-      setTimer(30);
-      setCanResend(false);
-      setOtp(['', '', '', '', '', '']);
-      inputRefs.current[0]?.focus();
+      setVerifying(true);
+      try {
+        console.log('🔄 Resending OTP...');
+
+        // Remove +91 prefix and space, get just the digits
+        const phoneDigits = phoneNumber.replace(/[^\d]/g, '');
+        const fullPhoneNumber = `+91${phoneDigits}`;
+
+        console.log('📱 Phone number:', fullPhoneNumber);
+
+        // Resend OTP
+        const newConfirmation = await auth().signInWithPhoneNumber(fullPhoneNumber);
+        console.log('✅ OTP resent successfully');
+
+        // Update route params with new confirmation
+        navigation.setParams({ confirmation: newConfirmation });
+
+        setTimer(30);
+        setCanResend(false);
+        setOtp(['', '', '', '', '', '']);
+        inputRefs.current[0]?.focus();
+
+        Alert.alert('Success', 'OTP has been resent to your phone.');
+      } catch (error: any) {
+        console.error('❌ Error resending OTP:', error);
+        Alert.alert(
+          'Error',
+          error.message || 'Failed to resend OTP. Please try again.'
+        );
+      } finally {
+        setVerifying(false);
+      }
     }
   };
 
   const handleGetStarted = () => {
-    // Navigate to main app regardless of OTP validation for demo purposes
-    // In production, you should validate the OTP first
-    navigation.dispatch(
-      CommonActions.reset({
-        index: 0,
-        routes: [{ name: 'Main' }],
-      })
-    );
+    handleVerifyOTP();
   };
 
   return (
@@ -320,8 +459,9 @@ const OTPVerificationScreen = ({ navigation, route }: Props) => {
             <TouchableOpacity
               activeOpacity={0.8}
               onPress={handleGetStarted}
+              disabled={verifying || otp.some(digit => digit === '')}
               style={{
-                backgroundColor: '#F56B4C',
+                backgroundColor: verifying || otp.some(digit => digit === '') ? '#CCCCCC' : '#F56B4C',
                 borderRadius: 100,
                 paddingVertical: 15,
                 alignItems: 'center',
@@ -334,11 +474,15 @@ const OTPVerificationScreen = ({ navigation, route }: Props) => {
                 elevation: 3,
               }}
             >
-              <Text
-                style={{ color: 'white', fontSize: 16, fontWeight: '600' }}
-              >
-                Get Started
-              </Text>
+              {verifying ? (
+                <ActivityIndicator color="white" />
+              ) : (
+                <Text
+                  style={{ color: 'white', fontSize: 16, fontWeight: '600' }}
+                >
+                  Get Started
+                </Text>
+              )}
             </TouchableOpacity>
 
             {/* Footer text */}

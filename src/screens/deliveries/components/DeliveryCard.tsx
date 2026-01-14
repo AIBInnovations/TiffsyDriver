@@ -2,30 +2,58 @@ import { View, Text, StyleSheet, TouchableOpacity, Linking } from "react-native"
 import { useState, useEffect } from "react";
 import MaterialCommunityIcons from "react-native-vector-icons/MaterialCommunityIcons";
 import { Delivery } from "../../../context/DeliveryContext";
+import type { OrderStatus } from "../../../types/api";
 
 interface DeliveryCardProps {
-  delivery: Delivery;
-  onStatusChange: (deliveryId: string, newStatus: Delivery["status"]) => void;
+  delivery: Delivery | any; // Allow both old Delivery and API order types
+  onStatusChange: (deliveryId: string, newStatus: any) => void;
 }
 
-const statusConfig: Record<Delivery["status"], { bg: string; text: string; label: string; icon: string }> = {
+// Status config for both old context statuses and new API statuses
+const statusConfig: Record<string, { bg: string; text: string; label: string; icon: string }> = {
+  // Old context statuses
   pending: { bg: "#F3F4F6", text: "#6B7280", label: "Pending", icon: "clock-outline" },
   in_progress: { bg: "#DBEAFE", text: "#1E40AF", label: "In Progress", icon: "truck-fast" },
   picked_up: { bg: "#FEF3C7", text: "#92400E", label: "Picked Up", icon: "package-variant" },
   completed: { bg: "#D1FAE5", text: "#065F46", label: "Completed", icon: "check-circle" },
   failed: { bg: "#FEE2E2", text: "#991B1B", label: "Failed", icon: "close-circle" },
+
+  // API statuses (new backend format)
+  READY: { bg: "#F3F4F6", text: "#6B7280", label: "Ready", icon: "clock-outline" },
+  EN_ROUTE: { bg: "#DBEAFE", text: "#1E40AF", label: "En Route", icon: "truck-fast" },
+  ARRIVED: { bg: "#FEF3C7", text: "#92400E", label: "Arrived", icon: "package-variant" },
+  DELIVERED: { bg: "#D1FAE5", text: "#065F46", label: "Delivered", icon: "check-circle" },
+  FAILED: { bg: "#FEE2E2", text: "#991B1B", label: "Failed", icon: "close-circle" },
+  RETURNED: { bg: "#FEE2E2", text: "#991B1B", label: "Returned", icon: "undo-variant" },
+
+  // Legacy API statuses (for backward compatibility)
+  OUT_FOR_DELIVERY: { bg: "#DBEAFE", text: "#1E40AF", label: "Out for Delivery", icon: "truck-fast" },
+  PICKED_UP: { bg: "#FEF3C7", text: "#92400E", label: "Picked Up", icon: "package-variant" },
 };
 
 export default function DeliveryCard({ delivery, onStatusChange }: DeliveryCardProps) {
   const [showPhone, setShowPhone] = useState(false);
   const [elapsedTime, setElapsedTime] = useState(0);
 
-  const status = statusConfig[delivery.status];
+  const status = statusConfig[delivery.status] || {
+    bg: "#F3F4F6",
+    text: "#6B7280",
+    label: delivery.status || "Unknown",
+    icon: "help-circle"
+  };
 
   // Timer for in-progress deliveries
   useEffect(() => {
     let interval: ReturnType<typeof setInterval> | null = null;
-    if ((delivery.status === "in_progress" || delivery.status === "picked_up") && delivery.startTime) {
+    const isActive =
+      delivery.status === "in_progress" ||
+      delivery.status === "picked_up" ||
+      delivery.status === "EN_ROUTE" ||
+      delivery.status === "ARRIVED" ||
+      delivery.status === "OUT_FOR_DELIVERY" ||  // Legacy
+      delivery.status === "PICKED_UP";  // Legacy
+
+    if (isActive && delivery.startTime) {
       const updateElapsed = () => {
         setElapsedTime(Math.floor((Date.now() - delivery.startTime!) / 1000));
       };
@@ -55,6 +83,7 @@ export default function DeliveryCard({ delivery, onStatusChange }: DeliveryCardP
 
   const getActionButton = () => {
     switch (delivery.status) {
+      // Old context statuses
       case "pending":
         return (
           <TouchableOpacity
@@ -85,12 +114,53 @@ export default function DeliveryCard({ delivery, onStatusChange }: DeliveryCardP
             <Text style={styles.actionButtonText}>Mark as Delivered</Text>
           </TouchableOpacity>
         );
+
+      // API statuses (new backend format: READY → EN_ROUTE → ARRIVED → DELIVERED)
+      case "READY":
+        return (
+          <TouchableOpacity
+            style={[styles.actionButton, styles.startButton]}
+            onPress={() => onStatusChange(delivery.id, "EN_ROUTE")}
+          >
+            <MaterialCommunityIcons name="play" size={18} color="#FFFFFF" />
+            <Text style={styles.actionButtonText}>Start Delivery</Text>
+          </TouchableOpacity>
+        );
+      case "EN_ROUTE":
+      case "OUT_FOR_DELIVERY":  // Legacy support
+        return (
+          <TouchableOpacity
+            style={[styles.actionButton, styles.deliverButton]}
+            onPress={() => onStatusChange(delivery.id, "DELIVERED")}
+          >
+            <MaterialCommunityIcons name="check" size={18} color="#FFFFFF" />
+            <Text style={styles.actionButtonText}>Mark as Delivered</Text>
+          </TouchableOpacity>
+        );
+      case "ARRIVED":
+      case "PICKED_UP":  // Legacy support
+        return (
+          <TouchableOpacity
+            style={[styles.actionButton, styles.deliverButton]}
+            onPress={() => onStatusChange(delivery.id, "DELIVERED")}
+          >
+            <MaterialCommunityIcons name="check" size={18} color="#FFFFFF" />
+            <Text style={styles.actionButtonText}>Mark as Delivered</Text>
+          </TouchableOpacity>
+        );
+
       default:
         return null;
     }
   };
 
-  const showFailButton = delivery.status === "in_progress" || delivery.status === "picked_up";
+  const showFailButton =
+    delivery.status === "in_progress" ||
+    delivery.status === "picked_up" ||
+    delivery.status === "EN_ROUTE" ||
+    delivery.status === "ARRIVED" ||
+    delivery.status === "OUT_FOR_DELIVERY" ||  // Legacy
+    delivery.status === "PICKED_UP";  // Legacy
 
   return (
     <View style={styles.card}>
@@ -112,7 +182,7 @@ export default function DeliveryCard({ delivery, onStatusChange }: DeliveryCardP
       </View>
 
       {/* Timer for active deliveries */}
-      {(delivery.status === "in_progress" || delivery.status === "picked_up") && delivery.startTime && (
+      {(delivery.status === "in_progress" || delivery.status === "picked_up" || delivery.status === "EN_ROUTE" || delivery.status === "ARRIVED" || delivery.status === "OUT_FOR_DELIVERY" || delivery.status === "PICKED_UP") && delivery.startTime && (
         <View style={styles.timerContainer}>
           <MaterialCommunityIcons name="timer-outline" size={16} color="#F56B4C" />
           <Text style={styles.timerText}>Time elapsed: {formatTime(elapsedTime)}</Text>
@@ -189,7 +259,18 @@ export default function DeliveryCard({ delivery, onStatusChange }: DeliveryCardP
         {showFailButton && (
           <TouchableOpacity
             style={[styles.actionButton, styles.failButton]}
-            onPress={() => onStatusChange(delivery.id, "failed")}
+            onPress={() => {
+              // Use API status if dealing with API order, otherwise use context status
+              const isAPIStatus = (
+                delivery.status === "READY" ||
+                delivery.status === "EN_ROUTE" ||
+                delivery.status === "ARRIVED" ||
+                delivery.status === "OUT_FOR_DELIVERY" ||
+                delivery.status === "PICKED_UP"
+              );
+              const failStatus = isAPIStatus ? "FAILED" : "failed";
+              onStatusChange(delivery.id, failStatus);
+            }}
           >
             <MaterialCommunityIcons name="close" size={18} color="#FFFFFF" />
             <Text style={styles.actionButtonText}>Fail</Text>

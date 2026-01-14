@@ -6,6 +6,7 @@ import {
   TouchableOpacity,
   RefreshControl,
   StatusBar,
+  Alert,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useState, useCallback, useEffect } from "react";
@@ -20,6 +21,8 @@ import PODCapture from "./components/PODCapture";
 import FailedDeliveryModal from "./components/FailedDeliveryModal";
 import DeliveryCompleteModal from "./components/DeliveryCompleteModal";
 import NotificationBanner, { NotificationType } from "./components/NotificationBanner";
+import { getMyBatch, updateDeliveryStatus as apiUpdateDeliveryStatus } from "../../services/deliveryService";
+import type { Order, OrderStatus } from "../../types/api";
 
 type DeliveryStatusScreenRouteProp = RouteProp<MainTabsParamList, "DeliveryStatus">;
 
@@ -47,19 +50,42 @@ interface Notification {
   onAction?: () => void;
 }
 
-// Mock data for demonstration
-const mockDeliveryData: DeliveryData = {
-  deliveryId: "DEL-001",
-  orderId: "Order #12345",
-  customerName: "John Doe",
-  customerPhone: "+1 (555) 123-4567",
-  pickupLocation: "123 Main Street, Downtown, City 10001",
-  dropoffLocation: "456 Oak Avenue, Suburbs, City 10002",
-  deliveryWindow: "10:00 AM - 11:00 AM",
-  specialInstructions: "Please ring the doorbell twice. Leave package at the door if no answer. Gate code: 1234",
-  currentStatus: "pending",
-  stopNumber: 1,
-  totalStops: 3,
+// Map API OrderStatus to local DeliveryStatusType
+const mapOrderStatusToDeliveryStatus = (status: OrderStatus): DeliveryStatusType => {
+  switch (status) {
+    case 'READY':
+      return 'pending';
+    case 'EN_ROUTE':
+    case 'OUT_FOR_DELIVERY':  // Legacy support
+      return 'in_progress';
+    case 'ARRIVED':
+    case 'PICKED_UP':  // Legacy support
+      return 'picked_up';
+    case 'DELIVERED':
+      return 'delivered';
+    case 'FAILED':
+      return 'failed';
+    default:
+      return 'pending';
+  }
+};
+
+// Map local DeliveryStatusType to API OrderStatus (backend expects: EN_ROUTE, ARRIVED, DELIVERED, FAILED)
+const mapDeliveryStatusToOrderStatus = (status: DeliveryStatusType): OrderStatus => {
+  switch (status) {
+    case 'pending':
+      return 'READY';
+    case 'in_progress':
+      return 'EN_ROUTE';  // Backend expects EN_ROUTE, not OUT_FOR_DELIVERY
+    case 'picked_up':
+      return 'ARRIVED';  // Backend expects ARRIVED, not PICKED_UP
+    case 'delivered':
+      return 'DELIVERED';
+    case 'failed':
+      return 'FAILED';
+    default:
+      return 'READY';
+  }
 };
 
 export default function DeliveryStatusScreen() {
@@ -80,36 +106,85 @@ export default function DeliveryStatusScreen() {
     loadDeliveryData();
   }, [route.params]);
 
-  const loadDeliveryData = useCallback(() => {
-    if (route.params?.deliveryId) {
-      // Use params if provided
-      setDelivery({
-        deliveryId: route.params.deliveryId,
-        orderId: route.params.orderId || "Order #12345",
-        customerName: route.params.customerName || "Customer",
-        customerPhone: route.params.customerPhone || "",
-        pickupLocation: route.params.pickupLocation || "",
-        dropoffLocation: route.params.dropoffLocation || "",
-        deliveryWindow: route.params.deliveryWindow || "",
-        specialInstructions: route.params.specialInstructions || "",
-        currentStatus: route.params.currentStatus || "pending",
-        batchId: route.params.batchId,
-        stopNumber: route.params.stopNumber,
-        totalStops: route.params.totalStops,
-      });
-    } else {
-      // Use mock data
-      setDelivery(mockDeliveryData);
+  const loadDeliveryData = useCallback(async () => {
+    try {
+      console.log('📥 Fetching delivery data for status screen...');
+
+      if (route.params?.deliveryId) {
+        // Use params if provided
+        setDelivery({
+          deliveryId: route.params.deliveryId,
+          orderId: route.params.orderId || "Order #12345",
+          customerName: route.params.customerName || "Customer",
+          customerPhone: route.params.customerPhone || "",
+          pickupLocation: route.params.pickupLocation || "",
+          dropoffLocation: route.params.dropoffLocation || "",
+          deliveryWindow: route.params.deliveryWindow || "",
+          specialInstructions: route.params.specialInstructions || "",
+          currentStatus: route.params.currentStatus || "pending",
+          batchId: route.params.batchId,
+          stopNumber: route.params.stopNumber,
+          totalStops: route.params.totalStops,
+        });
+      } else {
+        // Fetch from API - get current batch and find active order
+        const response = await getMyBatch();
+
+        if (response.data.batch && response.data.orders && response.data.orders.length > 0) {
+          const batch = response.data.batch;
+          const orders = response.data.orders;
+
+          // Find the first order that's not delivered or failed
+          const activeOrder = orders.find(
+            order => order.status !== 'DELIVERED' && order.status !== 'FAILED'
+          ) || orders[0];
+
+          const kitchen = typeof batch.kitchenId === 'object' ? batch.kitchenId : null;
+          const kitchenAddress = kitchen?.address ?
+            `${kitchen.name}, ${kitchen.address.locality || kitchen.address.area}, ${kitchen.address.city}` :
+            'Kitchen';
+
+          const deliveryAddr = activeOrder.deliveryAddress;
+          const dropoffAddr = `${deliveryAddr.flatNumber || ''} ${deliveryAddr.street || deliveryAddr.addressLine1 || ''}, ${deliveryAddr.locality || deliveryAddr.area}, ${deliveryAddr.city}`.trim();
+
+          setDelivery({
+            deliveryId: activeOrder._id,
+            orderId: activeOrder.orderNumber,
+            customerName: deliveryAddr.name || 'Customer',
+            customerPhone: deliveryAddr.phone || '',
+            pickupLocation: kitchenAddress,
+            dropoffLocation: dropoffAddr,
+            deliveryWindow: batch.mealWindow,
+            specialInstructions: activeOrder.specialInstructions || '',
+            currentStatus: mapOrderStatusToDeliveryStatus(activeOrder.status),
+            batchId: batch._id,
+            stopNumber: activeOrder.sequenceNumber,
+            totalStops: orders.length,
+          });
+
+          console.log('✅ Delivery data loaded:', activeOrder.orderNumber);
+        } else {
+          console.log('ℹ️ No active batch/orders found');
+          setDelivery(null);
+        }
+      }
+    } catch (error: any) {
+      console.error('❌ Error loading delivery data:', error);
+      Alert.alert('Error', 'Failed to load delivery data. Please try again.');
+      setDelivery(null);
     }
   }, [route.params]);
 
-  const handleRefresh = useCallback(() => {
+  const handleRefresh = useCallback(async () => {
     setIsRefreshing(true);
-    setTimeout(() => {
-      loadDeliveryData();
-      setIsRefreshing(false);
+    try {
+      await loadDeliveryData();
       showNotification("success", "Updated", "Delivery details refreshed");
-    }, 1000);
+    } catch (error) {
+      console.error('❌ Error refreshing:', error);
+    } finally {
+      setIsRefreshing(false);
+    }
   }, [loadDeliveryData]);
 
   const showNotification = (
@@ -125,19 +200,48 @@ export default function DeliveryStatusScreen() {
     });
   };
 
-  const updateDeliveryStatus = (newStatus: DeliveryStatusType) => {
+  const updateDeliveryStatus = async (
+    newStatus: DeliveryStatusType,
+    podData?: { otpVerified: boolean; otp: string; notes?: string; recipientName?: string }
+  ) => {
     if (!delivery) return;
 
     setIsUpdating(true);
 
-    // Simulate API call
-    setTimeout(() => {
+    try {
+      console.log('📝 Updating delivery status:', delivery.deliveryId, newStatus);
+
+      // Map local status to API status
+      const apiStatus = mapDeliveryStatusToOrderStatus(newStatus);
+
+      // Prepare request body
+      const requestBody: any = { status: apiStatus };
+
+      // Add proof of delivery for DELIVERED status
+      if (newStatus === "delivered" && podData?.otpVerified && podData?.otp) {
+        requestBody.proofOfDelivery = {
+          type: 'OTP',
+          otp: podData.otp, // Send actual OTP entered by driver
+        };
+        if (podData.notes) {
+          requestBody.notes = podData.notes;
+        }
+      }
+
+      console.log('📦 Request body:', JSON.stringify(requestBody, null, 2));
+
+      // Call the API to update status
+      await apiUpdateDeliveryStatus(delivery.deliveryId, requestBody);
+
+      console.log('✅ Status updated successfully');
+
+      // Update local state
       setDelivery({ ...delivery, currentStatus: newStatus });
-      setIsUpdating(false);
 
       // Show completion modal for delivered status
       if (newStatus === "delivered") {
         setShowCompleteModal(true);
+        setIsUpdating(false);
         return;
       }
 
@@ -153,7 +257,26 @@ export default function DeliveryStatusScreen() {
         newStatus === "failed" ? "error" : "success",
         statusMessages[newStatus]
       );
-    }, 500);
+    } catch (error: any) {
+      console.error('❌ Error updating status:', error);
+      console.error('❌ Error details:', JSON.stringify(error, null, 2));
+      console.error('❌ Error message:', error?.message);
+      console.error('❌ Error stack:', error?.stack);
+
+      // Handle OTP-specific errors
+      let errorMessage = error.message || 'Failed to update delivery status. Please try again.';
+
+      if (newStatus === "delivered" && (
+        errorMessage.toLowerCase().includes('otp') ||
+        errorMessage.toLowerCase().includes('proof of delivery')
+      )) {
+        errorMessage = 'Invalid OTP. Please verify with customer and try again.';
+      }
+
+      Alert.alert('Error', errorMessage, [{ text: 'OK' }]);
+    } finally {
+      setIsUpdating(false);
+    }
   };
 
   const handleStartDelivery = () => {
@@ -168,9 +291,9 @@ export default function DeliveryStatusScreen() {
     setShowPODModal(true);
   };
 
-  const handlePODSubmit = () => {
+  const handlePODSubmit = (podData: { otpVerified: boolean; otp: string; notes?: string; recipientName?: string }) => {
     setShowPODModal(false);
-    updateDeliveryStatus("delivered");
+    updateDeliveryStatus("delivered", podData);
   };
 
   const handleMarkFailed = () => {
@@ -193,20 +316,10 @@ export default function DeliveryStatusScreen() {
     // Navigate to profile
   };
 
-  const handleNextDelivery = () => {
+  const handleNextDelivery = async () => {
     setShowCompleteModal(false);
-    // In a real app, this would load the next delivery data
-    // For now, simulate loading next delivery
-    if (delivery && delivery.stopNumber && delivery.totalStops && delivery.stopNumber < delivery.totalStops) {
-      setDelivery({
-        ...delivery,
-        deliveryId: `DEL-00${(delivery.stopNumber || 0) + 1}`,
-        orderId: `Order #1234${(delivery.stopNumber || 0) + 1}`,
-        customerName: `Customer ${(delivery.stopNumber || 0) + 1}`,
-        stopNumber: (delivery.stopNumber || 0) + 1,
-        currentStatus: "pending",
-      });
-    }
+    // Reload delivery data to get the next active order
+    await loadDeliveryData();
   };
 
   const handleViewAllDeliveries = () => {
@@ -223,9 +336,13 @@ export default function DeliveryStatusScreen() {
     if (!delivery || !delivery.stopNumber || !delivery.totalStops) return undefined;
     if (delivery.stopNumber >= delivery.totalStops) return undefined;
 
+    // Check if there are more deliveries in the batch
+    const remainingDeliveries = delivery.totalStops - delivery.stopNumber;
+    if (remainingDeliveries <= 0) return undefined;
+
     return {
-      orderId: `Order #1234${delivery.stopNumber + 1}`,
-      customerName: `Customer ${delivery.stopNumber + 1}`,
+      orderId: `Next Order`,
+      customerName: `Next Customer`,
       stopNumber: delivery.stopNumber + 1,
       totalStops: delivery.totalStops,
     };
@@ -337,6 +454,8 @@ export default function DeliveryStatusScreen() {
         visible={showPODModal}
         onClose={() => setShowPODModal(false)}
         onSubmit={handlePODSubmit}
+        customerPhone={delivery?.customerPhone}
+        orderId={delivery?.orderId}
       />
 
       <FailedDeliveryModal

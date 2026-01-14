@@ -11,6 +11,7 @@ interface PODCaptureProps {
   onClose: () => void;
   onSubmit: (data: {
     otpVerified: boolean;
+    otp: string;
     notes?: string;
     recipientName?: string;
   }) => void;
@@ -31,6 +32,7 @@ export default function PODCapture({
   const [isVerifying, setIsVerifying] = useState(false);
   const [notes, setNotes] = useState("");
   const [recipientName, setRecipientName] = useState("");
+  const [enteredOtp, setEnteredOtp] = useState("");
 
   const resetForm = () => {
     setStep("otp");
@@ -39,6 +41,7 @@ export default function PODCapture({
     setIsVerifying(false);
     setNotes("");
     setRecipientName("");
+    setEnteredOtp("");
   };
 
   const handleClose = () => {
@@ -49,19 +52,23 @@ export default function PODCapture({
   const handleOTPVerify = (otp: string) => {
     setOtpError(undefined);
 
-    // Simulate: 1234 is valid, anything else is invalid
-    if (otp === "1234") {
-      setIsVerifying(true);
-      // Show loading only for successful verification
-      setTimeout(() => {
-        setOtpVerified(true);
-        setStep("notes");
-        setIsVerifying(false);
-      }, 500);
-    } else {
-      // Show error immediately without loading
-      setOtpError("Invalid OTP. Please try again.");
+    // Validate OTP format (must be 4 digits)
+    if (!/^\d{4}$/.test(otp)) {
+      setOtpError("Please enter a valid 4-digit OTP");
+      return;
     }
+
+    // Save the entered OTP and proceed to notes step
+    // Backend will verify the OTP when we submit
+    setEnteredOtp(otp);
+    setIsVerifying(true);
+
+    // Show brief loading animation for better UX
+    setTimeout(() => {
+      setOtpVerified(true);
+      setStep("notes");
+      setIsVerifying(false);
+    }, 500);
   };
 
   const handleOTPResend = () => {
@@ -72,6 +79,7 @@ export default function PODCapture({
   const handleSubmit = () => {
     onSubmit({
       otpVerified,
+      otp: enteredOtp,
       notes: notes || undefined,
       recipientName: recipientName || undefined,
     });

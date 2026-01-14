@@ -7,7 +7,10 @@ import {
   TextInput,
   StyleSheet,
   Image,
+  Alert,
+  ActivityIndicator,
 } from 'react-native';
+import auth from '@react-native-firebase/auth';
 import type { AuthStackScreenProps } from "../../navigation/types";
 
 type Props = AuthStackScreenProps<'Login'>;
@@ -16,10 +19,32 @@ const LoginScreen = ({ navigation }: Props) => {
   const [phone, setPhone] = useState('');
   const [remember, setRemember] = useState(false);
   const [selectedTab, setSelectedTab] = useState<'login' | 'register'>('login');
+  const [loading, setLoading] = useState(false);
 
-  const handleGetOtp = () => {
+  const handleGetOtp = async () => {
     if (phone.length >= 10) {
-      navigation.navigate('OtpVerify', { phoneNumber: `+91 ${phone}` });
+      setLoading(true);
+      try {
+        const phoneNumber = `+91${phone}`;
+        console.log('📱 Sending OTP to:', phoneNumber);
+
+        const confirmation = await auth().signInWithPhoneNumber(phoneNumber);
+        console.log('✅ OTP sent successfully');
+
+        // Navigate to OTP screen with confirmation object
+        navigation.navigate('OtpVerify', {
+          phoneNumber: `+91 ${phone}`,
+          confirmation
+        });
+      } catch (error: any) {
+        console.error('❌ Error sending OTP:', error);
+        Alert.alert(
+          'Error',
+          error.message || 'Failed to send OTP. Please try again.'
+        );
+      } finally {
+        setLoading(false);
+      }
     }
   };
 
@@ -136,9 +161,17 @@ const LoginScreen = ({ navigation }: Props) => {
         <TouchableOpacity
           activeOpacity={0.8}
           onPress={handleGetOtp}
-          style={styles.otpButton}
+          disabled={loading || phone.length < 10}
+          style={[
+            styles.otpButton,
+            (loading || phone.length < 10) && styles.otpButtonDisabled
+          ]}
         >
-          <Text style={styles.otpButtonText}>Get OTP</Text>
+          {loading ? (
+            <ActivityIndicator color="white" />
+          ) : (
+            <Text style={styles.otpButtonText}>Get OTP</Text>
+          )}
         </TouchableOpacity>
 
         {/* Divider with "or" */}
@@ -313,6 +346,10 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.1,
     shadowRadius: 4,
     elevation: 3,
+  },
+  otpButtonDisabled: {
+    backgroundColor: '#CCCCCC',
+    opacity: 0.6,
   },
   otpButtonText: {
     color: 'white',

@@ -1,0 +1,1648 @@
+# Driver Authentication and Operations Integration Guide
+
+Backend API Documentation for React Native Frontend Integration
+
+## Overview
+
+This document provides complete integration specifications for implementing driver authentication and delivery operations in the Tiffsy React Native mobile application. The backend uses Firebase Phone OTP authentication with MongoDB for user management and a batch-based delivery system.
+
+## Technology Stack
+
+Backend: Express.js with MongoDB and Mongoose
+Authentication: Firebase Authentication for Phone OTP
+Authorization: Role-based access control with Firebase ID tokens
+Database: MongoDB with user roles CUSTOMER, KITCHEN_STAFF, DRIVER, ADMIN
+
+## Base Configuration
+
+API Base URL: Your backend domain with /api prefix
+All endpoints require proper authentication headers unless specified otherwise
+
+Authentication Header Format:
+```
+Authorization: Bearer <firebase_id_token>
+```
+
+Response Format:
+All API responses follow this structure:
+```
+{
+  "message": "Human readable message",
+  "data": { /* actual response data */ },
+  "error": null  // or error details if failed
+}
+```
+
+## Driver Authentication Flow
+
+### Step 1: Firebase Phone OTP Authentication (Client-Side)
+
+The mobile app first authenticates the user with Firebase using phone number OTP. Firebase handles the OTP generation, delivery, and verification. Once verified, Firebase returns an ID token.
+
+Client Flow:
+1. User enters phone number (10-digit Indian mobile number starting with 6-9)
+2. Firebase sends OTP to phone
+3. User enters OTP
+4. Firebase verifies OTP and returns ID token
+5. App stores ID token for subsequent API calls
+
+### Step 2: Check If Driver Exists (Sync Endpoint)
+
+After obtaining Firebase ID token, check if the driver account exists in the backend database.
+
+Endpoint: POST /api/auth/sync
+Authentication: Firebase ID token required
+Middleware: firebaseAuthMiddleware (verifies Firebase token, extracts phone and UID)
+
+Request Headers:
+```
+Authorization: Bearer <firebase_id_token>
+Content-Type: application/json
+```
+
+Request Body:
+```
+{}
+```
+Note: Phone number and Firebase UID are extracted from the token by the backend
+
+Response when driver exists:
+```
+{
+  "message": "User authenticated",
+  "data": {
+    "user": {
+      "_id": "507f1f77bcf86cd799439011",
+      "phone": "9179621765",
+      "role": "DRIVER",
+      "name": "John Doe",
+      "email": "john@example.com",
+      "status": "ACTIVE",
+      "firebaseUid": "firebase_uid_string",
+      "lastLoginAt": "2025-01-12T10:30:00.000Z",
+      "fcmTokens": [],
+      "createdAt": "2025-01-01T00:00:00.000Z",
+      "updatedAt": "2025-01-12T10:30:00.000Z"
+    },
+    "isNewUser": false,
+    "isProfileComplete": true
+  },
+  "error": null
+}
+```
+
+Response when driver does not exist:
+```
+{
+  "message": "User not found",
+  "data": {
+    "user": null,
+    "isNewUser": true,
+    "isProfileComplete": false
+  },
+  "error": null
+}
+```
+
+UI Logic:
+- If isNewUser is true: Display registration flow (driver accounts must be created by admin, show error message)
+- If isNewUser is false and isProfileComplete is true: Proceed to main driver dashboard
+- If isNewUser is false and isProfileComplete is false: Show profile completion screen
+
+Important: Driver accounts cannot be self-registered. Only admins can create driver accounts. If sync returns isNewUser true, the app should inform the user to contact administration.
+
+### Step 3: Get Current Driver Profile
+
+Retrieve authenticated driver's complete profile including all details.
+
+Endpoint: GET /api/auth/me
+Authentication: Firebase ID token required
+Middleware: authMiddleware (verifies token, checks user exists and is active)
+
+Request Headers:
+```
+Authorization: Bearer <firebase_id_token>
+```
+
+Response:
+```
+{
+  "message": "User profile",
+  "data": {
+    "user": {
+      "_id": "507f1f77bcf86cd799439011",
+      "phone": "9179621765",
+      "role": "DRIVER",
+      "name": "John Doe",
+      "email": "john@example.com",
+      "profileImage": "https://cloudinary.com/path/to/image.jpg",
+      "status": "ACTIVE",
+      "firebaseUid": "firebase_uid_string",
+      "lastLoginAt": "2025-01-12T10:30:00.000Z",
+      "fcmTokens": ["fcm_token_1", "fcm_token_2"],
+      "createdAt": "2025-01-01T00:00:00.000Z",
+      "updatedAt": "2025-01-12T10:30:00.000Z"
+    }
+  },
+  "error": null
+}
+```
+
+UI Usage:
+Display driver name, phone, email, and profile image in the app header or profile section.
+
+### Step 4: Update Profile (Optional for Drivers)
+
+Drivers can update their profile information like name, email, and profile image.
+
+Endpoint: PUT /api/auth/profile
+Authentication: Firebase ID token required
+Middleware: authMiddleware
+
+Request Headers:
+```
+Authorization: Bearer <firebase_id_token>
+Content-Type: application/json
+```
+
+Request Body:
+```
+{
+  "name": "John Doe Updated",
+  "email": "newemail@example.com",
+  "profileImage": "https://cloudinary.com/path/to/new-image.jpg"
+}
+```
+
+All fields are optional. Only include fields you want to update.
+
+Response:
+```
+{
+  "message": "Profile updated",
+  "data": {
+    "user": {
+      "_id": "507f1f77bcf86cd799439011",
+      "phone": "9179621765",
+      "role": "DRIVER",
+      "name": "John Doe Updated",
+      "email": "newemail@example.com",
+      "profileImage": "https://cloudinary.com/path/to/new-image.jpg",
+      "status": "ACTIVE",
+      "firebaseUid": "firebase_uid_string",
+      "lastLoginAt": "2025-01-12T10:30:00.000Z",
+      "createdAt": "2025-01-01T00:00:00.000Z",
+      "updatedAt": "2025-01-12T10:35:00.000Z"
+    },
+    "isProfileComplete": true
+  },
+  "error": null
+}
+```
+
+### Step 5: Register FCM Token for Push Notifications
+
+After successful authentication, register the device's FCM token to receive push notifications for new batch assignments and delivery updates.
+
+Endpoint: POST /api/auth/fcm-token
+Authentication: Firebase ID token required
+Middleware: authMiddleware
+
+Request Headers:
+```
+Authorization: Bearer <firebase_id_token>
+Content-Type: application/json
+```
+
+Request Body:
+```
+{
+  "fcmToken": "fcm_token_from_firebase_messaging",
+  "deviceId": "unique_device_identifier_optional"
+}
+```
+
+Response:
+```
+{
+  "message": "FCM token registered",
+  "data": null,
+  "error": null
+}
+```
+
+Notes:
+- Backend stores up to 5 FCM tokens per user for multi-device support
+- If deviceId is provided, it replaces any existing token for that device
+- Duplicate tokens are automatically removed
+
+### Step 6: Remove FCM Token (Logout)
+
+When driver logs out from a device, remove the FCM token to stop receiving notifications on that device.
+
+Endpoint: DELETE /api/auth/fcm-token
+Authentication: Firebase ID token required
+Middleware: authMiddleware
+
+Request Headers:
+```
+Authorization: Bearer <firebase_id_token>
+Content-Type: application/json
+```
+
+Request Body:
+```
+{
+  "fcmToken": "fcm_token_to_remove"
+}
+```
+
+Response:
+```
+{
+  "message": "FCM token removed",
+  "data": null,
+  "error": null
+}
+```
+
+## Delivery Batch System Overview
+
+The backend uses a batch-based delivery system where multiple orders are grouped into delivery batches. Drivers accept entire batches, pick them up from the kitchen, and deliver them in sequence.
+
+Batch Lifecycle:
+1. COLLECTING: Orders are being added to batch (not visible to drivers)
+2. READY_FOR_DISPATCH: Batch is ready for drivers to accept (after meal window ends)
+3. DISPATCHED: Driver accepted batch but hasn't picked up yet
+4. IN_PROGRESS: Driver picked up batch from kitchen and is delivering
+5. COMPLETED: All orders delivered successfully
+6. PARTIAL_COMPLETE: Some orders delivered, some failed
+7. CANCELLED: Batch cancelled by admin
+
+Order Statuses Relevant to Drivers:
+- READY: Order is ready for pickup at kitchen
+- PICKED_UP: Driver picked up order from kitchen
+- OUT_FOR_DELIVERY: Driver is en route to customer (optional status)
+- DELIVERED: Successfully delivered to customer
+- FAILED: Delivery failed (customer unavailable, wrong address, etc.)
+- RETURNED: Order returned to kitchen
+
+## Driver Operations
+
+### 1. Get Available Batches
+
+View all delivery batches that are ready for acceptance. Batches become available after the meal window ends (1:00 PM for lunch, 10:00 PM for dinner).
+
+Endpoint: GET /api/delivery/available-batches
+Authentication: Firebase ID token required
+Middleware: adminAuthMiddleware + roleMiddleware("DRIVER")
+Access: Only DRIVER role
+
+Request Headers:
+```
+Authorization: Bearer <firebase_id_token>
+```
+
+Response:
+```
+{
+  "message": "Available batches retrieved",
+  "data": {
+    "batches": [
+      {
+        "_id": "65a1b2c3d4e5f6a7b8c9d0e1",
+        "batchNumber": "BTH-KRN-20250112-001",
+        "kitchen": {
+          "_id": "65a1b2c3d4e5f6a7b8c9d0e2",
+          "name": "Tiffsy Kitchen Koramangala",
+          "address": {
+            "street": "123 Main Street",
+            "area": "Koramangala",
+            "city": "Bangalore",
+            "state": "Karnataka",
+            "pincode": "560034",
+            "latitude": 12.9352,
+            "longitude": 77.6245
+          }
+        },
+        "zone": {
+          "_id": "65a1b2c3d4e5f6a7b8c9d0e3",
+          "name": "Koramangala",
+          "city": "Bangalore"
+        },
+        "orderCount": 12,
+        "mealWindow": "LUNCH",
+        "estimatedEarnings": 240
+      },
+      {
+        "_id": "65a1b2c3d4e5f6a7b8c9d0e4",
+        "batchNumber": "BTH-INR-20250112-001",
+        "kitchen": {
+          "_id": "65a1b2c3d4e5f6a7b8c9d0e5",
+          "name": "Tiffsy Kitchen Indiranagar",
+          "address": {
+            "street": "456 MG Road",
+            "area": "Indiranagar",
+            "city": "Bangalore",
+            "state": "Karnataka",
+            "pincode": "560038",
+            "latitude": 12.9716,
+            "longitude": 77.6412
+          }
+        },
+        "zone": {
+          "_id": "65a1b2c3d4e5f6a7b8c9d0e6",
+          "name": "Indiranagar",
+          "city": "Bangalore"
+        },
+        "orderCount": 8,
+        "mealWindow": "LUNCH",
+        "estimatedEarnings": 160
+      }
+    ]
+  },
+  "error": null
+}
+```
+
+UI Implementation:
+- Display list of available batches sorted by proximity or earnings
+- Show batch details: kitchen name, zone, order count, estimated earnings
+- Provide "Accept Batch" button for each batch
+- Highlight urgent batches or high-earning batches
+- Show kitchen pickup address with map preview
+- Display meal window (LUNCH or DINNER)
+
+Important: Batches operate on a first-come-first-served basis. Multiple drivers may see the same batch, but only the first to accept it successfully gets assigned.
+
+### 2. Accept a Batch
+
+Accept a delivery batch. This is an atomic operation that prevents race conditions when multiple drivers try to accept the same batch simultaneously.
+
+Endpoint: POST /api/delivery/batches/:batchId/accept
+Authentication: Firebase ID token required
+Middleware: adminAuthMiddleware + roleMiddleware("DRIVER")
+Access: Only DRIVER role
+
+Request Headers:
+```
+Authorization: Bearer <firebase_id_token>
+```
+
+URL Parameters:
+- batchId: MongoDB ObjectId of the batch (24-character hex string)
+
+Request Body:
+```
+{}
+```
+
+Success Response:
+```
+{
+  "message": "Batch accepted",
+  "data": {
+    "batch": {
+      "_id": "65a1b2c3d4e5f6a7b8c9d0e1",
+      "batchNumber": "BTH-KRN-20250112-001",
+      "kitchenId": "65a1b2c3d4e5f6a7b8c9d0e2",
+      "zoneId": "65a1b2c3d4e5f6a7b8c9d0e3",
+      "driverId": "507f1f77bcf86cd799439011",
+      "menuType": "MEAL_MENU",
+      "mealWindow": "LUNCH",
+      "status": "DISPATCHED",
+      "orderIds": [
+        "65a1b2c3d4e5f6a7b8c9d0e7",
+        "65a1b2c3d4e5f6a7b8c9d0e8",
+        "65a1b2c3d4e5f6a7b8c9d0e9"
+      ],
+      "batchDate": "2025-01-12T00:00:00.000Z",
+      "windowEndTime": "2025-01-12T13:00:00.000Z",
+      "maxBatchSize": 15,
+      "totalDelivered": 0,
+      "totalFailed": 0,
+      "driverAssignedAt": "2025-01-12T13:15:00.000Z",
+      "dispatchedAt": "2025-01-12T13:15:00.000Z",
+      "createdAt": "2025-01-12T12:30:00.000Z",
+      "updatedAt": "2025-01-12T13:15:00.000Z"
+    },
+    "orders": [
+      {
+        "_id": "65a1b2c3d4e5f6a7b8c9d0e7",
+        "orderNumber": "ORD-20250112-001",
+        "status": "READY",
+        "deliveryAddress": {
+          "name": "Customer Name",
+          "phone": "9876543210",
+          "flatNumber": "Apt 401",
+          "street": "10th Cross Road",
+          "landmark": "Near Park",
+          "area": "Koramangala 5th Block",
+          "city": "Bangalore",
+          "state": "Karnataka",
+          "pincode": "560034",
+          "latitude": 12.9350,
+          "longitude": 77.6240
+        },
+        "items": [
+          {
+            "menuItemId": "65a1b2c3d4e5f6a7b8c9d0ea",
+            "name": "Chicken Biryani",
+            "quantity": 2,
+            "price": 180
+          }
+        ]
+      },
+      {
+        "_id": "65a1b2c3d4e5f6a7b8c9d0e8",
+        "orderNumber": "ORD-20250112-002",
+        "status": "READY",
+        "deliveryAddress": {
+          "name": "Another Customer",
+          "phone": "9123456789",
+          "flatNumber": "House 12",
+          "street": "15th Main Road",
+          "landmark": "Opposite Temple",
+          "area": "Koramangala 6th Block",
+          "city": "Bangalore",
+          "state": "Karnataka",
+          "pincode": "560034",
+          "latitude": 12.9340,
+          "longitude": 77.6250
+        },
+        "items": [
+          {
+            "menuItemId": "65a1b2c3d4e5f6a7b8c9d0eb",
+            "name": "Paneer Butter Masala",
+            "quantity": 1,
+            "price": 150
+          }
+        ]
+      }
+    ],
+    "pickupAddress": {
+      "street": "123 Main Street",
+      "area": "Koramangala",
+      "city": "Bangalore",
+      "state": "Karnataka",
+      "pincode": "560034",
+      "latitude": 12.9352,
+      "longitude": 77.6245
+    },
+    "deliveries": [
+      {
+        "order": {
+          "_id": "65a1b2c3d4e5f6a7b8c9d0e7",
+          "orderNumber": "ORD-20250112-001",
+          "status": "READY",
+          "deliveryAddress": { /* same as above */ }
+        },
+        "address": { /* same as deliveryAddress above */ },
+        "sequence": 1
+      },
+      {
+        "order": {
+          "_id": "65a1b2c3d4e5f6a7b8c9d0e8",
+          "orderNumber": "ORD-20250112-002",
+          "status": "READY",
+          "deliveryAddress": { /* same as above */ }
+        },
+        "address": { /* same as deliveryAddress above */ },
+        "sequence": 2
+      }
+    ]
+  },
+  "error": null
+}
+```
+
+Error Response (Batch Already Taken):
+```
+{
+  "message": "Batch already taken or not available",
+  "data": null,
+  "error": "Batch already taken or not available"
+}
+```
+HTTP Status: 400
+
+UI Implementation After Acceptance:
+- Navigate to batch details screen
+- Show kitchen pickup address with navigation button
+- Display list of deliveries with sequence numbers
+- Show map with all delivery locations
+- Provide "Navigate to Kitchen" button
+- Show total order count and estimated earnings
+- Display "Start Pickup" or "Arrived at Kitchen" button
+
+### 3. Get Current Active Batch
+
+Retrieve the driver's currently assigned batch with all order details and delivery assignments.
+
+Endpoint: GET /api/delivery/my-batch
+Authentication: Firebase ID token required
+Middleware: adminAuthMiddleware + roleMiddleware("DRIVER")
+Access: Only DRIVER role
+
+Request Headers:
+```
+Authorization: Bearer <firebase_id_token>
+```
+
+Response when driver has active batch:
+```
+{
+  "message": "Current batch retrieved",
+  "data": {
+    "batch": {
+      "_id": "65a1b2c3d4e5f6a7b8c9d0e1",
+      "batchNumber": "BTH-KRN-20250112-001",
+      "kitchenId": {
+        "_id": "65a1b2c3d4e5f6a7b8c9d0e2",
+        "name": "Tiffsy Kitchen Koramangala",
+        "address": {
+          "street": "123 Main Street",
+          "area": "Koramangala",
+          "city": "Bangalore",
+          "state": "Karnataka",
+          "pincode": "560034",
+          "latitude": 12.9352,
+          "longitude": 77.6245
+        },
+        "phone": "9876543210"
+      },
+      "zoneId": {
+        "_id": "65a1b2c3d4e5f6a7b8c9d0e3",
+        "name": "Koramangala",
+        "city": "Bangalore"
+      },
+      "driverId": "507f1f77bcf86cd799439011",
+      "status": "IN_PROGRESS",
+      "menuType": "MEAL_MENU",
+      "mealWindow": "LUNCH",
+      "orderIds": [
+        "65a1b2c3d4e5f6a7b8c9d0e7",
+        "65a1b2c3d4e5f6a7b8c9d0e8"
+      ],
+      "totalDelivered": 1,
+      "totalFailed": 0,
+      "driverAssignedAt": "2025-01-12T13:15:00.000Z",
+      "dispatchedAt": "2025-01-12T13:15:00.000Z",
+      "pickedUpAt": "2025-01-12T13:25:00.000Z"
+    },
+    "orders": [
+      {
+        "_id": "65a1b2c3d4e5f6a7b8c9d0e7",
+        "orderNumber": "ORD-20250112-001",
+        "status": "DELIVERED",
+        "deliveryAddress": {
+          "name": "Customer Name",
+          "phone": "9876543210",
+          "flatNumber": "Apt 401",
+          "street": "10th Cross Road",
+          "landmark": "Near Park",
+          "area": "Koramangala 5th Block",
+          "city": "Bangalore",
+          "state": "Karnataka",
+          "pincode": "560034",
+          "latitude": 12.9350,
+          "longitude": 77.6240
+        },
+        "sequenceNumber": 1,
+        "assignmentStatus": "DELIVERED"
+      },
+      {
+        "_id": "65a1b2c3d4e5f6a7b8c9d0e8",
+        "orderNumber": "ORD-20250112-002",
+        "status": "PICKED_UP",
+        "deliveryAddress": {
+          "name": "Another Customer",
+          "phone": "9123456789",
+          "flatNumber": "House 12",
+          "street": "15th Main Road",
+          "landmark": "Opposite Temple",
+          "area": "Koramangala 6th Block",
+          "city": "Bangalore",
+          "state": "Karnataka",
+          "pincode": "560034",
+          "latitude": 12.9340,
+          "longitude": 77.6250
+        },
+        "sequenceNumber": 2,
+        "assignmentStatus": "PICKED_UP"
+      }
+    ],
+    "pickupAddress": {
+      "street": "123 Main Street",
+      "area": "Koramangala",
+      "city": "Bangalore",
+      "state": "Karnataka",
+      "pincode": "560034",
+      "latitude": 12.9352,
+      "longitude": 77.6245
+    },
+    "summary": {
+      "totalOrders": 2,
+      "delivered": 1,
+      "pending": 1,
+      "failed": 0
+    }
+  },
+  "error": null
+}
+```
+
+Response when driver has no active batch:
+```
+{
+  "message": "No active batch",
+  "data": {
+    "batch": null,
+    "orders": [],
+    "summary": {
+      "totalOrders": 0,
+      "delivered": 0,
+      "pending": 0,
+      "failed": 0
+    }
+  },
+  "error": null
+}
+```
+
+UI Implementation:
+- Use this endpoint to persist batch state across app restarts
+- Call on app launch if driver was mid-delivery
+- Display batch progress: delivered count, pending count, failed count
+- Show list of orders with their current status
+- Highlight next delivery in sequence
+- Show navigation for current/next delivery location
+
+### 4. Mark Batch as Picked Up
+
+Mark the batch as picked up from kitchen. This updates batch status to IN_PROGRESS and all order statuses to PICKED_UP.
+
+Endpoint: PATCH /api/delivery/batches/:batchId/pickup
+Authentication: Firebase ID token required
+Middleware: adminAuthMiddleware + roleMiddleware("DRIVER")
+Access: Only DRIVER role assigned to this batch
+
+Request Headers:
+```
+Authorization: Bearer <firebase_id_token>
+```
+
+URL Parameters:
+- batchId: MongoDB ObjectId of the batch
+
+Request Body:
+```
+{}
+```
+
+Success Response:
+```
+{
+  "message": "Batch picked up",
+  "data": {
+    "batch": {
+      "_id": "65a1b2c3d4e5f6a7b8c9d0e1",
+      "batchNumber": "BTH-KRN-20250112-001",
+      "status": "IN_PROGRESS",
+      "pickedUpAt": "2025-01-12T13:25:00.000Z",
+      "driverId": "507f1f77bcf86cd799439011"
+    }
+  },
+  "error": null
+}
+```
+
+Error Response (Not Assigned):
+```
+{
+  "message": "Not assigned to this batch",
+  "data": null,
+  "error": "Not assigned to this batch"
+}
+```
+HTTP Status: 403
+
+Error Response (Wrong Status):
+```
+{
+  "message": "Batch must be in DISPATCHED status",
+  "data": null,
+  "error": "Batch must be in DISPATCHED status"
+}
+```
+HTTP Status: 400
+
+UI Flow:
+- Driver navigates to kitchen
+- Driver arrives at kitchen
+- Driver verifies all orders in batch are ready
+- Driver taps "Mark as Picked Up" button
+- App calls this endpoint
+- On success, navigate to delivery list screen
+- Show first delivery location with navigation
+
+### 5. Update Individual Delivery Status
+
+Update the status of a specific order delivery. Used to mark orders as delivered, failed, or returned.
+
+Endpoint: PATCH /api/delivery/orders/:orderId/status
+Authentication: Firebase ID token required
+Middleware: adminAuthMiddleware + roleMiddleware("DRIVER")
+Access: Only DRIVER role assigned to this order
+
+Request Headers:
+```
+Authorization: Bearer <firebase_id_token>
+Content-Type: application/json
+```
+
+URL Parameters:
+- orderId: MongoDB ObjectId of the order
+
+Request Body for Successful Delivery:
+```
+{
+  "status": "DELIVERED",
+  "notes": "Delivered to customer at door",
+  "proofOfDelivery": {
+    "type": "OTP",
+    "otp": "1234"
+  }
+}
+```
+
+Request Body for Failed Delivery:
+```
+{
+  "status": "FAILED",
+  "notes": "Customer not available after multiple attempts",
+  "failureReason": "CUSTOMER_UNAVAILABLE"
+}
+```
+
+Valid Status Values:
+- DELIVERED: Successfully delivered to customer
+- FAILED: Delivery failed
+- RETURNED: Order returned to kitchen
+
+Valid Failure Reasons:
+- CUSTOMER_UNAVAILABLE: Customer not available at location
+- WRONG_ADDRESS: Address incorrect or not found
+- CUSTOMER_REFUSED: Customer refused to accept order
+- ADDRESS_NOT_FOUND: Could not locate the address
+- CUSTOMER_UNREACHABLE: Could not contact customer by phone
+- OTHER: Other reason (provide details in notes)
+
+Proof of Delivery Types:
+- OTP: Customer provides 4-digit OTP (most common)
+- SIGNATURE: Customer signature image URL
+- PHOTO: Photo of delivered order
+
+Success Response for Delivered:
+```
+{
+  "message": "Delivery status updated",
+  "data": {
+    "order": {
+      "_id": "65a1b2c3d4e5f6a7b8c9d0e7",
+      "orderNumber": "ORD-20250112-001",
+      "status": "DELIVERED",
+      "proofOfDelivery": {
+        "type": "OTP",
+        "value": "1234",
+        "verifiedAt": "2025-01-12T13:45:00.000Z"
+      },
+      "deliveredAt": "2025-01-12T13:45:00.000Z"
+    },
+    "assignment": {
+      "_id": "65a1b2c3d4e5f6a7b8c9d0f0",
+      "orderId": "65a1b2c3d4e5f6a7b8c9d0e7",
+      "driverId": "507f1f77bcf86cd799439011",
+      "batchId": "65a1b2c3d4e5f6a7b8c9d0e1",
+      "status": "DELIVERED",
+      "deliveredAt": "2025-01-12T13:45:00.000Z",
+      "proofOfDelivery": {
+        "type": "OTP",
+        "otp": "1234",
+        "otpVerified": true,
+        "verifiedAt": "2025-01-12T13:45:00.000Z",
+        "verifiedBy": "CUSTOMER"
+      }
+    },
+    "batchProgress": {
+      "delivered": 1,
+      "failed": 0,
+      "total": 3
+    }
+  },
+  "error": null
+}
+```
+
+Success Response for Failed:
+```
+{
+  "message": "Delivery status updated",
+  "data": {
+    "order": {
+      "_id": "65a1b2c3d4e5f6a7b8c9d0e7",
+      "orderNumber": "ORD-20250112-001",
+      "status": "FAILED",
+      "failedAt": "2025-01-12T13:50:00.000Z"
+    },
+    "assignment": {
+      "_id": "65a1b2c3d4e5f6a7b8c9d0f0",
+      "orderId": "65a1b2c3d4e5f6a7b8c9d0e7",
+      "driverId": "507f1f77bcf86cd799439011",
+      "batchId": "65a1b2c3d4e5f6a7b8c9d0e1",
+      "status": "FAILED",
+      "failedAt": "2025-01-12T13:50:00.000Z",
+      "failureReason": "CUSTOMER_UNAVAILABLE",
+      "failureNotes": "Customer not available after multiple attempts"
+    },
+    "batchProgress": {
+      "delivered": 0,
+      "failed": 1,
+      "total": 3
+    }
+  },
+  "error": null
+}
+```
+
+Error Response (Not Assigned):
+```
+{
+  "message": "Not assigned to this order",
+  "data": null,
+  "error": "Not assigned to this order"
+}
+```
+HTTP Status: 403
+
+UI Implementation for Delivery:
+
+Arrival at Customer Location:
+- Driver navigates to customer address
+- App detects arrival (geofence or manual confirmation)
+- Show customer contact details with call button
+- Display order details and items
+- Show "Mark as Delivered" button
+
+Delivery Confirmation Flow:
+1. Driver taps "Mark as Delivered"
+2. App shows OTP input dialog
+3. Driver asks customer for OTP (displayed in customer app)
+4. Driver enters OTP in app
+5. App validates OTP format (4 digits)
+6. App calls this endpoint with status DELIVERED and OTP
+7. Backend verifies OTP matches the one generated in DeliveryAssignment
+8. On success, show delivery confirmation
+9. Navigate to next delivery or batch summary if all complete
+
+Failed Delivery Flow:
+1. Driver attempts delivery multiple times
+2. Driver taps "Mark as Failed"
+3. App shows failure reason selection screen
+4. Driver selects reason from predefined list
+5. Driver optionally adds notes
+6. App calls this endpoint with status FAILED, failureReason, and notes
+7. On success, show failed delivery confirmation
+8. Navigate to next delivery or batch summary
+
+### 6. Update Delivery Sequence
+
+Reorder the delivery sequence within a batch. Allows drivers to optimize delivery route based on traffic, proximity, or customer requests.
+
+Endpoint: PATCH /api/delivery/batches/:batchId/sequence
+Authentication: Firebase ID token required
+Middleware: adminAuthMiddleware + roleMiddleware("DRIVER")
+Access: Only DRIVER role assigned to this batch
+
+Request Headers:
+```
+Authorization: Bearer <firebase_id_token>
+Content-Type: application/json
+```
+
+URL Parameters:
+- batchId: MongoDB ObjectId of the batch
+
+Request Body:
+```
+{
+  "sequence": [
+    {
+      "orderId": "65a1b2c3d4e5f6a7b8c9d0e8",
+      "sequenceNumber": 1
+    },
+    {
+      "orderId": "65a1b2c3d4e5f6a7b8c9d0e7",
+      "sequenceNumber": 2
+    },
+    {
+      "orderId": "65a1b2c3d4e5f6a7b8c9d0e9",
+      "sequenceNumber": 3
+    }
+  ]
+}
+```
+
+Success Response:
+```
+{
+  "message": "Delivery sequence updated",
+  "data": {
+    "batch": {
+      "_id": "65a1b2c3d4e5f6a7b8c9d0e1",
+      "batchNumber": "BTH-KRN-20250112-001",
+      "status": "IN_PROGRESS",
+      "deliverySequence": [
+        {
+          "orderId": "65a1b2c3d4e5f6a7b8c9d0e8",
+          "sequenceNumber": 1
+        },
+        {
+          "orderId": "65a1b2c3d4e5f6a7b8c9d0e7",
+          "sequenceNumber": 2
+        },
+        {
+          "orderId": "65a1b2c3d4e5f6a7b8c9d0e9",
+          "sequenceNumber": 3
+        }
+      ]
+    }
+  },
+  "error": null
+}
+```
+
+Error Response (Sequence Locked):
+```
+{
+  "message": "Sequence is locked for this batch",
+  "data": null,
+  "error": "Sequence is locked for this batch"
+}
+```
+HTTP Status: 400
+
+UI Implementation:
+- Provide drag-and-drop interface to reorder deliveries
+- Show current sequence with sequence numbers
+- Allow driver to reorder based on map view
+- Validate all orders are included before submitting
+- Call endpoint with new sequence
+- Update local state on success
+
+Note: Some batches may have sequencePolicy set to "LOCKED" by admin, preventing reordering.
+
+### 7. Complete Batch
+
+Mark the batch as complete when all deliveries have final statuses (delivered or failed).
+
+Endpoint: PATCH /api/delivery/batches/:batchId/complete
+Authentication: Firebase ID token required
+Middleware: adminAuthMiddleware + roleMiddleware("DRIVER")
+Access: Only DRIVER role assigned to this batch
+
+Request Headers:
+```
+Authorization: Bearer <firebase_id_token>
+```
+
+URL Parameters:
+- batchId: MongoDB ObjectId of the batch
+
+Request Body:
+```
+{}
+```
+
+Success Response:
+```
+{
+  "message": "Batch completed",
+  "data": {
+    "batch": {
+      "_id": "65a1b2c3d4e5f6a7b8c9d0e1",
+      "batchNumber": "BTH-KRN-20250112-001",
+      "status": "COMPLETED",
+      "completedAt": "2025-01-12T14:30:00.000Z",
+      "totalDelivered": 11,
+      "totalFailed": 1
+    },
+    "summary": {
+      "totalOrders": 12,
+      "delivered": 11,
+      "failed": 1
+    }
+  },
+  "error": null
+}
+```
+
+If some orders failed, status will be PARTIAL_COMPLETE:
+```
+{
+  "message": "Batch completed",
+  "data": {
+    "batch": {
+      "_id": "65a1b2c3d4e5f6a7b8c9d0e1",
+      "batchNumber": "BTH-KRN-20250112-001",
+      "status": "PARTIAL_COMPLETE",
+      "completedAt": "2025-01-12T14:30:00.000Z",
+      "totalDelivered": 10,
+      "totalFailed": 2
+    },
+    "summary": {
+      "totalOrders": 12,
+      "delivered": 10,
+      "failed": 2
+    }
+  },
+  "error": null
+}
+```
+
+Error Response (Incomplete):
+```
+{
+  "message": "Not all orders have final status",
+  "data": null,
+  "error": "Not all orders have final status"
+}
+```
+HTTP Status: 400
+
+UI Flow:
+- Automatically call this endpoint when driver marks last delivery
+- Show batch completion summary screen
+- Display total deliveries, successful count, failed count
+- Show earnings calculation
+- Provide button to view delivery history
+- Reset to available batches screen
+
+Note: Backend automatically detects batch completion and updates status, so this endpoint is optional. The batch will be marked complete automatically when the last delivery status is updated.
+
+### 8. Get Specific Batch Details
+
+Retrieve detailed information about a specific batch including all orders and delivery assignments.
+
+Endpoint: GET /api/delivery/batches/:batchId
+Authentication: Firebase ID token required
+Middleware: adminAuthMiddleware
+Access: DRIVER (assigned to batch), ADMIN, KITCHEN_STAFF (own kitchen)
+
+Request Headers:
+```
+Authorization: Bearer <firebase_id_token>
+```
+
+URL Parameters:
+- batchId: MongoDB ObjectId of the batch
+
+Response:
+```
+{
+  "message": "Batch retrieved",
+  "data": {
+    "batch": {
+      "_id": "65a1b2c3d4e5f6a7b8c9d0e1",
+      "batchNumber": "BTH-KRN-20250112-001",
+      "kitchenId": {
+        "_id": "65a1b2c3d4e5f6a7b8c9d0e2",
+        "name": "Tiffsy Kitchen Koramangala",
+        "address": {
+          "street": "123 Main Street",
+          "area": "Koramangala",
+          "city": "Bangalore",
+          "state": "Karnataka",
+          "pincode": "560034"
+        },
+        "phone": "9876543210"
+      },
+      "zoneId": {
+        "_id": "65a1b2c3d4e5f6a7b8c9d0e3",
+        "name": "Koramangala",
+        "city": "Bangalore"
+      },
+      "driverId": {
+        "_id": "507f1f77bcf86cd799439011",
+        "name": "John Doe",
+        "phone": "9179621765"
+      },
+      "status": "COMPLETED",
+      "menuType": "MEAL_MENU",
+      "mealWindow": "LUNCH",
+      "orderIds": ["65a1b2c3d4e5f6a7b8c9d0e7", "65a1b2c3d4e5f6a7b8c9d0e8"],
+      "totalDelivered": 2,
+      "totalFailed": 0,
+      "completedAt": "2025-01-12T14:30:00.000Z"
+    },
+    "orders": [
+      {
+        "_id": "65a1b2c3d4e5f6a7b8c9d0e7",
+        "orderNumber": "ORD-20250112-001",
+        "status": "DELIVERED",
+        "deliveryAddress": {
+          "name": "Customer Name",
+          "phone": "9876543210",
+          "flatNumber": "Apt 401",
+          "street": "10th Cross Road",
+          "area": "Koramangala 5th Block",
+          "city": "Bangalore",
+          "pincode": "560034"
+        },
+        "items": [
+          {
+            "name": "Chicken Biryani",
+            "quantity": 2
+          }
+        ]
+      }
+    ],
+    "assignments": [
+      {
+        "_id": "65a1b2c3d4e5f6a7b8c9d0f0",
+        "orderId": "65a1b2c3d4e5f6a7b8c9d0e7",
+        "driverId": "507f1f77bcf86cd799439011",
+        "batchId": "65a1b2c3d4e5f6a7b8c9d0e1",
+        "sequenceInBatch": 1,
+        "status": "DELIVERED",
+        "deliveredAt": "2025-01-12T13:45:00.000Z",
+        "proofOfDelivery": {
+          "type": "OTP",
+          "otpVerified": true
+        }
+      }
+    ]
+  },
+  "error": null
+}
+```
+
+## Error Handling
+
+All endpoints follow consistent error response format.
+
+Common HTTP Status Codes:
+- 200: Success
+- 201: Created (used in registration)
+- 400: Bad Request (invalid input, validation errors)
+- 401: Unauthorized (missing or invalid token, token expired)
+- 403: Forbidden (insufficient permissions, account suspended/inactive)
+- 404: Not Found (resource not found)
+- 409: Conflict (user already exists)
+- 500: Server Error (internal server error)
+
+Error Response Format:
+```
+{
+  "message": "Human readable error message",
+  "data": null,
+  "error": "Detailed error information"
+}
+```
+
+Common Authentication Errors:
+
+Token Expired:
+```
+{
+  "message": "Unauthorized",
+  "data": null,
+  "error": "Token expired"
+}
+```
+HTTP Status: 401
+Action: Refresh Firebase ID token and retry
+
+Invalid Token:
+```
+{
+  "message": "Unauthorized",
+  "data": null,
+  "error": "Invalid token"
+}
+```
+HTTP Status: 401
+Action: Re-authenticate with Firebase
+
+Account Suspended:
+```
+{
+  "message": "Account suspended",
+  "data": null,
+  "error": "Your account has been suspended"
+}
+```
+HTTP Status: 403
+Action: Contact support, logout user
+
+Account Inactive:
+```
+{
+  "message": "Account inactive",
+  "data": null,
+  "error": "Your account is inactive"
+}
+```
+HTTP Status: 403
+Action: Contact support, logout user
+
+Insufficient Permissions:
+```
+{
+  "message": "Forbidden",
+  "data": null,
+  "error": "Access denied. Required role: DRIVER"
+}
+```
+HTTP Status: 403
+Action: User has wrong role, logout and re-authenticate
+
+## UI Implementation Guidelines
+
+### Authentication Flow UI States
+
+1. Initial Loading State
+- Check if Firebase ID token exists in secure storage
+- If exists, validate token and call GET /api/auth/me
+- If valid, navigate to appropriate screen based on user data
+- If invalid, clear token and show phone input screen
+
+2. Phone Input Screen
+- Input field for 10-digit phone number
+- Validation: Must start with 6-9, exactly 10 digits
+- "Send OTP" button
+- On submit: Call Firebase Phone Auth
+
+3. OTP Verification Screen
+- Display phone number (masked for privacy)
+- 6-digit OTP input field
+- Auto-focus and auto-submit on 6 digits
+- Resend OTP button (with countdown timer)
+- On verification success: Call POST /api/auth/sync
+
+4. Sync Response Handling
+- If isNewUser is true: Show error "Driver account not found. Contact admin."
+- If isNewUser is false: Store user data, navigate to main screen
+
+5. Main Driver Dashboard
+- Show driver name and profile image in header
+- Display current earnings summary
+- Show active batch status or "No Active Batch"
+- Button to view available batches
+- Navigation to delivery history, earnings, profile
+
+### Batch and Delivery Flow UI States
+
+1. Available Batches Screen
+- Pull to refresh list
+- Each batch card shows:
+  - Batch number
+  - Kitchen name and address
+  - Zone name
+  - Order count
+  - Estimated earnings
+  - Meal window (LUNCH/DINNER)
+  - "Accept" button
+- Empty state: "No batches available. Check back soon."
+- Loading state while fetching
+
+2. Batch Accepted Screen
+- Congratulations message
+- Batch summary card
+- Kitchen pickup details with address
+- Map showing kitchen location
+- "Navigate to Kitchen" button (opens maps app)
+- List preview of deliveries (collapsed)
+- "Start Pickup" button
+
+3. At Kitchen Screen (DISPATCHED status)
+- Kitchen address and contact
+- "Call Kitchen" button
+- List of orders to pickup with order numbers
+- Checklist to verify each order
+- "Mark as Picked Up" button
+- Button disabled until all orders verified
+
+4. Active Delivery Screen (IN_PROGRESS status)
+- Progress indicator: X of Y delivered
+- Current/next delivery highlighted
+- Delivery card shows:
+  - Sequence number
+  - Customer name (partial for privacy)
+  - Customer phone (masked, with call button)
+  - Delivery address
+  - Landmark
+  - "Navigate" button
+  - Order items summary
+- Map showing all pending deliveries
+- Ability to reorder sequence (drag and drop)
+
+5. At Customer Location Screen
+- Customer details (name, phone)
+- Full delivery address
+- Landmark highlighted
+- "Call Customer" button
+- Order items list with quantities
+- "Mark as Delivered" button
+- "Mark as Failed" button
+
+6. Delivery Confirmation Dialog
+- OTP input field (4 digits)
+- Auto-submit on 4 digits entered
+- "Verify and Complete" button
+- "Cancel" to go back
+
+7. Failed Delivery Dialog
+- Failure reason dropdown
+- Options:
+  - Customer Unavailable
+  - Wrong Address
+  - Customer Refused
+  - Address Not Found
+  - Customer Unreachable
+  - Other
+- Notes text area (optional)
+- "Submit" button
+- "Cancel" button
+
+8. Batch Completion Screen
+- Success animation/checkmark
+- Summary card:
+  - Total deliveries
+  - Successfully delivered
+  - Failed deliveries
+  - Estimated earnings
+- "View Details" button
+- "Find Next Batch" button
+
+### Error Handling UI
+
+Token Expiration:
+- Silently refresh Firebase token
+- Retry failed request
+- If refresh fails, logout and show login screen
+
+Network Errors:
+- Show toast: "Network error. Please check connection."
+- Provide retry button
+- Cache critical data locally for offline viewing
+
+Batch Already Taken:
+- Show toast: "This batch was already accepted by another driver"
+- Refresh available batches list
+- Highlight next best batch
+
+Permission Errors:
+- Show alert: "Access denied. Please contact support."
+- Logout user if role mismatch detected
+
+Server Errors:
+- Show toast: "Something went wrong. Please try again."
+- Log error details for debugging
+- Provide retry button
+
+### Data Persistence and Offline Support
+
+Store Locally (Secure Storage):
+- Firebase ID token
+- User profile data
+- Current active batch details
+- Delivery assignments
+- Batch progress state
+
+Sync on App Launch:
+- Validate stored token
+- Fetch latest user profile
+- Fetch active batch if exists
+- Update local cache
+
+Handle Mid-Delivery App Restart:
+- Check for active batch on launch
+- If found, restore delivery screen state
+- Resume from current delivery
+- Sync with server to get latest statuses
+
+Background Location Tracking:
+- Track driver location during active deliveries
+- Optional: Send location updates to backend
+- Use for estimated arrival times
+- Respect user privacy settings
+
+## Additional Considerations
+
+### Phone Number Format
+
+The backend expects 10-digit Indian mobile numbers starting with 6-9.
+Valid formats accepted: 9179621765, 09179621765, +919179621765
+Backend normalizes to: 9179621765
+
+In UI:
+- Display phone numbers in readable format: +91 917 962 1765
+- Accept input with or without country code
+- Validate before sending to backend
+
+### FCM Push Notifications
+
+Implement push notifications for:
+- New batch available (when batch status changes to READY_FOR_DISPATCH)
+- Batch reassigned by admin
+- Order cancelled by customer
+- Important announcements from admin
+
+Notification payload structure:
+```
+{
+  "notification": {
+    "title": "New Batch Available",
+    "body": "BTH-KRN-20250112-001 in Koramangala (12 orders)"
+  },
+  "data": {
+    "type": "NEW_BATCH",
+    "batchId": "65a1b2c3d4e5f6a7b8c9d0e1",
+    "batchNumber": "BTH-KRN-20250112-001",
+    "orderCount": "12"
+  }
+}
+```
+
+Handle notification taps:
+- NEW_BATCH: Navigate to available batches screen, highlight specific batch
+- BATCH_REASSIGNED: Refresh current batch data
+- ORDER_CANCELLED: Refresh batch order list
+
+### Location Services
+
+Required permissions:
+- Location permission (foreground and background)
+- For navigation and delivery tracking
+
+Integration:
+- Use Google Maps or Apple Maps for navigation
+- Open navigation app with destination coordinates
+- Format: geo:latitude,longitude or maps://
+
+Optional Features:
+- Send location updates to backend during delivery
+- Show estimated arrival time to customer
+- Track route efficiency for analytics
+
+### Image Upload for Proof of Delivery
+
+If implementing photo-based proof of delivery:
+
+1. Capture photo using device camera
+2. Compress image before upload (max 2MB)
+3. Upload to backend file upload endpoint: POST /api/upload
+4. Receive image URL
+5. Include URL in proofOfDelivery.photoUrl
+
+Upload endpoint expects multipart/form-data with field name "file"
+
+### Earnings Calculation
+
+Current simple calculation in backend:
+- estimatedEarnings = orderCount * 20
+
+Actual earnings should be calculated by backend based on:
+- Base delivery fee per order
+- Distance-based charges
+- Incentives and bonuses
+- Deductions if any
+
+Display earnings prominently:
+- Estimated earnings when viewing available batches
+- Confirmed earnings after batch completion
+- Daily/weekly earnings summary
+- Payment history
+
+### Time Windows
+
+Meal windows are fixed:
+- LUNCH: Window ends at 1:00 PM (13:00)
+- DINNER: Window ends at 10:00 PM (22:00)
+
+Batches become available for driver acceptance only after the window ends.
+
+Display appropriate messaging:
+- "Lunch batches will be available after 1:00 PM"
+- "Dinner batches will be available after 10:00 PM"
+- Show countdown timer until batches available
+
+### Testing Scenarios
+
+Authentication Testing:
+- New phone number (should show error for drivers)
+- Existing driver account
+- Suspended driver account
+- Expired Firebase token
+- Invalid token
+- Network timeout during auth
+
+Batch Operations Testing:
+- Accept available batch
+- Two drivers accepting same batch simultaneously
+- Marking pickup when already picked up
+- Delivering orders out of sequence
+- Marking last order as delivered (auto-completion)
+- Failed delivery with each failure reason
+- Network failure mid-delivery
+- App restart during active batch
+
+Edge Cases:
+- App in background during delivery
+- Location services disabled
+- Camera permission denied (for photo proof)
+- Phone call during delivery
+- Low battery warning
+- Order cancelled by customer mid-delivery
+
+### Security Best Practices
+
+Token Management:
+- Store Firebase ID token in secure storage (Keychain/Keystore)
+- Never log tokens in production
+- Implement token refresh before expiration
+- Clear tokens on logout
+
+API Communication:
+- Use HTTPS for all API calls
+- Implement certificate pinning for production
+- Validate SSL certificates
+- Timeout requests after 30 seconds
+
+Data Privacy:
+- Mask customer phone numbers in UI (show last 4 digits)
+- Don't store customer addresses permanently
+- Clear delivery data after batch completion
+- Respect location privacy settings
+
+Input Validation:
+- Validate all user inputs client-side
+- Sanitize text inputs before sending to API
+- Validate OTP format (4 digits)
+- Validate phone number format
+
+### Performance Optimization
+
+API Call Optimization:
+- Cache user profile data (refresh every 6 hours)
+- Cache available batches (refresh every 2 minutes)
+- Use pull-to-refresh for manual updates
+- Implement exponential backoff for retries
+
+Image Optimization:
+- Compress profile images before upload
+- Use appropriate image sizes
+- Cache profile images locally
+- Lazy load delivery location images
+
+Battery Optimization:
+- Use geofencing instead of continuous location polling
+- Batch location updates
+- Reduce update frequency when driver is stationary
+- Stop location tracking after batch completion
+
+Network Optimization:
+- Implement request deduplication
+- Use network caching for static data
+- Handle offline mode gracefully
+- Queue failed requests for retry
+
+## Summary
+
+This document provides complete specifications for integrating driver authentication and delivery operations into the Tiffsy React Native mobile application.
+
+Key Integration Points:
+
+Authentication:
+- Firebase Phone OTP for driver login
+- Role-based access control with DRIVER role
+- Token-based API authorization
+- FCM token registration for push notifications
+
+Driver Operations:
+- View available delivery batches
+- Accept batch (atomic, race-condition safe)
+- Mark batch as picked up from kitchen
+- Update individual delivery statuses
+- Reorder delivery sequence
+- Complete batch
+
+Core Features:
+- Batch-based delivery system
+- OTP-based delivery confirmation
+- Failed delivery handling with reasons
+- Real-time batch progress tracking
+- Push notifications for updates
+
+All endpoints use consistent request/response formats with proper error handling and status codes. The system supports offline operation with data persistence and automatic sync on network restoration.

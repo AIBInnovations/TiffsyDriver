@@ -2,6 +2,7 @@
   "extends": "@react-native/typescript-config",
   "compilerOptions": {
     "jsx": "react-jsx",
+    "lib": ["ES2015", "ES2016", "ES2017", "ES2018", "ES2019", "ES2020"],
     "types": [
       "jest"
     ]

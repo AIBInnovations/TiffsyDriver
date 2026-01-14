@@ -1,75 +1,52 @@
-import { View, Text, ScrollView, RefreshControl, StyleSheet, StatusBar, TouchableOpacity, Switch, Animated } from 'react-native';
+import {
+  View,
+  Text,
+  ScrollView,
+  RefreshControl,
+  StyleSheet,
+  StatusBar,
+  TouchableOpacity,
+  Switch,
+  Animated,
+  ActivityIndicator,
+  Alert,
+} from 'react-native';
 import { useState, useCallback, useEffect, useRef } from 'react';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import type { BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
 import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons';
 import type { MainTabsParamList } from '../../navigation/types';
-import DeliveryCard from './components/DeliveryCard';
-import BatchCard from './components/BatchCard';
-import NotificationBanner from './components/NotificationBanner';
 import StatsCard from './components/StatsCard';
-import NewDeliveryRequestModal, { NewDeliveryRequest } from './components/NewDeliveryRequestModal';
 import { useDriverProfileStore } from '../profile/useDriverProfileStore';
-import { useDeliveryContext } from '../../context/DeliveryContext';
-
-// Mock data - replace with actual data from API/state
-const mockDeliveries = [
-  {
-    id: 'DEL-001',
-    customerName: 'John Doe',
-    pickupLocation: 'Tiffsy Kitchen, Ikeja',
-    dropoffLocation: '123 Main Street, Victoria Island',
-    status: 'pending' as const,
-    eta: '15 mins',
-  },
-  {
-    id: 'DEL-002',
-    customerName: 'Jane Smith',
-    pickupLocation: 'Tiffsy Kitchen, Ikeja',
-    dropoffLocation: '456 Oak Avenue, Lekki Phase 1',
-    status: 'in_progress' as const,
-    eta: '25 mins',
-  },
-];
-
-const mockBatches = [
-  {
-    batchId: 'BATCH-001',
-    stops: 5,
-    status: 'in_progress' as const,
-    estimatedTime: '2:30 PM',
-  },
-];
-
-// Mock new delivery request - simulating incoming delivery
-const mockNewDeliveryRequest: NewDeliveryRequest = {
-  id: 'DEL-NEW-001',
-  orderId: 'Order #98765',
-  customerName: 'Michael Johnson',
-  pickupLocation: 'Tiffsy Kitchen, Lekki Phase 1',
-  dropoffLocation: '789 Palm Avenue, Ikoyi',
-  estimatedDistance: '8.5 km',
-  estimatedEarnings: 'N2,500',
-  deliveryWindow: '30 mins',
-};
+import { getMyBatch, getAvailableBatches, markBatchPickedUp } from '../../services/deliveryService';
+import { getCurrentUser } from '../../services/authService';
+import type { Batch, BatchSummary } from '../../types/api';
 
 export default function DashboardScreen() {
   const navigation = useNavigation<BottomTabNavigationProp<MainTabsParamList>>();
   const { profile, setAvailabilityStatus } = useDriverProfileStore();
-  const { addDelivery } = useDeliveryContext();
+
+  // State
   const [refreshing, setRefreshing] = useState(false);
-  const [showNotification, setShowNotification] = useState(true);
-  const [showRecentUpdates, setShowRecentUpdates] = useState(true);
-  const [showNewDeliveryModal, setShowNewDeliveryModal] = useState(false);
-  const [newDeliveryRequest, setNewDeliveryRequest] = useState<NewDeliveryRequest | null>(null);
-  const [deliveries, setDeliveries] = useState(mockDeliveries);
+  const [loading, setLoading] = useState(true);
   const [toastVisible, setToastVisible] = useState(false);
   const [toastMessage, setToastMessage] = useState('');
   const [toastType, setToastType] = useState<'success' | 'error'>('success');
   const toastOpacity = useRef(new Animated.Value(0)).current;
+
+  // Backend Data
+  const [currentBatch, setCurrentBatch] = useState<Batch | null>(null);
+  const [batchSummary, setBatchSummary] = useState<BatchSummary>({
+    totalOrders: 0,
+    delivered: 0,
+    pending: 0,
+    failed: 0,
+  });
+  const [availableBatchesCount, setAvailableBatchesCount] = useState(0);
+
   const isOnline = profile.availabilityStatus === 'ONLINE';
-  const driverName = profile.fullName;
+  const driverName = profile.fullName || 'Driver';
 
   // Show toast with animation
   const showToast = useCallback((message: string, type: 'success' | 'error' = 'success') => {
@@ -83,103 +60,239 @@ export default function DashboardScreen() {
     ]).start(() => setToastVisible(false));
   }, [toastOpacity]);
 
-  // Simulate receiving a new delivery request after 3 seconds
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      setNewDeliveryRequest(mockNewDeliveryRequest);
-      setShowNewDeliveryModal(true);
-    }, 3000);
-    return () => clearTimeout(timer);
+  // Fetch current batch from backend
+  const fetchCurrentBatch = useCallback(async () => {
+    try {
+      console.log('📥 Fetching current batch...');
+      const response = await getMyBatch();
+
+      if (response.data.batch) {
+        setCurrentBatch(response.data.batch);
+        setBatchSummary(response.data.summary);
+        console.log('✅ Current batch loaded:', response.data.batch.batchNumber);
+      } else {
+        setCurrentBatch(null);
+        setBatchSummary({
+          totalOrders: 0,
+          delivered: 0,
+          pending: 0,
+          failed: 0,
+        });
+        console.log('ℹ️ No active batch');
+      }
+    } catch (error: any) {
+      console.error('❌ Error fetching current batch:', error);
+      showToast('Failed to load current batch', 'error');
+    }
+  }, [showToast]);
+
+  // Fetch available batches count
+  const fetchAvailableBatches = useCallback(async () => {
+    try {
+      console.log('📥 Fetching available batches count...');
+      const response = await getAvailableBatches();
+      const batchCount = response?.data?.batches?.length || 0;
+      setAvailableBatchesCount(batchCount);
+      console.log('✅ Available batches:', batchCount);
+    } catch (error: any) {
+      console.error('❌ Error fetching available batches:', error);
+      setAvailableBatchesCount(0);
+      // Don't show error toast for this as it's not critical
+    }
   }, []);
 
-  const handleAcceptDelivery = useCallback((delivery: NewDeliveryRequest) => {
-    // Add accepted delivery to local list (Dashboard)
-    setDeliveries(prev => [
-      ...prev,
-      {
-        id: delivery.id,
-        customerName: delivery.customerName,
-        pickupLocation: delivery.pickupLocation,
-        dropoffLocation: delivery.dropoffLocation,
-        status: 'pending' as const,
-        eta: delivery.deliveryWindow,
-      },
-    ]);
-    // Add to shared context (Deliveries screen)
-    addDelivery({
-      id: delivery.id,
-      orderId: delivery.orderId,
-      customerName: delivery.customerName,
-      customerPhone: '+234 800 000 0000',
-      pickupLocation: delivery.pickupLocation,
-      dropoffLocation: delivery.dropoffLocation,
-      status: 'pending',
-      eta: delivery.deliveryWindow,
-      deliveryWindow: delivery.deliveryWindow,
-      distance: delivery.estimatedDistance,
-    });
-    setShowNewDeliveryModal(false);
-    setNewDeliveryRequest(null);
-    showToast(`${delivery.orderId} has been added to your deliveries`);
-  }, [showToast, addDelivery]);
+  // Fetch user profile for updated stats
+  const fetchUserProfile = useCallback(async () => {
+    try {
+      console.log('📥 Fetching user profile...');
+      const response = await getCurrentUser();
 
-  const handleRejectDelivery = useCallback(() => {
-    const rejectedOrder = newDeliveryRequest?.orderId;
-    setShowNewDeliveryModal(false);
-    setNewDeliveryRequest(null);
-    if (rejectedOrder) {
-      showToast(`${rejectedOrder} has been rejected`, 'error');
+      // Update profile store with latest data
+      if (response.data.user) {
+        console.log('✅ User profile updated');
+      }
+    } catch (error: any) {
+      console.error('❌ Error fetching user profile:', error);
+      // Don't show error toast for this
     }
-  }, [newDeliveryRequest, showToast]);
+  }, []);
 
+  // Initial data load
+  useEffect(() => {
+    const loadDashboardData = async () => {
+      setLoading(true);
+      try {
+        await Promise.all([
+          fetchCurrentBatch(),
+          fetchAvailableBatches(),
+          fetchUserProfile(),
+        ]);
+      } catch (error) {
+        console.error('❌ Error loading dashboard data:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    loadDashboardData();
+  }, [fetchCurrentBatch, fetchAvailableBatches, fetchUserProfile]);
+
+  // Auto-refresh current batch if active (every 30 seconds)
+  useEffect(() => {
+    if (!currentBatch) return;
+
+    const interval = setInterval(() => {
+      console.log('🔄 Auto-refreshing current batch...');
+      fetchCurrentBatch();
+    }, 30000); // 30 seconds
+
+    return () => clearInterval(interval);
+  }, [currentBatch, fetchCurrentBatch]);
+
+  // Toggle online/offline status
   const handleToggleOnline = useCallback((value: boolean) => {
     setAvailabilityStatus(value ? 'ONLINE' : 'OFFLINE');
-  }, [setAvailabilityStatus]);
+    showToast(value ? 'You are now online' : 'You are now offline');
+  }, [setAvailabilityStatus, showToast]);
 
-  const onRefresh = useCallback(() => {
+  // Pull to refresh
+  const onRefresh = useCallback(async () => {
     setRefreshing(true);
-    // TODO: Fetch latest data from API
-    setTimeout(() => setRefreshing(false), 1500);
-  }, []);
+    try {
+      await Promise.all([
+        fetchCurrentBatch(),
+        fetchAvailableBatches(),
+        fetchUserProfile(),
+      ]);
+      showToast('Dashboard refreshed');
+    } catch (error) {
+      console.error('❌ Error refreshing dashboard:', error);
+      showToast('Failed to refresh', 'error');
+    } finally {
+      setRefreshing(false);
+    }
+  }, [fetchCurrentBatch, fetchAvailableBatches, fetchUserProfile, showToast]);
 
-  const handleStartDelivery = (id: string) => {
-    const delivery = mockDeliveries.find(d => d.id === id);
-    if (delivery) {
-      navigation.navigate('DeliveryStatus', {
-        deliveryId: delivery.id,
-        customerName: delivery.customerName,
-        pickupLocation: delivery.pickupLocation,
-        dropoffLocation: delivery.dropoffLocation,
-        currentStatus: 'in_progress',
+  // Navigate to batch details
+  const handleViewBatch = useCallback(() => {
+    if (!currentBatch) return;
+
+    // Navigate to Deliveries tab with active batch
+    navigation.navigate('Deliveries', {
+      screen: 'DeliveriesList',
+      params: { batchId: currentBatch._id },
+    });
+  }, [currentBatch, navigation]);
+
+  // Navigate to available batches
+  const handleFindBatches = useCallback(() => {
+    navigation.navigate('Deliveries', {
+      screen: 'DeliveriesList',
+    });
+  }, [navigation]);
+
+  // Navigate to kitchen or continue deliveries
+  const handlePrimaryAction = useCallback(async () => {
+    if (!currentBatch) return;
+
+    if (currentBatch.status === 'READY_FOR_DISPATCH') {
+      // Mark batch as picked up from kitchen
+      Alert.alert(
+        'Pickup Batch',
+        'Have you picked up all items from the kitchen?',
+        [
+          { text: 'Cancel', style: 'cancel' },
+          {
+            text: 'Yes, Picked Up',
+            onPress: async () => {
+              try {
+                await markBatchPickedUp(currentBatch._id);
+                showToast('Batch marked as picked up!', 'success');
+                fetchCurrentBatch();
+              } catch (error: any) {
+                showToast(error.message || 'Failed to mark batch as picked up', 'error');
+              }
+            }
+          },
+        ]
+      );
+    } else if (currentBatch.status === 'DISPATCHED') {
+      // Navigate to kitchen pickup screen
+      Alert.alert(
+        'Navigate to Kitchen',
+        'Open maps to navigate to the kitchen?',
+        [
+          { text: 'Cancel', style: 'cancel' },
+          {
+            text: 'Open Maps',
+            onPress: () => {
+              // TODO: Open maps with kitchen coordinates
+              showToast('Opening maps...');
+            }
+          },
+        ]
+      );
+    } else if (currentBatch.status === 'IN_PROGRESS') {
+      // Navigate to active delivery screen
+      navigation.navigate('Deliveries', {
+        screen: 'DeliveriesList',
+        params: { batchId: currentBatch._id },
       });
+    }
+  }, [currentBatch, navigation, showToast, fetchCurrentBatch]);
+
+  // Get batch status text and color
+  const getBatchStatusInfo = () => {
+    if (!currentBatch) return { text: 'No Batch', color: '#6B7280' };
+
+    switch (currentBatch.status) {
+      case 'COLLECTING':
+        return { text: 'Collecting Orders', color: '#8B5CF6' };
+      case 'READY_FOR_DISPATCH':
+        return { text: 'Ready for Pickup', color: '#F59E0B' };
+      case 'DISPATCHED':
+        return { text: 'Dispatched', color: '#F59E0B' };
+      case 'IN_PROGRESS':
+        return { text: 'In Progress', color: '#3B82F6' };
+      case 'COMPLETED':
+        return { text: 'Completed', color: '#10B981' };
+      case 'PARTIAL_COMPLETE':
+        return { text: 'Partial Complete', color: '#F59E0B' };
+      case 'CANCELLED':
+        return { text: 'Cancelled', color: '#EF4444' };
+      default:
+        return { text: currentBatch.status, color: '#6B7280' };
     }
   };
 
-  const handleViewDelivery = (id: string) => {
-    const delivery = mockDeliveries.find(d => d.id === id);
-    if (delivery) {
-      navigation.navigate('DeliveryStatus', {
-        deliveryId: delivery.id,
-        customerName: delivery.customerName,
-        pickupLocation: delivery.pickupLocation,
-        dropoffLocation: delivery.dropoffLocation,
-        currentStatus: delivery.status === 'in_progress' ? 'in_progress' : 'pending',
-      });
+  // Get primary action button text
+  const getPrimaryActionText = () => {
+    if (!currentBatch) return 'Find Batches';
+
+    switch (currentBatch.status) {
+      case 'READY_FOR_DISPATCH':
+        return 'Pickup from Kitchen';
+      case 'DISPATCHED':
+        return 'Navigate to Kitchen';
+      case 'IN_PROGRESS':
+        return 'Continue Deliveries';
+      default:
+        return 'View Details';
     }
   };
 
-  const handleStartBatch = (batchId: string) => {
-    console.log('Starting batch:', batchId);
-    // TODO: Start batch and navigate
-  };
-
-  const handleViewBatch = (batchId: string) => {
-    navigation.navigate('Deliveries', { screen: 'DeliveriesList', params: { batchId } });
-  };
-
-  const handleClearAllUpdates = () => {
-    setShowRecentUpdates(false);
-  };
+  // Render loading state
+  if (loading) {
+    return (
+      <SafeAreaView style={styles.container} edges={['top']}>
+        <StatusBar barStyle="dark-content" backgroundColor="#F9FAFB" />
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color="#F56B4C" />
+          <Text style={styles.loadingText}>Loading dashboard...</Text>
+        </View>
+      </SafeAreaView>
+    );
+  }
 
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
@@ -201,7 +314,12 @@ export default function DashboardScreen() {
         {/* Header Section */}
         <View style={styles.header}>
           <View style={styles.headerLeft}>
+            <Text style={styles.greeting}>
+              {new Date().getHours() < 12 ? 'Good Morning' :
+               new Date().getHours() < 18 ? 'Good Afternoon' : 'Good Evening'}
+            </Text>
             <Text style={styles.driverName}>{driverName}</Text>
+
             {/* Online/Offline Toggle */}
             <View style={[styles.statusPill, isOnline ? styles.statusPillOnline : styles.statusPillOffline]}>
               <View style={styles.statusPillContent}>
@@ -219,22 +337,109 @@ export default function DashboardScreen() {
               />
             </View>
           </View>
-          {/* Notification Button */}
-          <TouchableOpacity style={styles.notificationButton} activeOpacity={0.7}>
-            <MaterialCommunityIcons name="bell-outline" size={28} color="#FFFFFF" />
-            <View style={styles.notificationBadge}>
-              <Text style={styles.notificationBadgeText}>3</Text>
+
+          {/* Earnings Button */}
+          <TouchableOpacity style={styles.earningsButton} activeOpacity={0.7}>
+            <View style={styles.earningsIconCircle}>
+              <MaterialCommunityIcons name="currency-inr" size={20} color="#F56B4C" />
             </View>
           </TouchableOpacity>
         </View>
 
-        {/* Notification Banner */}
-        {showNotification && (
-          <NotificationBanner
-            message="You have 3 pending deliveries waiting to be picked up"
-            type="info"
-            onDismiss={() => setShowNotification(false)}
-          />
+        {/* Current Batch Card */}
+        {currentBatch ? (
+          <View style={styles.currentBatchSection}>
+            <View style={styles.currentBatchCard}>
+              <View style={styles.currentBatchHeader}>
+                <View>
+                  <Text style={styles.currentBatchLabel}>Current Batch</Text>
+                  <Text style={styles.currentBatchNumber}>{currentBatch.batchNumber}</Text>
+                </View>
+                <View style={[styles.batchStatusBadge, { backgroundColor: getBatchStatusInfo().color + '20' }]}>
+                  <Text style={[styles.batchStatusText, { color: getBatchStatusInfo().color }]}>
+                    {getBatchStatusInfo().text}
+                  </Text>
+                </View>
+              </View>
+
+              {/* Progress Bar */}
+              <View style={styles.progressSection}>
+                <Text style={styles.progressLabel}>
+                  {batchSummary.delivered} of {batchSummary.totalOrders} delivered
+                </Text>
+                <View style={styles.progressBarContainer}>
+                  <View
+                    style={[
+                      styles.progressBar,
+                      {
+                        width: `${batchSummary.totalOrders > 0
+                          ? (batchSummary.delivered / batchSummary.totalOrders) * 100
+                          : 0}%`
+                      }
+                    ]}
+                  />
+                </View>
+              </View>
+
+              {/* Kitchen Info */}
+              {typeof currentBatch.kitchenId === 'object' && currentBatch.kitchenId !== null && (
+                <View style={styles.kitchenInfo}>
+                  <MaterialCommunityIcons name="store" size={20} color="#6B7280" />
+                  <View style={styles.kitchenTextContainer}>
+                    <Text style={styles.kitchenName}>{currentBatch.kitchenId.name}</Text>
+                    <Text style={styles.kitchenArea}>{currentBatch.kitchenId.address.area}</Text>
+                  </View>
+                </View>
+              )}
+
+              {/* Action Buttons */}
+              <View style={styles.batchActions}>
+                <TouchableOpacity
+                  style={styles.primaryBatchButton}
+                  onPress={handlePrimaryAction}
+                  activeOpacity={0.8}
+                >
+                  <MaterialCommunityIcons
+                    name={currentBatch.status === 'DISPATCHED' ? 'navigation' : 'truck-fast'}
+                    size={20}
+                    color="#FFFFFF"
+                  />
+                  <Text style={styles.primaryBatchButtonText}>{getPrimaryActionText()}</Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={styles.secondaryBatchButton}
+                  onPress={handleViewBatch}
+                  activeOpacity={0.8}
+                >
+                  <Text style={styles.secondaryBatchButtonText}>View Details</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          </View>
+        ) : (
+          /* Empty State - No Active Batch */
+          <View style={styles.currentBatchSection}>
+            <View style={styles.emptyBatchCard}>
+              <MaterialCommunityIcons name="package-variant" size={64} color="#D1D5DB" />
+              <Text style={styles.emptyBatchTitle}>No Active Deliveries</Text>
+              <Text style={styles.emptyBatchText}>
+                Accept a batch to start earning
+              </Text>
+              <TouchableOpacity
+                style={styles.findBatchesButton}
+                onPress={handleFindBatches}
+                activeOpacity={0.8}
+              >
+                <Text style={styles.findBatchesButtonText}>Find Batches</Text>
+                {availableBatchesCount > 0 && (
+                  <View style={styles.availableBadge}>
+                    <Text style={styles.availableBadgeText}>{availableBatchesCount} Available</Text>
+                  </View>
+                )}
+              </TouchableOpacity>
+            </View>
+          </View>
         )}
 
         {/* Stats Section */}
@@ -242,7 +447,7 @@ export default function DashboardScreen() {
           <View style={styles.statsRow}>
             <StatsCard
               label="Today's Deliveries"
-              value="12"
+              value={batchSummary.delivered.toString()}
               subLabel="Completed"
               icon="truck-check"
               iconColor="#3B82F6"
@@ -250,7 +455,7 @@ export default function DashboardScreen() {
             <View style={styles.statsSpacer} />
             <StatsCard
               label="Earnings"
-              value="N15,400"
+              value="₹0"
               subLabel="Today"
               valueColor="#10B981"
               icon="cash"
@@ -259,9 +464,11 @@ export default function DashboardScreen() {
           </View>
           <View style={[styles.statsRow, { marginTop: 12 }]}>
             <StatsCard
-              label="Rating"
-              value="4.8"
-              subLabel="out of 5 stars"
+              label="Success Rate"
+              value={batchSummary.totalOrders > 0
+                ? `${Math.round((batchSummary.delivered / batchSummary.totalOrders) * 100)}%`
+                : '0%'}
+              subLabel={`${batchSummary.failed} failed`}
               valueColor="#F59E0B"
               icon="star"
               iconColor="#F59E0B"
@@ -269,7 +476,7 @@ export default function DashboardScreen() {
             <View style={styles.statsSpacer} />
             <StatsCard
               label="Pending"
-              value="3"
+              value={batchSummary.pending.toString()}
               subLabel="Deliveries"
               valueColor="#F56B4C"
               icon="clock-outline"
@@ -278,95 +485,84 @@ export default function DashboardScreen() {
           </View>
         </View>
 
-        {/* Active Batches Section */}
-        {mockBatches.length > 0 && (
+        {/* Available Batches Notification */}
+        {availableBatchesCount > 0 && (
           <View style={styles.section}>
-            <View style={styles.sectionHeader}>
-              <Text style={styles.sectionTitle}>Active Batches</Text>
-              <TouchableOpacity onPress={() => navigation.navigate('Deliveries', { screen: 'DeliveriesList' })}>
-                <Text style={styles.seeAllText}>See All</Text>
-              </TouchableOpacity>
-            </View>
-            {mockBatches.map((batch) => (
-              <BatchCard
-                key={batch.batchId}
-                batchId={batch.batchId}
-                stops={batch.stops}
-                status={batch.status}
-                estimatedTime={batch.estimatedTime}
-                onPress={() => handleViewBatch(batch.batchId)}
-                onStartBatch={() => handleStartBatch(batch.batchId)}
-              />
-            ))}
-          </View>
-        )}
-
-        {/* Upcoming Deliveries Section */}
-        <View style={styles.section}>
-          <View style={styles.sectionHeader}>
-            <Text style={styles.sectionTitle}>Upcoming Deliveries</Text>
-            <TouchableOpacity onPress={() => navigation.navigate('Deliveries', { screen: 'DeliveriesList', params: { initialFilter: 'pending' } })}>
-              <Text style={styles.seeAllText}>See All</Text>
+            <TouchableOpacity
+              style={styles.availableBatchesBanner}
+              onPress={handleFindBatches}
+              activeOpacity={0.8}
+            >
+              <View style={styles.availableBatchesContent}>
+                <MaterialCommunityIcons name="package-variant-closed" size={24} color="#F56B4C" />
+                <View style={styles.availableBatchesTextContainer}>
+                  <Text style={styles.availableBatchesTitle}>
+                    {availableBatchesCount} {availableBatchesCount === 1 ? 'Batch' : 'Batches'} Available
+                  </Text>
+                  <Text style={styles.availableBatchesSubtitle}>
+                    Tap to view and accept batches
+                  </Text>
+                </View>
+              </View>
+              <MaterialCommunityIcons name="chevron-right" size={24} color="#F56B4C" />
             </TouchableOpacity>
           </View>
-
-          {deliveries.length > 0 ? (
-            deliveries.map((delivery) => (
-              <DeliveryCard
-                key={delivery.id}
-                id={delivery.id}
-                customerName={delivery.customerName}
-                pickupLocation={delivery.pickupLocation}
-                dropoffLocation={delivery.dropoffLocation}
-                status={delivery.status}
-                eta={delivery.eta}
-                onPress={() => handleViewDelivery(delivery.id)}
-                onStartDelivery={() => handleStartDelivery(delivery.id)}
-              />
-            ))
-          ) : (
-            <View style={styles.emptyState}>
-              <Text style={styles.emptyIcon}>O</Text>
-              <Text style={styles.emptyTitle}>No Deliveries Assigned</Text>
-              <Text style={styles.emptyText}>
-                You don't have any deliveries assigned yet.{'\n'}
-                Pull down to refresh.
-              </Text>
-            </View>
-          )}
-        </View>
-
-        {/* Notifications Section */}
-        {showRecentUpdates && (
-          <View style={[styles.section, { marginBottom: 20 }]}>
-            <View style={styles.sectionHeader}>
-              <Text style={styles.sectionTitle}>Recent Updates</Text>
-              <TouchableOpacity onPress={handleClearAllUpdates}>
-                <Text style={styles.seeAllText}>Clear All</Text>
-              </TouchableOpacity>
-            </View>
-
-            <View style={styles.notificationsList}>
-              <NotificationBanner
-                message="New delivery assigned: DEL-003"
-                type="success"
-              />
-              <NotificationBanner
-                message="Traffic delay on Lekki-Epe Expressway"
-                type="warning"
-              />
-            </View>
-          </View>
         )}
-      </ScrollView>
 
-      {/* New Delivery Request Modal */}
-      <NewDeliveryRequestModal
-        visible={showNewDeliveryModal}
-        delivery={newDeliveryRequest}
-        onAccept={handleAcceptDelivery}
-        onReject={handleRejectDelivery}
-      />
+        {/* Quick Actions */}
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Quick Actions</Text>
+          <View style={styles.quickActionsGrid}>
+            <TouchableOpacity
+              style={styles.quickActionCard}
+              onPress={handleFindBatches}
+              activeOpacity={0.8}
+            >
+              <View style={[styles.quickActionIcon, { backgroundColor: '#DBEAFE' }]}>
+                <MaterialCommunityIcons name="package-variant" size={28} color="#3B82F6" />
+              </View>
+              <Text style={styles.quickActionLabel}>Available{'\n'}Batches</Text>
+              {availableBatchesCount > 0 && (
+                <View style={styles.quickActionBadge}>
+                  <Text style={styles.quickActionBadgeText}>{availableBatchesCount}</Text>
+                </View>
+              )}
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={styles.quickActionCard}
+              onPress={() => navigation.navigate('Deliveries', { screen: 'DeliveriesList' })}
+              activeOpacity={0.8}
+            >
+              <View style={[styles.quickActionIcon, { backgroundColor: '#D1FAE5' }]}>
+                <MaterialCommunityIcons name="history" size={28} color="#10B981" />
+              </View>
+              <Text style={styles.quickActionLabel}>Delivery{'\n'}History</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={styles.quickActionCard}
+              onPress={() => navigation.navigate('Profile')}
+              activeOpacity={0.8}
+            >
+              <View style={[styles.quickActionIcon, { backgroundColor: '#FEE2E2' }]}>
+                <MaterialCommunityIcons name="account" size={28} color="#EF4444" />
+              </View>
+              <Text style={styles.quickActionLabel}>Profile{'\n'}Settings</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={styles.quickActionCard}
+              activeOpacity={0.8}
+            >
+              <View style={[styles.quickActionIcon, { backgroundColor: '#FEF3C7' }]}>
+                <MaterialCommunityIcons name="help-circle" size={28} color="#F59E0B" />
+              </View>
+              <Text style={styles.quickActionLabel}>Help &{'\n'}Support</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </ScrollView>
 
       {/* Toast */}
       {toastVisible && (
@@ -384,51 +580,69 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#F9FAFB',
   },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: '#F9FAFB',
+  },
+  loadingText: {
+    marginTop: 16,
+    fontSize: 16,
+    color: '#6B7280',
+    fontWeight: '500',
+  },
   scrollView: {
     flex: 1,
   },
   scrollContent: {
-    paddingBottom: 0,
+    paddingBottom: 20,
   },
   header: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'center',
+    alignItems: 'flex-start',
     paddingHorizontal: 20,
-    paddingVertical: 20,
-    backgroundColor: 'rgba(245, 107, 76, 1)',
+    paddingVertical: 24,
+    backgroundColor: '#F56B4C',
     borderBottomLeftRadius: 24,
     borderBottomRightRadius: 24,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
+    shadowOpacity: 0.1,
     shadowRadius: 8,
-    elevation: 2,
+    elevation: 3,
   },
   headerLeft: {
     flex: 1,
+  },
+  greeting: {
+    fontSize: 14,
+    color: '#FFFFFF',
+    opacity: 0.9,
+    marginBottom: 4,
   },
   driverName: {
     fontSize: 28,
     fontWeight: '700',
     color: '#FFFFFF',
-    marginBottom: 10,
+    marginBottom: 12,
   },
   statusPill: {
     alignSelf: 'flex-start',
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingLeft: 8,
-    paddingRight: 2,
-    paddingVertical: 3,
+    paddingLeft: 12,
+    paddingRight: 4,
+    paddingVertical: 4,
     borderRadius: 20,
-    gap: 4,
+    gap: 8,
   },
   statusPillContent: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 4,
+    gap: 6,
   },
   statusPillOnline: {
     backgroundColor: '#D1FAE5',
@@ -437,9 +651,9 @@ const styles = StyleSheet.create({
     backgroundColor: '#FEE2E2',
   },
   statusPillDot: {
-    width: 6,
-    height: 6,
-    borderRadius: 3,
+    width: 8,
+    height: 8,
+    borderRadius: 4,
   },
   statusPillDotOnline: {
     backgroundColor: '#10B981',
@@ -448,7 +662,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#EF4444',
   },
   statusPillText: {
-    fontSize: 13,
+    fontSize: 14,
     fontWeight: '600',
   },
   statusPillTextOnline: {
@@ -458,32 +672,189 @@ const styles = StyleSheet.create({
     color: '#991B1B',
   },
   statusPillSwitch: {
-    transform: [{ scale: 0.6 }],
+    transform: [{ scale: 0.7 }],
   },
-  notificationButton: {
-    padding: 8,
+  earningsButton: {
+    padding: 4,
     position: 'relative',
   },
-  notificationBadge: {
-    position: 'absolute',
-    top: 4,
-    right: 4,
-    minWidth: 18,
-    height: 18,
-    borderRadius: 9,
-    backgroundColor: '#EF4444',
+  earningsIconCircle: {
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    backgroundColor: '#FFFFFF',
     alignItems: 'center',
     justifyContent: 'center',
-    paddingHorizontal: 4,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
   },
-  notificationBadgeText: {
-    fontSize: 10,
+  currentBatchSection: {
+    paddingHorizontal: 16,
+    marginTop: -20,
+  },
+  currentBatchCard: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 16,
+    padding: 20,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 3,
+  },
+  currentBatchHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+    marginBottom: 16,
+  },
+  currentBatchLabel: {
+    fontSize: 14,
+    color: '#6B7280',
+    marginBottom: 4,
+  },
+  currentBatchNumber: {
+    fontSize: 18,
     fontWeight: '700',
+    color: '#111827',
+  },
+  batchStatusBadge: {
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 12,
+  },
+  batchStatusText: {
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  progressSection: {
+    marginBottom: 16,
+  },
+  progressLabel: {
+    fontSize: 14,
+    color: '#6B7280',
+    marginBottom: 8,
+  },
+  progressBarContainer: {
+    height: 8,
+    backgroundColor: '#E5E7EB',
+    borderRadius: 4,
+    overflow: 'hidden',
+  },
+  progressBar: {
+    height: '100%',
+    backgroundColor: '#10B981',
+    borderRadius: 4,
+  },
+  kitchenInfo: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 16,
+    paddingTop: 16,
+    borderTopWidth: 1,
+    borderTopColor: '#F3F4F6',
+  },
+  kitchenTextContainer: {
+    marginLeft: 12,
+    flex: 1,
+  },
+  kitchenName: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#111827',
+    marginBottom: 2,
+  },
+  kitchenArea: {
+    fontSize: 14,
+    color: '#6B7280',
+  },
+  batchActions: {
+    flexDirection: 'row',
+    gap: 12,
+  },
+  primaryBatchButton: {
+    flex: 1,
+    backgroundColor: '#F56B4C',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 14,
+    borderRadius: 12,
+    gap: 8,
+  },
+  primaryBatchButtonText: {
     color: '#FFFFFF',
+    fontSize: 15,
+    fontWeight: '600',
+  },
+  secondaryBatchButton: {
+    flex: 1,
+    backgroundColor: '#F3F4F6',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 14,
+    borderRadius: 12,
+  },
+  secondaryBatchButtonText: {
+    color: '#374151',
+    fontSize: 15,
+    fontWeight: '600',
+  },
+  emptyBatchCard: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 16,
+    padding: 32,
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 3,
+  },
+  emptyBatchTitle: {
+    fontSize: 20,
+    fontWeight: '700',
+    color: '#111827',
+    marginTop: 16,
+    marginBottom: 8,
+  },
+  emptyBatchText: {
+    fontSize: 15,
+    color: '#6B7280',
+    textAlign: 'center',
+    marginBottom: 24,
+  },
+  findBatchesButton: {
+    backgroundColor: '#F56B4C',
+    paddingHorizontal: 32,
+    paddingVertical: 14,
+    borderRadius: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  findBatchesButtonText: {
+    color: '#FFFFFF',
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  availableBadge: {
+    backgroundColor: '#FFFFFF',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 8,
+  },
+  availableBadgeText: {
+    color: '#F56B4C',
+    fontSize: 12,
+    fontWeight: '700',
   },
   statsSection: {
     paddingHorizontal: 16,
-    marginTop: 16,
+    marginTop: 20,
   },
   statsRow: {
     flexDirection: 'row',
@@ -495,57 +866,99 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     marginTop: 24,
   },
-  sectionHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 12,
-  },
   sectionTitle: {
     fontSize: 18,
     fontWeight: '700',
     color: '#111827',
-    marginBottom: 20,
-  },
-  seeAllText: {
-    fontSize: 14,
-    color: '#F56B4C',
-    fontWeight: '600',
-  },
-  quickActionsRow: {
-    flexDirection: 'row',
-  },
-  emptyState: {
-    backgroundColor: 'white',
-    borderRadius: 16,
-    padding: 32,
-    alignItems: 'center',
-  },
-  emptyIcon: {
-    fontSize: 48,
     marginBottom: 16,
   },
-  emptyTitle: {
-    fontSize: 18,
+  availableBatchesBanner: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 12,
+    padding: 16,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 4,
+    elevation: 2,
+  },
+  availableBatchesContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+  },
+  availableBatchesTextContainer: {
+    marginLeft: 12,
+    flex: 1,
+  },
+  availableBatchesTitle: {
+    fontSize: 16,
     fontWeight: '600',
     color: '#111827',
-    marginBottom: 8,
+    marginBottom: 2,
   },
-  emptyText: {
-    fontSize: 14,
+  availableBatchesSubtitle: {
+    fontSize: 13,
     color: '#6B7280',
-    textAlign: 'center',
-    lineHeight: 20,
   },
-  notificationsList: {
-    gap: 0,
+  quickActionsGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 12,
+  },
+  quickActionCard: {
+    width: '48%',
+    backgroundColor: '#FFFFFF',
+    borderRadius: 12,
+    padding: 16,
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 4,
+    elevation: 2,
+    position: 'relative',
+  },
+  quickActionIcon: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 12,
+  },
+  quickActionLabel: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#374151',
+    textAlign: 'center',
+    lineHeight: 18,
+  },
+  quickActionBadge: {
+    position: 'absolute',
+    top: 8,
+    right: 8,
+    backgroundColor: '#F56B4C',
+    minWidth: 20,
+    height: 20,
+    borderRadius: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 6,
+  },
+  quickActionBadgeText: {
+    color: '#FFFFFF',
+    fontSize: 11,
+    fontWeight: '700',
   },
   toast: {
     position: 'absolute',
     bottom: 100,
     left: 20,
     right: 20,
-    backgroundColor: '#10B981',
     borderRadius: 12,
     paddingVertical: 14,
     paddingHorizontal: 16,

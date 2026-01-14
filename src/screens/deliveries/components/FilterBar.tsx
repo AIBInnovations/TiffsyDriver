@@ -2,8 +2,9 @@ import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Modal } from "rea
 import { useState } from "react";
 import MaterialCommunityIcons from "react-native-vector-icons/MaterialCommunityIcons";
 
-type FilterStatus = "all" | "pending" | "in_progress" | "picked_up" | "completed" | "failed";
-type SortOption = "eta" | "distance" | "status";
+// Backend OrderStatus values
+type FilterStatus = "all" | "READY" | "PICKED_UP" | "OUT_FOR_DELIVERY" | "DELIVERED" | "FAILED" | "RETURNED";
+type SortOption = "sequence" | "distance" | "status";
 
 interface FilterBarProps {
   filterStatus: FilterStatus;
@@ -14,15 +15,15 @@ interface FilterBarProps {
 
 const statusFilters: { value: FilterStatus; label: string; icon: string }[] = [
   { value: "all", label: "All", icon: "view-grid" },
-  { value: "pending", label: "Pending", icon: "clock-outline" },
-  { value: "in_progress", label: "In Progress", icon: "truck-fast" },
-  { value: "picked_up", label: "Picked Up", icon: "package-variant" },
-  { value: "completed", label: "Completed", icon: "check-circle" },
-  { value: "failed", label: "Failed", icon: "close-circle" },
+  { value: "READY", label: "Ready", icon: "clock-outline" },
+  { value: "PICKED_UP", label: "Picked Up", icon: "package-variant" },
+  { value: "OUT_FOR_DELIVERY", label: "Out for Delivery", icon: "truck-fast" },
+  { value: "DELIVERED", label: "Delivered", icon: "check-circle" },
+  { value: "FAILED", label: "Failed", icon: "close-circle" },
 ];
 
 const sortOptions: { value: SortOption; label: string; icon: string }[] = [
-  { value: "eta", label: "ETA (Earliest)", icon: "clock-fast" },
+  { value: "sequence", label: "Delivery Sequence", icon: "sort-numeric-ascending" },
   { value: "distance", label: "Distance (Nearest)", icon: "map-marker-distance" },
   { value: "status", label: "Status Priority", icon: "sort" },
 ];

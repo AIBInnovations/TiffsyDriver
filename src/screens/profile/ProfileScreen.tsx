@@ -6,6 +6,7 @@ import {
   StyleSheet,
   Pressable,
   StatusBar,
+  InteractionManager,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useState, useCallback, useRef, useEffect } from "react";
@@ -63,6 +64,7 @@ export default function ProfileScreen() {
   const [showVehicleModal, setShowVehicleModal] = useState(false);
   const [showDocumentsModal, setShowDocumentsModal] = useState(false);
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
+  const [isLoggingOut, setIsLoggingOut] = useState(false);
   const [showTermsModal, setShowTermsModal] = useState(false);
   const [showPrivacyModal, setShowPrivacyModal] = useState(false);
 
@@ -124,12 +126,26 @@ export default function ProfileScreen() {
   }, []);
 
   const handleLogout = useCallback(async () => {
-    await clearSessionData();
-    setShowLogoutConfirm(false);
-    navigation.reset({
-      index: 0,
-      routes: [{ name: "Auth" }],
-    });
+    // Show loading state in modal
+    setIsLoggingOut(true);
+
+    try {
+      // Clear session data
+      await clearSessionData();
+
+      // Small delay to ensure state is cleared
+      await new Promise(resolve => setTimeout(resolve, 100));
+
+      // Navigate - this will unmount the screen and modal automatically
+      navigation.reset({
+        index: 0,
+        routes: [{ name: "Auth" }],
+      });
+    } catch (error) {
+      // Reset loading state if error occurs
+      setIsLoggingOut(false);
+      console.error("Logout error:", error);
+    }
   }, [clearSessionData, navigation]);
 
   // Loading skeleton
@@ -455,12 +471,17 @@ export default function ProfileScreen() {
 
       <ConfirmationModal
         visible={showLogoutConfirm}
-        onClose={() => setShowLogoutConfirm(false)}
+        onClose={() => {
+          if (!isLoggingOut) {
+            setShowLogoutConfirm(false);
+          }
+        }}
         title="Logout"
         message="Are you sure you want to logout? Your app settings will be preserved."
         confirmText="Logout"
         onConfirm={handleLogout}
         destructive
+        isLoading={isLoggingOut}
       />
     </SafeAreaView>
   );

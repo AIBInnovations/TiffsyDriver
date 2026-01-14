@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useCallback, ReactNode } from 'react';
+import { createContext, useContext, useState, useCallback, ReactNode } from 'react';
 
 export interface Delivery {
   id: string;
@@ -198,7 +198,20 @@ export function DeliveryProvider({ children }: { children: ReactNode }) {
   const [batches] = useState<Batch[]>(initialBatches);
 
   const addDelivery = useCallback((delivery: Delivery) => {
-    setDeliveries(prev => [...prev, delivery]);
+    setDeliveries(prev => {
+      // Check if delivery with this ID already exists
+      const exists = prev.some(d => d.id === delivery.id);
+      if (exists) {
+        console.warn(`Delivery with ID ${delivery.id} already exists. Skipping duplicate.`);
+        return prev;
+      }
+      // Generate unique ID if not provided or create a new one
+      const uniqueDelivery = {
+        ...delivery,
+        id: delivery.id || `DEL-${Date.now()}-${Math.random().toString(36).substring(2, 11)}`,
+      };
+      return [...prev, uniqueDelivery];
+    });
   }, []);
 
   const updateDeliveryStatus = useCallback((deliveryId: string, newStatus: Delivery["status"]) => {
