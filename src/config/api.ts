@@ -24,6 +24,14 @@ export const API_CONFIG = {
     UPDATE_SEQUENCE: (batchId: string) => `/delivery/batches/${batchId}/sequence`,
     COMPLETE_BATCH: (batchId: string) => `/delivery/batches/${batchId}/complete`,
     GET_BATCH: (batchId: string) => `/delivery/batches/${batchId}`,
+    DRIVER_ORDERS: '/orders/driver',
+
+    // Driver Profile endpoints
+    DRIVER_PROFILE: '/driver/profile',
+    DRIVER_VEHICLE: '/driver/vehicle',
+    DRIVER_PROFILE_IMAGE: '/driver/profile/image',
+    DRIVER_DOCUMENTS_REQUEST: '/driver/documents/request',
+    DRIVER_STATS: '/driver/stats',
   },
 };
 

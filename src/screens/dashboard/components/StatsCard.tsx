@@ -8,6 +8,7 @@ interface StatsCardProps {
   valueColor?: string;
   icon?: string;
   iconColor?: string;
+  flex?: boolean;
 }
 
 export default function StatsCard({
@@ -17,16 +18,17 @@ export default function StatsCard({
   valueColor = '#111827',
   icon,
   iconColor = '#9CA3AF',
+  flex = true,
 }: StatsCardProps) {
   return (
-    <View style={styles.card}>
+    <View style={[styles.card, flex ? styles.flexCard : styles.fixedCard]}>
       <View style={styles.header}>
         {icon && (
           <View style={[styles.iconContainer, { backgroundColor: iconColor + '15' }]}>
-            <MaterialCommunityIcons name={icon} size={20} color={iconColor} />
+            <MaterialCommunityIcons name={icon} size={18} color={iconColor} />
           </View>
         )}
-        <Text style={styles.label}>{label}</Text>
+        <Text style={styles.label} numberOfLines={2}>{label}</Text>
       </View>
       <Text style={[styles.value, { color: valueColor }]}>{value}</Text>
       {subLabel && <Text style={styles.subLabel}>{subLabel}</Text>}
@@ -36,40 +38,53 @@ export default function StatsCard({
 
 const styles = StyleSheet.create({
   card: {
-    flex: 1,
     backgroundColor: 'white',
     borderRadius: 12,
     padding: 16,
     paddingVertical: 20,
     borderWidth: 1,
     borderColor: '#F3F4F6',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 3,
+  },
+  flexCard: {
+    flex: 1,
+  },
+  fixedCard: {
+    width: 158,
   },
   header: {
     flexDirection: 'row',
-    alignItems: 'center',
+    alignItems: 'flex-start',
     marginBottom: 10,
   },
   iconContainer: {
-    width: 36,
-    height: 36,
-    borderRadius: 10,
+    width: 32,
+    height: 32,
+    borderRadius: 8,
     alignItems: 'center',
     justifyContent: 'center',
-    marginRight: 10,
+    marginRight: 8,
   },
   label: {
-    fontSize: 15,
+    fontSize: 14,
     color: '#6B7280',
     fontWeight: '500',
     flex: 1,
+    lineHeight: 18,
+    flexWrap: 'wrap',
+    maxWidth: 70,
   },
   value: {
-    fontSize: 22,
+    fontSize: 24,
     fontWeight: '700',
     marginBottom: 2,
   },
   subLabel: {
-    fontSize: 11,
+    fontSize: 12,
     color: '#9CA3AF',
   },
 });

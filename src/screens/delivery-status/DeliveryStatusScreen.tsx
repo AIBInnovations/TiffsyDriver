@@ -10,7 +10,7 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useState, useCallback, useEffect } from "react";
-import { useNavigation, useRoute, RouteProp } from "@react-navigation/native";
+import { useNavigation, useRoute, RouteProp, useFocusEffect } from "@react-navigation/native";
 import MaterialCommunityIcons from "react-native-vector-icons/MaterialCommunityIcons";
 import { DeliveryStatusType, MainTabsParamList } from "../../navigation/types";
 import ProgressTracker from "./components/ProgressTracker";
@@ -100,6 +100,14 @@ export default function DeliveryStatusScreen() {
   const [showFailedModal, setShowFailedModal] = useState(false);
   const [showCompleteModal, setShowCompleteModal] = useState(false);
   const [notification, setNotification] = useState<Notification | null>(null);
+
+  // Set status bar colors when screen is focused
+  useFocusEffect(
+    useCallback(() => {
+      StatusBar.setBarStyle('dark-content');
+      StatusBar.setBackgroundColor('#FFFFFF');
+    }, [])
+  );
 
   // Load delivery data
   useEffect(() => {
@@ -202,7 +210,8 @@ export default function DeliveryStatusScreen() {
 
   const updateDeliveryStatus = async (
     newStatus: DeliveryStatusType,
-    podData?: { otpVerified: boolean; otp: string; notes?: string; recipientName?: string }
+    podData?: { otpVerified: boolean; otp: string; notes?: string; recipientName?: string },
+    failureData?: { reason: string; notes?: string }
   ) => {
     if (!delivery) return;
 
@@ -225,6 +234,14 @@ export default function DeliveryStatusScreen() {
         };
         if (podData.notes) {
           requestBody.notes = podData.notes;
+        }
+      }
+
+      // Add failure reason for FAILED status
+      if (newStatus === "failed" && failureData?.reason) {
+        requestBody.failureReason = failureData.reason;
+        if (failureData.notes) {
+          requestBody.notes = failureData.notes;
         }
       }
 
@@ -302,7 +319,7 @@ export default function DeliveryStatusScreen() {
 
   const handleFailedSubmit = (reason: string, notes?: string) => {
     setShowFailedModal(false);
-    updateDeliveryStatus("failed");
+    updateDeliveryStatus("failed", undefined, { reason, notes });
     console.log("Failed reason:", reason, "Notes:", notes);
   };
 
@@ -310,10 +327,6 @@ export default function DeliveryStatusScreen() {
     if (navigation.canGoBack()) {
       navigation.goBack();
     }
-  };
-
-  const handleProfilePress = () => {
-    // Navigate to profile
   };
 
   const handleNextDelivery = async () => {
@@ -324,7 +337,15 @@ export default function DeliveryStatusScreen() {
 
   const handleViewAllDeliveries = () => {
     setShowCompleteModal(false);
-    navigation.navigate("Deliveries" as never);
+    // Pass completed order info to Deliveries screen
+    // Navigate to Deliveries tab with nested screen params
+    navigation.navigate("Deliveries" as never, {
+      screen: 'DeliveriesList',
+      params: {
+        completedOrderId: delivery?.deliveryId,
+        completedOrderNumber: delivery?.orderId,
+      },
+    } as never);
   };
 
   const handleCloseCompleteModal = () => {
@@ -352,12 +373,9 @@ export default function DeliveryStatusScreen() {
   if (!delivery) {
     return (
       <SafeAreaView style={styles.container} edges={["top"]}>
-        <StatusBar barStyle="dark-content" backgroundColor="#F9FAFB" />
+        <StatusBar barStyle="dark-content" backgroundColor="#FFFFFF" />
         <View style={styles.header}>
           <Text style={styles.headerTitle}>Delivery Status</Text>
-          <TouchableOpacity style={styles.notificationButton}>
-            <MaterialCommunityIcons name="bell-outline" size={28} color="#F56B4C" />
-          </TouchableOpacity>
         </View>
         <View style={styles.emptyContainer}>
           <View style={styles.emptyIcon}>
@@ -378,14 +396,11 @@ export default function DeliveryStatusScreen() {
 
   return (
     <SafeAreaView style={styles.container} edges={["top"]}>
-      <StatusBar barStyle="dark-content" backgroundColor="#F9FAFB" />
+      <StatusBar barStyle="dark-content" backgroundColor="#FFFFFF" />
 
       {/* Header */}
       <View style={styles.header}>
         <Text style={styles.headerTitle}>Delivery Status</Text>
-        <TouchableOpacity style={styles.notificationButton}>
-          <MaterialCommunityIcons name="bell-outline" size={28} color="#F56B4C" />
-        </TouchableOpacity>
       </View>
 
       {/* Notification Banner */}
@@ -502,19 +517,12 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   headerTitle: {
-    fontSize: 18,
+    fontSize: 24,
     fontWeight: "700",
     color: "#111827",
   },
   headerRight: {
     width: 40,
-  },
-  notificationButton: {
-    padding: 8,
-    backgroundColor: "#FEF2F2",
-    borderRadius: 20,
-    alignItems: "center",
-    justifyContent: "center",
   },
   scrollView: {
     flex: 1,

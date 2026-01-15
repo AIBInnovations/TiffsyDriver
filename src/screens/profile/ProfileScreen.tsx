@@ -10,7 +10,7 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useState, useCallback, useRef, useEffect } from "react";
-import { useNavigation } from "@react-navigation/native";
+import { useNavigation, useFocusEffect } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import MaterialCommunityIcons from "react-native-vector-icons/MaterialCommunityIcons";
 import type { RootStackParamList, ProfileStackParamList } from "../../navigation/types";
@@ -19,7 +19,13 @@ import {
   getInitials,
   vehicleTypeLabels,
   languageLabels,
+  VehicleType,
 } from "./useDriverProfileStore";
+import {
+  getDriverProfile,
+  updateDriverProfile as updateDriverProfileAPI,
+  updateDriverVehicle,
+} from "../../services/driverProfileService";
 import {
   ProfileAvatar,
   SectionCard,
@@ -81,6 +87,8 @@ export default function ProfileScreen() {
 
   // Refresh control
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const [backendError, setBackendError] = useState<string | null>(null);
+  const [hasAttemptedBackendSync, setHasAttemptedBackendSync] = useState(false);
 
   const showToast = useCallback(
     (message: string, type: "success" | "error" | "info" = "success") => {
@@ -93,12 +101,87 @@ export default function ProfileScreen() {
     setToast((prev) => ({ ...prev, visible: false }));
   }, []);
 
+  // Fetch profile from backend and sync with local store
+  const fetchBackendProfile = useCallback(async () => {
+    try {
+      console.log('🔄 Fetching profile from backend...');
+      const response = await getDriverProfile();
+
+      console.log('📥 Backend response received');
+      console.log('📥 Response keys:', Object.keys(response || {}));
+      console.log('📥 Response.data keys:', Object.keys(response?.data || {}));
+
+      // Validate response structure
+      if (!response || !response.data) {
+        console.error('❌ Invalid response structure - missing data');
+        throw new Error('Invalid response structure from backend');
+      }
+
+      const { user, driverDetails, statistics } = response.data;
+
+      console.log('📥 User exists:', !!user);
+      console.log('📥 DriverDetails exists:', !!driverDetails);
+      console.log('📥 Statistics exists:', !!statistics);
+
+      // Update local store with backend data only if we have valid user data
+      // driverDetails might not exist if the backend hasn't implemented it yet
+      const updates: any = {
+        lastSyncedAt: new Date().toISOString(),
+      };
+
+      if (user) {
+        if (user._id) updates.driverId = user._id;
+        if (user.name) updates.fullName = user.name;
+        if (user.phone) updates.phone = user.phone;
+        if (user.email !== undefined) updates.email = user.email || '';
+      } else {
+        console.warn('⚠️ No user data in backend response');
+        throw new Error('User data not found in backend response');
+      }
+
+      // Driver details are optional - backend may not have this endpoint yet
+      if (driverDetails) {
+        if (driverDetails.vehicleType) updates.vehicleType = driverDetails.vehicleType as VehicleType;
+        if (driverDetails.vehicleNumber) updates.vehicleNumber = driverDetails.vehicleNumber;
+        if (driverDetails.isAvailable !== undefined) {
+          updates.availabilityStatus = driverDetails.isAvailable ? 'ONLINE' : 'OFFLINE';
+        }
+      } else {
+        console.log('ℹ️ No driver details in backend response (endpoint may not be implemented yet)');
+      }
+
+      await updateProfile(updates);
+
+      console.log('✅ Profile synced from backend');
+      if (statistics) {
+        console.log('📊 Statistics:', statistics);
+      }
+      // Don't clear backend error here - let the caller decide
+    } catch (error: any) {
+      console.error('❌ Error fetching backend profile:', error);
+      console.error('❌ Error details:', error.message);
+
+      // Re-throw to let caller handle the error
+      // This allows different behavior for automatic vs manual sync
+      throw error;
+    }
+  }, [updateProfile]);
+
   const handleRefresh = useCallback(async () => {
     setIsRefreshing(true);
-    await refresh();
-    setIsRefreshing(false);
-    showToast("Updated", "success");
-  }, [refresh, showToast]);
+    try {
+      await fetchBackendProfile();
+      showToast("Profile synced", "success");
+      setBackendError(null);
+    } catch (error: any) {
+      // Only show error toast on explicit user refresh
+      const errorMessage = error?.message || "Failed to sync profile";
+      showToast(errorMessage, "error");
+      setBackendError(errorMessage);
+    } finally {
+      setIsRefreshing(false);
+    }
+  }, [fetchBackendProfile, showToast]);
 
   // Handle preference changes with debounced "saved" indicator
   const handlePrefChange = useCallback(
@@ -124,6 +207,28 @@ export default function ProfileScreen() {
       }
     };
   }, []);
+
+  // Fetch profile from backend on mount (only once per session)
+  useEffect(() => {
+    if (isHydrated && !isLoading && !hasAttemptedBackendSync) {
+      setHasAttemptedBackendSync(true);
+      InteractionManager.runAfterInteractions(() => {
+        fetchBackendProfile().catch((error) => {
+          // Silently fail on automatic sync
+          // Error already logged in console
+          console.log('ℹ️ Using local profile data, backend sync failed silently');
+        });
+      });
+    }
+  }, [isHydrated, isLoading, hasAttemptedBackendSync, fetchBackendProfile]);
+
+  // Set status bar color when screen is focused
+  useFocusEffect(
+    useCallback(() => {
+      StatusBar.setBarStyle('dark-content');
+      StatusBar.setBackgroundColor('#FFFFFF');
+    }, [])
+  );
 
   const handleLogout = useCallback(async () => {
     // Show loading state in modal
@@ -152,7 +257,7 @@ export default function ProfileScreen() {
   if (isLoading && !isHydrated) {
     return (
       <SafeAreaView style={styles.container} edges={["top"]}>
-        <StatusBar barStyle="dark-content" backgroundColor="#F9FAFB" />
+        <StatusBar barStyle="dark-content" backgroundColor="#FFFFFF" />
         <View style={styles.header}>
           <Text style={styles.headerTitle}>Profile</Text>
         </View>
@@ -185,7 +290,7 @@ export default function ProfileScreen() {
 
   return (
     <SafeAreaView style={styles.container} edges={["top"]}>
-      <StatusBar barStyle="dark-content" backgroundColor="#F9FAFB" />
+      <StatusBar barStyle="dark-content" backgroundColor="#FFFFFF" />
 
       {/* Header */}
       <View style={styles.header}>
@@ -216,6 +321,12 @@ export default function ProfileScreen() {
           <ErrorBanner
             message={error}
             onRetry={retryHydration}
+          />
+        )}
+        {backendError && !error && (
+          <ErrorBanner
+            message={backendError}
+            onRetry={handleRefresh}
           />
         )}
 
@@ -420,8 +531,57 @@ export default function ProfileScreen() {
         onClose={() => setShowEditProfile(false)}
         profile={profile}
         onSave={async (updates) => {
-          await updateProfile(updates);
-          showToast("Profile updated", "success");
+          try {
+            // Prepare backend API calls
+            const profileUpdates: { name?: string; email?: string } = {};
+            const vehicleUpdates: { vehicleType?: VehicleType; vehicleNumber?: string } = {};
+
+            // Split updates into profile and vehicle
+            if (updates.fullName !== undefined) {
+              profileUpdates.name = updates.fullName;
+            }
+            if (updates.email !== undefined) {
+              profileUpdates.email = updates.email;
+            }
+            if (updates.vehicleType !== undefined) {
+              vehicleUpdates.vehicleType = updates.vehicleType;
+            }
+            if (updates.vehicleNumber !== undefined) {
+              vehicleUpdates.vehicleNumber = updates.vehicleNumber;
+            }
+
+            // Try to call backend APIs in parallel if both have updates
+            let backendSuccess = false;
+            try {
+              const apiCalls = [];
+              if (Object.keys(profileUpdates).length > 0) {
+                apiCalls.push(updateDriverProfileAPI(profileUpdates));
+              }
+              if (Object.keys(vehicleUpdates).length > 0) {
+                apiCalls.push(updateDriverVehicle(vehicleUpdates));
+              }
+
+              if (apiCalls.length > 0) {
+                await Promise.all(apiCalls);
+                backendSuccess = true;
+              }
+            } catch (backendError: any) {
+              console.error('❌ Backend update failed:', backendError);
+              // Continue to save locally even if backend fails
+              showToast("Saved locally (server sync failed)", "info");
+            }
+
+            // Always update local store
+            await updateProfile(updates);
+
+            if (backendSuccess) {
+              showToast("Profile updated", "success");
+            }
+          } catch (error: any) {
+            console.error('❌ Error updating profile:', error);
+            showToast(error.message || "Failed to update profile", "error");
+            throw error;
+          }
         }}
       />
 
@@ -446,8 +606,29 @@ export default function ProfileScreen() {
         currentVehicleType={profile.vehicleType}
         currentVehicleNumber={profile.vehicleNumber}
         onSave={async (vehicleType, vehicleNumber) => {
-          await updateProfile({ vehicleType, vehicleNumber });
-          showToast("Vehicle updated", "success");
+          try {
+            // Try to call backend API to update vehicle
+            let backendSuccess = false;
+            try {
+              await updateDriverVehicle({ vehicleType, vehicleNumber });
+              backendSuccess = true;
+            } catch (backendError: any) {
+              console.error('❌ Backend update failed:', backendError);
+              // Continue to save locally even if backend fails
+              showToast("Saved locally (server sync failed)", "info");
+            }
+
+            // Always update local store
+            await updateProfile({ vehicleType, vehicleNumber });
+
+            if (backendSuccess) {
+              showToast("Vehicle updated", "success");
+            }
+          } catch (error: any) {
+            console.error('❌ Error updating vehicle:', error);
+            showToast(error.message || "Failed to update vehicle", "error");
+            throw error;
+          }
         }}
       />
 

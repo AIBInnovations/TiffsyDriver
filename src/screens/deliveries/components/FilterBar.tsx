@@ -130,7 +130,7 @@ export default function FilterBar({ filterStatus, sortBy, onFilterChange, onSort
 const styles = StyleSheet.create({
   container: {
     backgroundColor: "white",
-    paddingVertical: 10,
+    paddingVertical: 6,
     borderBottomWidth: 1,
     borderBottomColor: "#F3F4F6",
   },

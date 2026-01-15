@@ -1,4 +1,4 @@
-import { View, Text, StyleSheet, TouchableOpacity, Linking } from "react-native";
+import { View, Text, StyleSheet, TouchableOpacity, Linking, Platform, Alert } from "react-native";
 import { useState, useEffect } from "react";
 import MaterialCommunityIcons from "react-native-vector-icons/MaterialCommunityIcons";
 import { Delivery } from "../../../context/DeliveryContext";
@@ -7,6 +7,8 @@ import type { OrderStatus } from "../../../types/api";
 interface DeliveryCardProps {
   delivery: Delivery | any; // Allow both old Delivery and API order types
   onStatusChange: (deliveryId: string, newStatus: any) => void;
+  onCallCustomer?: (phone: string) => void;
+  onNavigate?: (latitude?: number, longitude?: number, address?: string) => void;
 }
 
 // Status config for both old context statuses and new API statuses
@@ -31,7 +33,7 @@ const statusConfig: Record<string, { bg: string; text: string; label: string; ic
   PICKED_UP: { bg: "#FEF3C7", text: "#92400E", label: "Picked Up", icon: "package-variant" },
 };
 
-export default function DeliveryCard({ delivery, onStatusChange }: DeliveryCardProps) {
+export default function DeliveryCard({ delivery, onStatusChange, onCallCustomer, onNavigate: onNavigateProp }: DeliveryCardProps) {
   const [showPhone, setShowPhone] = useState(false);
   const [elapsedTime, setElapsedTime] = useState(0);
 
@@ -73,12 +75,39 @@ export default function DeliveryCard({ delivery, onStatusChange }: DeliveryCardP
   };
 
   const handleCall = () => {
-    Linking.openURL(`tel:${delivery.customerPhone}`);
+    if (onCallCustomer) {
+      onCallCustomer(delivery.customerPhone);
+    } else {
+      // Fallback to simple call
+      const phoneUrl = Platform.OS === 'ios' ? `telprompt:${delivery.customerPhone}` : `tel:${delivery.customerPhone}`;
+      Linking.canOpenURL(phoneUrl)
+        .then(supported => {
+          if (supported) {
+            return Linking.openURL(phoneUrl);
+          } else {
+            Alert.alert('Error', 'Phone dialer is not available');
+          }
+        })
+        .catch(err => console.error('Error opening phone dialer:', err));
+    }
   };
 
   const handleNavigate = () => {
-    const address = encodeURIComponent(delivery.dropoffLocation);
-    Linking.openURL(`https://maps.google.com/?q=${address}`);
+    if (onNavigateProp) {
+      // Use enhanced navigation with coordinates if available
+      const latitude = delivery.deliveryAddress?.latitude || delivery.deliveryAddress?.coordinates?.latitude;
+      const longitude = delivery.deliveryAddress?.longitude || delivery.deliveryAddress?.coordinates?.longitude;
+      onNavigateProp(latitude, longitude, delivery.dropoffLocation);
+    } else {
+      // Fallback to simple Google Maps navigation
+      const address = encodeURIComponent(delivery.dropoffLocation);
+      const url = Platform.OS === 'ios'
+        ? `maps:0,0?q=${address}`
+        : `geo:0,0?q=${address}`;
+      Linking.openURL(url).catch(() => {
+        Linking.openURL(`https://www.google.com/maps/search/?api=1&query=${address}`);
+      });
+    }
   };
 
   const getActionButton = () => {
@@ -305,6 +334,8 @@ const styles = StyleSheet.create({
     alignItems: "center",
     flexWrap: "wrap",
     gap: 8,
+    flex: 1,
+    minWidth: 0,
   },
   orderId: {
     fontSize: 16,
@@ -327,10 +358,12 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     gap: 4,
+    flexShrink: 0,
   },
   distanceText: {
     fontSize: 12,
     color: "#6B7280",
+    flexShrink: 0,
   },
   timerContainer: {
     flexDirection: "row",
@@ -340,7 +373,7 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
     borderRadius: 8,
     marginBottom: 12,
-    gap: 6,
+    gap: 8,
   },
   timerText: {
     fontSize: 14,
@@ -352,11 +385,12 @@ const styles = StyleSheet.create({
     alignItems: "center",
     marginBottom: 16,
     gap: 6,
+    flexWrap: "wrap",
   },
   deliveryWindowText: {
     fontSize: 13,
     color: "#6B7280",
-    flex: 1,
+    flexShrink: 1,
   },
   etaBadge: {
     backgroundColor: "#DBEAFE",
@@ -375,13 +409,15 @@ const styles = StyleSheet.create({
   locationRow: {
     flexDirection: "row",
     alignItems: "flex-start",
+    minHeight: 40,
   },
   locationDot: {
     width: 12,
     height: 12,
     borderRadius: 6,
-    marginTop: 4,
+    marginTop: 5,
     marginRight: 12,
+    flexShrink: 0,
   },
   locationLine: {
     width: 2,
@@ -392,17 +428,20 @@ const styles = StyleSheet.create({
   },
   locationInfo: {
     flex: 1,
+    minWidth: 0,
   },
   locationLabel: {
     fontSize: 11,
     color: "#9CA3AF",
     fontWeight: "500",
-    marginBottom: 2,
+    marginBottom: 4,
+    textTransform: "uppercase",
   },
   locationAddress: {
     fontSize: 14,
     color: "#374151",
     lineHeight: 20,
+    flexWrap: "wrap",
   },
   mapPreview: {
     marginBottom: 12,
@@ -427,18 +466,19 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     alignItems: "center",
     paddingVertical: 12,
-    borderTopWidth: 1,
-    borderTopColor: "#F3F4F6",
   },
   customerInfo: {
     flexDirection: "row",
     alignItems: "center",
     gap: 8,
+    flex: 1,
+    minWidth: 0,
   },
   customerName: {
     fontSize: 15,
     fontWeight: "600",
     color: "#111827",
+    flexShrink: 1,
   },
   customerActions: {
     flexDirection: "row",

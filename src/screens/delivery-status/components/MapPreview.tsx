@@ -161,7 +161,7 @@ export default function MapPreview({
 
       {/* Quick Navigation Button */}
       <TouchableOpacity style={styles.navigateButton} onPress={handleNavigatePress}>
-        <MaterialCommunityIcons name="navigation" size={20} color="#FFFFFF" />
+        <MaterialCommunityIcons name="navigation" size={18} color="#FFFFFF" />
         <Text style={styles.navigateButtonText}>Start Navigation</Text>
       </TouchableOpacity>
 
@@ -318,18 +318,18 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
-    backgroundColor: "#3B82F6",
-    paddingVertical: 14,
-    borderRadius: 12,
-    gap: 8,
-    shadowColor: "#3B82F6",
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.25,
-    shadowRadius: 8,
-    elevation: 4,
+    backgroundColor: "#10B981",
+    paddingVertical: 12,
+    borderRadius: 10,
+    gap: 6,
+    shadowColor: "#10B981",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 4,
+    elevation: 3,
   },
   navigateButtonText: {
-    fontSize: 15,
+    fontSize: 14,
     fontWeight: "600",
     color: "#FFFFFF",
   },

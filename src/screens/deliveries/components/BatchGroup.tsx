@@ -24,8 +24,8 @@ export default function BatchGroup({
           <View style={styles.batchIcon}>
             <MaterialCommunityIcons name="package-variant-closed" size={20} color="#FFFFFF" />
           </View>
-          <View>
-            <Text style={styles.batchId}>{batchId}</Text>
+          <View style={styles.batchInfo}>
+            <Text style={styles.batchId} numberOfLines={1}>{batchId}</Text>
             <Text style={styles.deliveryCount}>
               {deliveryCount} {deliveryCount === 1 ? "delivery" : "deliveries"}
             </Text>
@@ -74,6 +74,8 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     gap: 12,
+    flex: 1,
+    minWidth: 0,
   },
   batchIcon: {
     width: 40,
@@ -82,6 +84,11 @@ const styles = StyleSheet.create({
     backgroundColor: "#F56B4C",
     alignItems: "center",
     justifyContent: "center",
+    flexShrink: 0,
+  },
+  batchInfo: {
+    flex: 1,
+    minWidth: 0,
   },
   batchId: {
     fontSize: 16,
@@ -97,6 +104,7 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     gap: 8,
+    flexShrink: 0,
   },
   badge: {
     backgroundColor: "#FEF3C7",

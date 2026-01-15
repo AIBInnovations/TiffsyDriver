@@ -284,3 +284,111 @@ export interface DriverRegistrationData {
   approvalStatus: ApprovalStatus;
   message: string;
 }
+
+// ============================================
+// Driver Orders Types
+// ============================================
+
+// Customer interface for driver orders
+export interface Customer {
+  name: string;
+  phone: string;
+}
+
+// Driver Order interface
+export interface DriverOrder {
+  _id: string;
+  orderNumber: string;
+  customer: Customer;
+  deliveryAddress: Address;
+  items: OrderItem[];
+  totalAmount: number;
+  status: OrderStatus;
+  specialInstructions?: string;
+  scheduledDeliveryTime?: string;
+  createdAt: string;
+}
+
+// Driver Orders Response
+export interface DriverOrdersData {
+  orders: DriverOrder[];
+  count: number;
+}
+
+// ============================================
+// Driver Profile Types
+// ============================================
+
+// Driver Profile Details
+export interface DriverProfileDetails {
+  licenseNumber: string;
+  licenseImageUrl: string;
+  licenseExpiryDate?: string;
+  vehicleName: string;
+  vehicleNumber: string;
+  vehicleType: VehicleType;
+  vehicleDocuments: VehicleDocument[];
+  isAvailable: boolean;
+  currentLocation?: {
+    latitude: number;
+    longitude: number;
+  };
+}
+
+// Driver Delivery Statistics
+export interface DriverStats {
+  totalDeliveries: number;
+  deliveredCount: number;
+  failedCount: number;
+  activeCount: number;
+  successRate: number;
+}
+
+// Complete Driver Profile Response
+export interface DriverProfileData {
+  user: User;
+  driverDetails: DriverProfileDetails;
+  statistics: DriverStats;
+}
+
+// Update Basic Profile Request
+export interface UpdateDriverProfileRequest {
+  name?: string;
+  email?: string;
+  profileImage?: string;
+}
+
+// Update Vehicle Request
+export interface UpdateVehicleRequest {
+  vehicleName?: string;
+  vehicleNumber?: string;
+  vehicleType?: VehicleType;
+}
+
+// Update Profile Image Request
+export interface UpdateProfileImageRequest {
+  profileImage: string;
+}
+
+// Document Update Request
+export interface DocumentUpdateRequest {
+  documentType: 'LICENSE' | 'RC' | 'INSURANCE' | 'PUC' | 'OTHER';
+  reason: string;
+  currentValue?: string;
+  requestedValue?: string;
+}
+
+// Document Update Request Response
+export interface DocumentUpdateRequestData {
+  request: {
+    _id: string;
+    driverId: string;
+    documentType: string;
+    reason: string;
+    currentValue?: string;
+    requestedValue?: string;
+    status: 'PENDING' | 'APPROVED' | 'REJECTED';
+    createdAt: string;
+  };
+  message: string;
+}

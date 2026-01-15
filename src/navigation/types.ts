@@ -56,6 +56,8 @@ export type DeliveriesStackParamList = {
   DeliveriesList: {
     initialFilter?: "all" | "pending" | "in_progress" | "picked_up" | "completed" | "failed";
     batchId?: string;
+    completedOrderId?: string;
+    completedOrderNumber?: string;
   } | undefined;
   DeliveryDetail: { deliveryId: string };
   DeliveryStatus: DeliveryStatusParams;

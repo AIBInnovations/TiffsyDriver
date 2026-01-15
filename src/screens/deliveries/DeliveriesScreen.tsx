@@ -8,18 +8,24 @@ import {
   RefreshControl,
   ActivityIndicator,
   Alert,
+  Modal,
+  Animated,
+  StatusBar,
+  Linking,
+  Platform,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useState, useCallback, useMemo, useEffect } from 'react';
-import { useRoute, RouteProp, useFocusEffect } from '@react-navigation/native';
+import { useRoute, RouteProp, useFocusEffect, useNavigation } from '@react-navigation/native';
+import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons';
 import type { DeliveriesStackParamList } from '../../navigation/types';
 import DeliveryCard from './components/DeliveryCard';
 import FilterBar from './components/FilterBar';
 import BatchGroup from './components/BatchGroup';
 import AvailableBatchesModal from './components/AvailableBatchesModal';
-import { getMyBatch, getAvailableBatches, updateDeliveryStatus as apiUpdateDeliveryStatus, acceptBatch } from '../../services/deliveryService';
-import type { Batch, Order, OrderStatus, AvailableBatch } from '../../types/api';
+import { getMyBatch, getAvailableBatches, updateDeliveryStatus as apiUpdateDeliveryStatus, acceptBatch, getDriverOrders } from '../../services/deliveryService';
+import type { Batch, Order, OrderStatus, AvailableBatch, DriverOrder } from '../../types/api';
 
 type FilterStatus = 'all' | 'READY' | 'EN_ROUTE' | 'ARRIVED' | 'DELIVERED' | 'FAILED' | 'RETURNED' | 'PICKED_UP' | 'OUT_FOR_DELIVERY';
 type SortOption = 'sequence' | 'distance' | 'status';
@@ -38,12 +44,31 @@ interface LocalDelivery {
   batchId?: string;
   distance?: string;
   sequenceNumber?: number;
+  deliveryAddress?: {
+    latitude?: number;
+    longitude?: number;
+    coordinates?: {
+      latitude: number;
+      longitude: number;
+    };
+  };
 }
 
 export default function DeliveriesScreen() {
   const route = useRoute<RouteProp<DeliveriesStackParamList, 'DeliveriesList'>>();
+  const navigation = useNavigation<NativeStackNavigationProp<DeliveriesStackParamList>>();
   const initialFilter = route.params?.initialFilter;
   const selectedBatchId = route.params?.batchId;
+  const completedOrderId = route.params?.completedOrderId;
+  const completedOrderNumber = route.params?.completedOrderNumber;
+
+  // Log route params for debugging
+  console.log('📍 DeliveriesScreen route params:', {
+    initialFilter,
+    selectedBatchId,
+    completedOrderId,
+    completedOrderNumber,
+  });
 
   // State
   const [searchQuery, setSearchQuery] = useState('');
@@ -56,11 +81,19 @@ export default function DeliveriesScreen() {
   );
   const [viewingBatchId, setViewingBatchId] = useState<string | null>(selectedBatchId || null);
   const [showAvailableBatchesModal, setShowAvailableBatchesModal] = useState(false);
+  const [showNewBatchToast, setShowNewBatchToast] = useState(false);
+  const [newBatchMessage, setNewBatchMessage] = useState('');
+  const [showCompletionToast, setShowCompletionToast] = useState(false);
+  const [completionMessage, setCompletionMessage] = useState('');
 
   // Backend data
   const [currentBatch, setCurrentBatch] = useState<Batch | null>(null);
   const [currentOrders, setCurrentOrders] = useState<Order[]>([]);
   const [availableBatches, setAvailableBatches] = useState<AvailableBatch[]>([]);
+  const [previousBatchCount, setPreviousBatchCount] = useState<number>(0);
+  const [driverOrders, setDriverOrders] = useState<DriverOrder[]>([]);
+  const [deliveredOrders, setDeliveredOrders] = useState<DriverOrder[]>([]);
+  const [failedOrders, setFailedOrders] = useState<DriverOrder[]>([]);
 
   // Fetch current batch
   const fetchCurrentBatch = useCallback(async () => {
@@ -91,13 +124,88 @@ export default function DeliveriesScreen() {
     }
   }, [selectedBatchId]);
 
+  // Fetch driver orders (active orders not in batch)
+  const fetchDriverOrders = useCallback(async () => {
+    try {
+      console.log('📥 Fetching driver orders...');
+      const response = await getDriverOrders();
+
+      const orders = response.data.orders || [];
+      setDriverOrders(orders);
+      console.log('✅ Driver orders loaded:', orders.length);
+    } catch (error: any) {
+      console.error('❌ Error fetching driver orders:', error);
+      setDriverOrders([]);
+    }
+  }, []);
+
+  // Fetch delivered orders history
+  const fetchDeliveredOrders = useCallback(async () => {
+    try {
+      console.log('📥 Fetching delivered orders history...');
+      const response = await getDriverOrders('DELIVERED');
+
+      const orders = response.data.orders || [];
+      setDeliveredOrders(orders);
+      console.log('✅ Delivered orders loaded:', orders.length);
+
+      // Log order details for debugging
+      if (orders.length > 0) {
+        console.log('📋 Delivered order IDs:', orders.map(o => o.orderNumber).join(', '));
+        orders.forEach((order, index) => {
+          console.log(`📦 Order ${index + 1}:`, {
+            id: order._id,
+            orderNumber: order.orderNumber,
+            status: order.status,
+            customer: order.customer?.name || 'Unknown',
+          });
+        });
+      } else {
+        console.log('⚠️ No delivered orders found in response');
+      }
+    } catch (error: any) {
+      console.error('❌ Error fetching delivered orders:', error);
+      console.error('❌ Error details:', error.message);
+      setDeliveredOrders([]);
+    }
+  }, []);
+
+  // Fetch failed orders history
+  const fetchFailedOrders = useCallback(async () => {
+    try {
+      console.log('📥 Fetching failed orders history...');
+      const response = await getDriverOrders('FAILED');
+
+      const orders = response.data.orders || [];
+      setFailedOrders(orders);
+      console.log('✅ Failed orders loaded:', orders.length);
+    } catch (error: any) {
+      console.error('❌ Error fetching failed orders:', error);
+      setFailedOrders([]);
+    }
+  }, []);
+
   // Fetch available batches
   const fetchAvailableBatches = useCallback(async () => {
     try {
       console.log('📥 Fetching available batches...');
       const response = await getAvailableBatches();
       const batches = response.data.batches || [];
+
+      // Check if new batches were added
+      if (previousBatchCount > 0 && batches.length > previousBatchCount) {
+        const newBatchCount = batches.length - previousBatchCount;
+        setNewBatchMessage(`${newBatchCount} new ${newBatchCount === 1 ? 'batch' : 'batches'} available!`);
+        setShowNewBatchToast(true);
+
+        // Auto-dismiss after 4 seconds
+        setTimeout(() => {
+          setShowNewBatchToast(false);
+        }, 4000);
+      }
+
       setAvailableBatches(batches);
+      setPreviousBatchCount(batches.length);
       console.log('✅ Available batches loaded:', batches.length);
       console.log('📦 Batches data:', JSON.stringify(batches, null, 2));
 
@@ -117,14 +225,14 @@ export default function DeliveriesScreen() {
       console.error('❌ Error details:', error.message);
       setAvailableBatches([]);
     }
-  }, []);
+  }, [previousBatchCount]);
 
   // Initial data load
   useEffect(() => {
     const loadData = async () => {
       setLoading(true);
       try {
-        await Promise.all([fetchCurrentBatch(), fetchAvailableBatches()]);
+        await Promise.all([fetchCurrentBatch(), fetchAvailableBatches(), fetchDriverOrders()]);
       } catch (error) {
         console.error('❌ Error loading deliveries data:', error);
       } finally {
@@ -133,14 +241,74 @@ export default function DeliveriesScreen() {
     };
 
     loadData();
-  }, [fetchCurrentBatch, fetchAvailableBatches]);
+  }, [fetchCurrentBatch, fetchAvailableBatches, fetchDriverOrders]);
+
+  // Fetch delivered orders when DELIVERED filter is selected
+  useEffect(() => {
+    if (filterStatus === 'DELIVERED') {
+      fetchDeliveredOrders();
+    }
+  }, [filterStatus, fetchDeliveredOrders]);
+
+  // Fetch failed orders when FAILED filter is selected
+  useEffect(() => {
+    if (filterStatus === 'FAILED') {
+      fetchFailedOrders();
+    }
+  }, [filterStatus, fetchFailedOrders]);
 
   // Update filter and batch when screen comes into focus
   useFocusEffect(
     useCallback(() => {
+      // Set status bar color to match header
+      StatusBar.setBarStyle('dark-content');
+      StatusBar.setBackgroundColor('#FFFFFF');
+
+      console.log('🔄 DeliveriesScreen focused - refreshing data...');
+
+      // Show completion toast if coming back from completed delivery
+      if (completedOrderId && completedOrderNumber) {
+        setCompletionMessage(`Order ${completedOrderNumber} delivered successfully!`);
+        setShowCompletionToast(true);
+
+        // Auto-dismiss after 5 seconds
+        setTimeout(() => {
+          setShowCompletionToast(false);
+        }, 5000);
+
+        console.log('✅ Completed order:', completedOrderNumber);
+
+        // Fetch delivered orders after a short delay to allow backend to update
+        console.log('🔄 Scheduling delivered orders fetch...');
+        setTimeout(() => {
+          console.log('🔄 Fetching delivered orders after completion...');
+          fetchDeliveredOrders().catch((error) => {
+            console.error('❌ Error fetching delivered orders:', error);
+          });
+        }, 1000); // 1 second delay to allow backend to process
+      }
+
       // Refresh data when screen comes into focus
-      fetchCurrentBatch();
-      fetchAvailableBatches();
+      // Run all fetch operations to ensure we have the latest data
+      Promise.all([
+        fetchCurrentBatch(),
+        fetchAvailableBatches(),
+        fetchDriverOrders(),
+      ]).then(() => {
+        console.log('✅ Data refreshed on focus');
+      }).catch((error) => {
+        console.error('❌ Error refreshing on focus:', error);
+      });
+
+      // Fetch delivered orders if filter is set to DELIVERED
+      if (filterStatus === 'DELIVERED') {
+        fetchDeliveredOrders();
+      }
+
+      // Fetch failed orders if filter is set to FAILED
+      if (filterStatus === 'FAILED') {
+        fetchFailedOrders();
+      }
 
       // Reset filters based on params
       if (selectedBatchId) {
@@ -149,25 +317,126 @@ export default function DeliveriesScreen() {
       } else {
         setViewingBatchId(null);
       }
-    }, [selectedBatchId, fetchCurrentBatch, fetchAvailableBatches])
+    }, [selectedBatchId, filterStatus, completedOrderId, completedOrderNumber, fetchCurrentBatch, fetchAvailableBatches, fetchDriverOrders, fetchDeliveredOrders, fetchFailedOrders])
   );
 
   // Pull to refresh
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
     try {
-      await Promise.all([fetchCurrentBatch(), fetchAvailableBatches()]);
+      const promises = [fetchCurrentBatch(), fetchAvailableBatches(), fetchDriverOrders()];
+
+      // Also fetch delivered orders if filter is set to DELIVERED
+      if (filterStatus === 'DELIVERED') {
+        promises.push(fetchDeliveredOrders());
+      }
+
+      // Also fetch failed orders if filter is set to FAILED
+      if (filterStatus === 'FAILED') {
+        promises.push(fetchFailedOrders());
+      }
+
+      await Promise.all(promises);
     } catch (error) {
       console.error('❌ Error refreshing:', error);
     } finally {
       setRefreshing(false);
     }
-  }, [fetchCurrentBatch, fetchAvailableBatches]);
+  }, [filterStatus, fetchCurrentBatch, fetchAvailableBatches, fetchDriverOrders, fetchDeliveredOrders, fetchFailedOrders]);
 
   // Handle status change
   const handleStatusChange = async (deliveryId: string, newStatus: OrderStatus) => {
     try {
       console.log('📝 Updating order status:', deliveryId, newStatus);
+
+      // Prevent direct DELIVERED status change - navigate to DeliveryStatusScreen
+      if (newStatus === 'DELIVERED') {
+        // Find the order from either currentOrders or driverOrders
+        const batchOrder = currentOrders.find(o => o._id === deliveryId);
+        const driverOrder = driverOrders.find(o => o._id === deliveryId);
+
+        if (batchOrder || driverOrder) {
+          // Build dropoff location string
+          const address = batchOrder?.deliveryAddress || driverOrder?.deliveryAddress;
+          const dropoffLocation = address
+            ? [address.flatNumber, address.street, address.addressLine1, address.landmark, address.area, address.locality, address.city, address.state, address.pincode]
+                .filter(Boolean)
+                .join(', ')
+            : '';
+
+          // Navigate to DeliveryStatus screen for completing delivery with OTP and POD
+          navigation.navigate('DeliveryStatus', {
+            deliveryId: (batchOrder || driverOrder)?._id || '',
+            orderId: (batchOrder || driverOrder)?.orderNumber || '',
+            customerName: driverOrder?.customer?.name || address?.name || 'Customer',
+            customerPhone: driverOrder?.customer?.phone || address?.phone || '',
+            dropoffLocation,
+            specialInstructions: driverOrder?.specialInstructions,
+            currentStatus: (batchOrder || driverOrder)?.status === 'OUT_FOR_DELIVERY' ? 'in_progress' :
+                          (batchOrder || driverOrder)?.status === 'PICKED_UP' ? 'picked_up' : 'in_progress',
+            batchId: currentBatch?._id,
+          });
+        }
+        return;
+      }
+
+      // Check if trying to start a new delivery (READY → OUT_FOR_DELIVERY)
+      const isStartingDelivery = (newStatus === 'OUT_FOR_DELIVERY');
+
+      if (isStartingDelivery) {
+        // Check if there are any active deliveries from current batch (excluding the one being started)
+        const activeOrdersInCurrentBatch = currentOrders.filter(order => {
+          const isActive = order.status === 'OUT_FOR_DELIVERY' ||
+                          order.status === 'PICKED_UP' ||
+                          order.status === 'ARRIVED';
+
+          return isActive && order._id !== deliveryId;
+        });
+
+        // Also check driver orders for active deliveries
+        const activeDriverOrders = driverOrders.filter(order => {
+          return order.status === 'OUT_FOR_DELIVERY' ||
+                 order.status === 'PICKED_UP';
+        });
+
+        const totalActiveOrders = activeOrdersInCurrentBatch.length + activeDriverOrders.length;
+
+        if (totalActiveOrders > 0) {
+          Alert.alert(
+            'Complete Active Deliveries First',
+            `You have ${totalActiveOrders} active ${totalActiveOrders === 1 ? 'delivery' : 'deliveries'}.\n\nPlease complete all active deliveries before starting a new one.`,
+            [{ text: 'OK', style: 'default' }]
+          );
+          return;
+        }
+
+        // Navigate to DeliveryStatus screen when starting delivery
+        const batchOrder = currentOrders.find(o => o._id === deliveryId);
+        const driverOrder = driverOrders.find(o => o._id === deliveryId);
+
+        if (batchOrder || driverOrder) {
+          // Build dropoff location string
+          const address = batchOrder?.deliveryAddress || driverOrder?.deliveryAddress;
+          const dropoffLocation = address
+            ? [address.flatNumber, address.street, address.addressLine1, address.landmark, address.area, address.locality, address.city, address.state, address.pincode]
+                .filter(Boolean)
+                .join(', ')
+            : '';
+
+          // Navigate to DeliveryStatus screen
+          navigation.navigate('DeliveryStatus', {
+            deliveryId: (batchOrder || driverOrder)?._id || '',
+            orderId: (batchOrder || driverOrder)?.orderNumber || '',
+            customerName: driverOrder?.customer?.name || address?.name || 'Customer',
+            customerPhone: driverOrder?.customer?.phone || address?.phone || '',
+            dropoffLocation,
+            specialInstructions: driverOrder?.specialInstructions,
+            currentStatus: 'pending', // Starting delivery, so status is pending
+            batchId: currentBatch?._id,
+          });
+        }
+        return;
+      }
 
       // Call the API to update status
       await apiUpdateDeliveryStatus(deliveryId, { status: newStatus });
@@ -223,41 +492,181 @@ export default function DeliveriesScreen() {
     }
   };
 
+  // Handle call customer
+  const handleCallCustomer = (phone: string) => {
+    const phoneUrl = Platform.OS === 'ios' ? `telprompt:${phone}` : `tel:${phone}`;
+    Linking.canOpenURL(phoneUrl)
+      .then(supported => {
+        if (supported) {
+          return Linking.openURL(phoneUrl);
+        } else {
+          Alert.alert('Error', 'Phone dialer is not available');
+        }
+      })
+      .catch(err => console.error('Error opening phone dialer:', err));
+  };
+
+  // Handle navigate to address
+  const handleNavigate = (latitude?: number, longitude?: number, address?: string) => {
+    if (latitude && longitude) {
+      const url = Platform.OS === 'ios'
+        ? `maps:0,0?q=${latitude},${longitude}`
+        : `geo:0,0?q=${latitude},${longitude}`;
+
+      Linking.canOpenURL(url)
+        .then(supported => {
+          if (supported) {
+            return Linking.openURL(url);
+          } else {
+            // Fallback to Google Maps web
+            const webUrl = `https://www.google.com/maps/search/?api=1&query=${latitude},${longitude}`;
+            return Linking.openURL(webUrl);
+          }
+        })
+        .catch(err => console.error('Error opening maps:', err));
+    } else if (address) {
+      const encodedAddress = encodeURIComponent(address);
+      const url = Platform.OS === 'ios'
+        ? `maps:0,0?q=${encodedAddress}`
+        : `geo:0,0?q=${encodedAddress}`;
+
+      Linking.openURL(url).catch(err => console.error('Error opening maps:', err));
+    } else {
+      Alert.alert('Error', 'No address or coordinates available');
+    }
+  };
+
   // Convert API orders to local delivery format
   const convertOrderToDelivery = (order: Order, batchId?: string): LocalDelivery => {
+    // Build address string with available fields
+    const addressParts = [
+      order.deliveryAddress?.street,
+      order.deliveryAddress?.area,
+      order.deliveryAddress?.city
+    ].filter(Boolean);
+
+    const dropoffLocation = addressParts.length > 0 ? addressParts.join(', ') : 'Address not available';
+
     return {
       id: order._id,
       orderId: order.orderNumber,
-      customerName: order.deliveryAddress.name || 'Customer',
-      customerPhone: order.deliveryAddress.phone || '',
+      customerName: order.deliveryAddress?.name || 'Customer',
+      customerPhone: order.deliveryAddress?.phone || '',
       pickupLocation: currentBatch && typeof currentBatch.kitchenId === 'object'
         ? `${currentBatch.kitchenId.name}, ${currentBatch.kitchenId.address.area}`
         : 'Kitchen',
-      dropoffLocation: `${order.deliveryAddress.street}, ${order.deliveryAddress.area}, ${order.deliveryAddress.city}`,
+      dropoffLocation,
       status: order.status,
       eta: '15 mins', // TODO: Calculate ETA
       deliveryWindow: currentBatch?.mealWindow || 'LUNCH',
       batchId: batchId,
       distance: '5 km', // TODO: Calculate distance
       sequenceNumber: order.sequenceNumber,
+      deliveryAddress: order.deliveryAddress ? {
+        latitude: order.deliveryAddress.latitude,
+        longitude: order.deliveryAddress.longitude,
+        coordinates: order.deliveryAddress.coordinates,
+      } : undefined,
+    };
+  };
+
+  // Convert driver orders to local delivery format
+  const convertDriverOrderToDelivery = (order: DriverOrder): LocalDelivery => {
+    // Handle missing customer data - use deliveryAddress as fallback
+    const customerName = order.customer?.name || order.deliveryAddress?.name || 'Customer';
+    const customerPhone = order.customer?.phone || order.deliveryAddress?.phone || '';
+
+    // Build address string with available fields
+    const addressParts = [
+      order.deliveryAddress?.street || order.deliveryAddress?.addressLine1,
+      order.deliveryAddress?.area || order.deliveryAddress?.locality,
+      order.deliveryAddress?.city
+    ].filter(Boolean);
+
+    const dropoffLocation = addressParts.length > 0 ? addressParts.join(', ') : 'Address not available';
+
+    return {
+      id: order._id,
+      orderId: order.orderNumber,
+      customerName,
+      customerPhone,
+      pickupLocation: 'Kitchen',
+      dropoffLocation,
+      status: order.status,
+      eta: '15 mins',
+      deliveryWindow: 'LUNCH',
+      distance: '5 km',
+      deliveryAddress: order.deliveryAddress ? {
+        latitude: order.deliveryAddress.latitude,
+        longitude: order.deliveryAddress.longitude,
+        coordinates: order.deliveryAddress.coordinates,
+      } : undefined,
     };
   };
 
   // Get deliveries from current batch
+  // NOTE: This returns ALL deliveries without filtering - filtering happens in filteredAndSortedDeliveries
   const deliveries: LocalDelivery[] = useMemo(() => {
-    if (!currentBatch || !currentOrders || currentOrders.length === 0) {
-      console.log('📭 No deliveries to display - currentBatch:', !!currentBatch, 'currentOrders:', currentOrders?.length || 0);
-      return [];
+    console.log('🔄 Calculating deliveries to display:', {
+      filterStatus,
+      deliveredOrdersCount: deliveredOrders.length,
+      failedOrdersCount: failedOrders.length,
+      driverOrdersCount: driverOrders.length,
+      currentOrdersCount: currentOrders.length,
+    });
+
+    // Show batch orders + delivered orders + failed orders
+    const allDeliveries: LocalDelivery[] = [];
+    const seenIds = new Set<string>();
+
+    // Add current batch orders first
+    if (currentBatch && currentOrders && currentOrders.length > 0) {
+      const converted = currentOrders.map(order => convertOrderToDelivery(order, currentBatch._id));
+      converted.forEach(delivery => {
+        if (!seenIds.has(delivery.id)) {
+          seenIds.add(delivery.id);
+          allDeliveries.push(delivery);
+        }
+      });
+      console.log('📦 Added', converted.length, 'orders from current batch');
     }
 
-    const converted = currentOrders.map(order => convertOrderToDelivery(order, currentBatch._id));
-    console.log('📦 Displaying', converted.length, 'deliveries from API');
-    console.log('📋 Order IDs:', converted.map(d => d.orderId).join(', '));
-    return converted;
-  }, [currentBatch, currentOrders]);
+    // Add delivered orders (skip if already added from batch)
+    const convertedDelivered = deliveredOrders.map(order => convertDriverOrderToDelivery(order));
+    let deliveredAdded = 0;
+    convertedDelivered.forEach(delivery => {
+      if (!seenIds.has(delivery.id)) {
+        seenIds.add(delivery.id);
+        allDeliveries.push(delivery);
+        deliveredAdded++;
+      }
+    });
+    console.log('📦 Added', deliveredAdded, 'delivered orders (', convertedDelivered.length - deliveredAdded, 'duplicates skipped)');
+
+    // Add failed orders (skip if already added from batch)
+    const convertedFailed = failedOrders.map(order => convertDriverOrderToDelivery(order));
+    let failedAdded = 0;
+    convertedFailed.forEach(delivery => {
+      if (!seenIds.has(delivery.id)) {
+        seenIds.add(delivery.id);
+        allDeliveries.push(delivery);
+        failedAdded++;
+      }
+    });
+    console.log('📦 Added', failedAdded, 'failed orders (', convertedFailed.length - failedAdded, 'duplicates skipped)');
+
+    console.log('📦 Total unique deliveries:', allDeliveries.length);
+    return allDeliveries;
+  }, [currentBatch, currentOrders, driverOrders, deliveredOrders, failedOrders]);
 
   // Filter and sort deliveries
   const filteredAndSortedDeliveries = useMemo(() => {
+    console.log('🔍 Filtering deliveries:', {
+      totalDeliveries: deliveries.length,
+      filterStatus,
+      searchQuery: searchQuery || 'none',
+    });
+
     let result = [...deliveries];
 
     // Search filter
@@ -268,11 +677,22 @@ export default function DeliveriesScreen() {
           d.orderId.toLowerCase().includes(query) ||
           d.customerName.toLowerCase().includes(query)
       );
+      console.log('🔍 After search filter:', result.length, 'deliveries');
     }
 
     // Status filter
     if (filterStatus !== 'all') {
+      const beforeFilter = result.length;
       result = result.filter(d => d.status === filterStatus);
+      console.log(`🔍 Status filter '${filterStatus}': ${beforeFilter} → ${result.length} deliveries`);
+
+      if (result.length > 0) {
+        console.log('📋 Filtered order statuses:', result.map(d => `${d.orderId}:${d.status}`).join(', '));
+      } else {
+        console.log('⚠️ No deliveries match filter:', filterStatus);
+        const uniqueStatuses = Array.from(new Set(deliveries.map(d => d.status)));
+        console.log('⚠️ Available statuses:', uniqueStatuses.join(', '));
+      }
     }
 
     // Sorting
@@ -300,6 +720,11 @@ export default function DeliveriesScreen() {
 
   // Group by batch
   const batchedDeliveries = useMemo(() => {
+    // Don't group if viewing delivered or failed order history
+    if (filterStatus === 'DELIVERED' || filterStatus === 'FAILED') {
+      return [];
+    }
+
     if (!currentBatch) return [];
 
     // Filter if viewing specific batch
@@ -313,7 +738,7 @@ export default function DeliveriesScreen() {
         deliveries: filteredAndSortedDeliveries,
       },
     ];
-  }, [currentBatch, filteredAndSortedDeliveries, viewingBatchId]);
+  }, [filterStatus, currentBatch, filteredAndSortedDeliveries, viewingBatchId]);
 
   const activeDeliveriesCount = (deliveries || []).filter(
     d => d.status === 'READY' || d.status === 'PICKED_UP' || d.status === 'OUT_FOR_DELIVERY'
@@ -323,6 +748,7 @@ export default function DeliveriesScreen() {
   if (loading) {
     return (
       <SafeAreaView style={styles.container}>
+        <StatusBar barStyle="dark-content" backgroundColor="#FFFFFF" />
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color="#F56B4C" />
           <Text style={styles.loadingText}>Loading deliveries...</Text>
@@ -338,6 +764,8 @@ export default function DeliveriesScreen() {
 
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
+      <StatusBar barStyle="dark-content" backgroundColor="#FFFFFF" />
+
       {/* Sticky Header */}
       <View style={styles.header}>
         <View style={styles.headerTop}>
@@ -354,23 +782,16 @@ export default function DeliveriesScreen() {
                   : 'Your Deliveries'}
               </Text>
               <Text style={styles.subtitle}>
-                {currentBatch
+                {filterStatus === 'DELIVERED'
+                  ? `${deliveredOrders.length} delivered orders`
+                  : filterStatus === 'FAILED'
+                  ? `${failedOrders.length} failed orders`
+                  : currentBatch
                   ? `${activeDeliveriesCount} active • ${(deliveries || []).length} total`
                   : 'No active deliveries'}
               </Text>
             </View>
           </View>
-          <TouchableOpacity
-            style={styles.notificationButton}
-            onPress={() => availableBatches.length > 0 && setShowAvailableBatchesModal(true)}
-          >
-            <MaterialCommunityIcons name="bell-outline" size={28} color="#F56B4C" />
-            {availableBatches.length > 0 && (
-              <View style={styles.notificationBadge}>
-                <Text style={styles.notificationBadgeText}>{availableBatches.length}</Text>
-              </View>
-            )}
-          </TouchableOpacity>
         </View>
 
         {/* Search Bar */}
@@ -437,8 +858,20 @@ export default function DeliveriesScreen() {
           // Filtered empty state
           <View style={styles.emptyState}>
             <MaterialCommunityIcons name="filter-off" size={80} color="#D1D5DB" />
-            <Text style={styles.emptyTitle}>No deliveries found</Text>
-            <Text style={styles.emptySubtitle}>Try adjusting your search or filters</Text>
+            <Text style={styles.emptyTitle}>
+              {filterStatus === 'DELIVERED'
+                ? 'No delivered orders found'
+                : filterStatus === 'FAILED'
+                ? 'No failed orders found'
+                : 'No deliveries found'}
+            </Text>
+            <Text style={styles.emptySubtitle}>
+              {filterStatus === 'DELIVERED'
+                ? 'You haven\'t delivered any orders yet'
+                : filterStatus === 'FAILED'
+                ? 'You haven\'t had any failed deliveries'
+                : 'Try adjusting your search or filters'}
+            </Text>
             <TouchableOpacity
               style={styles.refreshButton}
               onPress={() => {
@@ -452,24 +885,55 @@ export default function DeliveriesScreen() {
           </View>
         ) : (
           <>
-            {/* Batched Deliveries */}
-            {batchedDeliveries.map(({ batch, deliveries: batchDeliveries }) => (
-              <BatchGroup
-                key={batch._id}
-                batchId={batch._id}
-                deliveryCount={batchDeliveries.length}
-                isExpanded={expandedBatches.includes(batch._id)}
-                onToggle={() => toggleBatchExpand(batch._id)}
-              >
-                {batchDeliveries.map(delivery => (
+            {/* Show delivered orders without batch grouping */}
+            {filterStatus === 'DELIVERED' ? (
+              <View style={styles.deliveredOrdersList}>
+                {filteredAndSortedDeliveries.map(delivery => (
                   <DeliveryCard
                     key={delivery.id}
                     delivery={delivery as any}
                     onStatusChange={handleStatusChange as any}
+                    onCallCustomer={handleCallCustomer}
+                    onNavigate={handleNavigate}
                   />
                 ))}
-              </BatchGroup>
-            ))}
+              </View>
+            ) : filterStatus === 'FAILED' ? (
+              <View style={styles.deliveredOrdersList}>
+                {filteredAndSortedDeliveries.map(delivery => (
+                  <DeliveryCard
+                    key={delivery.id}
+                    delivery={delivery as any}
+                    onStatusChange={handleStatusChange as any}
+                    onCallCustomer={handleCallCustomer}
+                    onNavigate={handleNavigate}
+                  />
+                ))}
+              </View>
+            ) : (
+              <>
+                {/* Batched Deliveries */}
+                {batchedDeliveries.map(({ batch, deliveries: batchDeliveries }) => (
+                  <BatchGroup
+                    key={batch._id}
+                    batchId={batch._id}
+                    deliveryCount={batchDeliveries.length}
+                    isExpanded={expandedBatches.includes(batch._id)}
+                    onToggle={() => toggleBatchExpand(batch._id)}
+                  >
+                    {batchDeliveries.map(delivery => (
+                      <DeliveryCard
+                        key={delivery.id}
+                        delivery={delivery as any}
+                        onStatusChange={handleStatusChange as any}
+                        onCallCustomer={handleCallCustomer}
+                        onNavigate={handleNavigate}
+                      />
+                    ))}
+                  </BatchGroup>
+                ))}
+              </>
+            )}
           </>
         )}
       </ScrollView>
@@ -481,6 +945,57 @@ export default function DeliveriesScreen() {
         onClose={() => setShowAvailableBatchesModal(false)}
         onAcceptBatch={handleAcceptBatch}
       />
+
+      {/* New Batch Toast Notification */}
+      {showNewBatchToast && (
+        <Animated.View style={styles.toastContainer}>
+          <View style={styles.toastContent}>
+            <View style={styles.toastIconContainer}>
+              <MaterialCommunityIcons name="package-variant-closed" size={24} color="#FFFFFF" />
+            </View>
+            <View style={styles.toastTextContainer}>
+              <Text style={styles.toastTitle}>New Batch Available!</Text>
+              <Text style={styles.toastMessage}>{newBatchMessage}</Text>
+            </View>
+            <TouchableOpacity
+              style={styles.toastButton}
+              onPress={() => {
+                setShowNewBatchToast(false);
+                setShowAvailableBatchesModal(true);
+              }}
+            >
+              <Text style={styles.toastButtonText}>View</Text>
+            </TouchableOpacity>
+          </View>
+        </Animated.View>
+      )}
+
+      {/* Completion Toast Notification */}
+      {showCompletionToast && (
+        <Animated.View style={styles.toastContainer}>
+          <View style={[styles.toastContent, styles.successToastContent]}>
+            <View style={[styles.toastIconContainer, styles.successToastIcon]}>
+              <MaterialCommunityIcons name="check-circle" size={24} color="#FFFFFF" />
+            </View>
+            <View style={styles.toastTextContainer}>
+              <Text style={styles.toastTitle}>Delivery Completed!</Text>
+              <Text style={styles.toastMessage}>{completionMessage}</Text>
+            </View>
+            <TouchableOpacity
+              style={styles.toastButton}
+              onPress={async () => {
+                setShowCompletionToast(false);
+                setFilterStatus('DELIVERED');
+                // Fetch delivered orders to ensure we have the latest data
+                console.log('🔄 Fetching delivered orders after completion...');
+                await fetchDeliveredOrders();
+              }}
+            >
+              <Text style={styles.toastButtonText}>View</Text>
+            </TouchableOpacity>
+          </View>
+        </Animated.View>
+      )}
     </SafeAreaView>
   );
 }
@@ -504,9 +1019,7 @@ const styles = StyleSheet.create({
     backgroundColor: 'white',
     paddingHorizontal: 16,
     paddingTop: 16,
-    paddingBottom: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: '#F3F4F6',
+    paddingBottom: 6,
   },
   headerTop: {
     flexDirection: 'row',
@@ -533,29 +1046,6 @@ const styles = StyleSheet.create({
     color: '#6B7280',
     marginTop: 4,
   },
-  notificationButton: {
-    padding: 8,
-    backgroundColor: '#FEF2F2',
-    borderRadius: 20,
-    position: 'relative',
-  },
-  notificationBadge: {
-    position: 'absolute',
-    top: 4,
-    right: 4,
-    minWidth: 18,
-    height: 18,
-    borderRadius: 9,
-    backgroundColor: '#EF4444',
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingHorizontal: 4,
-  },
-  notificationBadgeText: {
-    fontSize: 10,
-    fontWeight: '700',
-    color: '#FFFFFF',
-  },
   searchContainer: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -577,6 +1067,9 @@ const styles = StyleSheet.create({
   scrollContent: {
     paddingTop: 16,
     paddingBottom: 20,
+  },
+  deliveredOrdersList: {
+    paddingHorizontal: 16,
   },
   emptyState: {
     alignItems: 'center',
@@ -627,5 +1120,65 @@ const styles = StyleSheet.create({
     fontSize: 15,
     fontWeight: '600',
     marginLeft: 8,
+  },
+  toastContainer: {
+    position: 'absolute',
+    top: 20,
+    left: 16,
+    right: 16,
+    zIndex: 1000,
+  },
+  toastContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#10B981',
+    borderRadius: 12,
+    padding: 16,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 8,
+  },
+  toastIconContainer: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 12,
+  },
+  toastTextContainer: {
+    flex: 1,
+  },
+  toastTitle: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: '#FFFFFF',
+    marginBottom: 2,
+  },
+  toastMessage: {
+    fontSize: 13,
+    color: '#FFFFFF',
+    opacity: 0.9,
+  },
+  toastButton: {
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 8,
+    marginLeft: 8,
+  },
+  toastButtonText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#FFFFFF',
+  },
+  successToastContent: {
+    backgroundColor: '#10B981',
+  },
+  successToastIcon: {
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
   },
 });

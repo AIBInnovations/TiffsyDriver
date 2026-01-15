@@ -7,6 +7,7 @@ import type {
   MyBatchData,
   DeliveryStatusUpdateRequest,
   DeliveryStatusUpdateData,
+  DriverOrdersData,
 } from '../types/api';
 
 // Create authorized headers with Firebase token
@@ -308,6 +309,39 @@ export const getBatchDetails = async (batchId: string): Promise<ApiResponse<any>
     return data;
   } catch (error: any) {
     console.error('❌ Error getting batch details:', error);
+    throw error;
+  }
+};
+
+// Get driver's active orders (PICKED_UP and OUT_FOR_DELIVERY) or filter by status
+export const getDriverOrders = async (status?: string): Promise<ApiResponse<DriverOrdersData>> => {
+  try {
+    const endpoint = status
+      ? `${API_CONFIG.BASE_URL}${API_CONFIG.ENDPOINTS.DRIVER_ORDERS}?status=${status}`
+      : `${API_CONFIG.BASE_URL}${API_CONFIG.ENDPOINTS.DRIVER_ORDERS}`;
+
+    console.log('📡 Calling /orders/driver endpoint...', status ? `with status: ${status}` : '');
+
+    const headers = await createHeaders();
+
+    const response = await fetch(endpoint, {
+      method: 'GET',
+      headers,
+    });
+
+    console.log('📡 Response status:', response.status);
+
+    const data: ApiResponse<DriverOrdersData> = await response.json();
+
+    if (!response.ok) {
+      throw new Error(data.error || data.message || 'Failed to get driver orders');
+    }
+
+    console.log('✅ Driver orders retrieved:', data?.data?.count || 0);
+
+    return data;
+  } catch (error: any) {
+    console.error('❌ Error getting driver orders:', error);
     throw error;
   }
 };

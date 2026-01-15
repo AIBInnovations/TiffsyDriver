@@ -147,19 +147,24 @@ export default function AvailableBatchesModal({
                         <View style={styles.batchIcon}>
                           <MaterialCommunityIcons
                             name="package-variant-closed"
-                            size={20}
+                            size={18}
                             color="#FFFFFF"
                           />
                         </View>
-                        <View>
-                          <Text style={styles.batchNumber}>{batch.batchNumber}</Text>
+                        <View style={styles.batchHeaderText}>
+                          <Text style={styles.batchNumber} numberOfLines={1} ellipsizeMode="tail">
+                            {batch.batchNumber}
+                          </Text>
                           <View style={styles.mealWindowBadge}>
                             <MaterialCommunityIcons
                               name="clock-outline"
                               size={12}
                               color="#F59E0B"
+                              style={styles.mealWindowIcon}
                             />
-                            <Text style={styles.mealWindowText}>{batch.mealWindow}</Text>
+                            <Text style={styles.mealWindowText} numberOfLines={1} ellipsizeMode="tail">
+                              {batch.mealWindow}
+                            </Text>
                           </View>
                         </View>
                       </View>
@@ -171,10 +176,10 @@ export default function AvailableBatchesModal({
                         <MaterialCommunityIcons name="store" size={18} color="#6B7280" />
                         <View style={styles.infoContent}>
                           <Text style={styles.infoLabel}>Kitchen</Text>
-                          <Text style={styles.infoValue}>
+                          <Text style={styles.infoValue} numberOfLines={1} ellipsizeMode="tail">
                             {batch.kitchen?.name || 'Kitchen Name N/A'}
                           </Text>
-                          <Text style={styles.infoSubtext}>
+                          <Text style={styles.infoSubtext} numberOfLines={1} ellipsizeMode="tail">
                             {batch.kitchen?.address?.locality || batch.kitchen?.address?.area || 'Area'}, {batch.kitchen?.address?.city || 'City'}
                           </Text>
                         </View>
@@ -184,10 +189,10 @@ export default function AvailableBatchesModal({
                         <MaterialCommunityIcons name="map-marker" size={18} color="#6B7280" />
                         <View style={styles.infoContent}>
                           <Text style={styles.infoLabel}>Zone</Text>
-                          <Text style={styles.infoValue}>
+                          <Text style={styles.infoValue} numberOfLines={1} ellipsizeMode="tail">
                             {batch.zone?.name || 'Zone Name N/A'}
                           </Text>
-                          <Text style={styles.infoSubtext}>
+                          <Text style={styles.infoSubtext} numberOfLines={1} ellipsizeMode="tail">
                             {batch.zone?.city || 'City'}
                           </Text>
                         </View>
@@ -228,8 +233,10 @@ export default function AvailableBatchesModal({
                         disabled={acceptingBatchId !== null}
                         activeOpacity={0.8}
                       >
-                        <MaterialCommunityIcons name="close" size={18} color="#EF4444" />
-                        <Text style={styles.skipButtonText}>Not Interested</Text>
+                        <MaterialCommunityIcons name="close" size={18} color="#EF4444" style={styles.buttonIcon} />
+                        <Text style={styles.skipButtonText} numberOfLines={1} ellipsizeMode="tail">
+                          Not Interested
+                        </Text>
                       </TouchableOpacity>
 
                       <TouchableOpacity
@@ -244,13 +251,17 @@ export default function AvailableBatchesModal({
                       >
                         {acceptingBatchId === batch._id ? (
                           <>
-                            <ActivityIndicator size="small" color="#FFFFFF" />
-                            <Text style={styles.acceptButtonText}>Accepting...</Text>
+                            <ActivityIndicator size="small" color="#FFFFFF" style={styles.buttonIcon} />
+                            <Text style={styles.acceptButtonText} numberOfLines={1} ellipsizeMode="tail">
+                              Accepting...
+                            </Text>
                           </>
                         ) : (
                           <>
-                            <MaterialCommunityIcons name="check" size={20} color="#FFFFFF" />
-                            <Text style={styles.acceptButtonText}>Accept</Text>
+                            <MaterialCommunityIcons name="check" size={20} color="#FFFFFF" style={styles.buttonIcon} />
+                            <Text style={styles.acceptButtonText} numberOfLines={1} ellipsizeMode="tail">
+                              Accept
+                            </Text>
                           </>
                         )}
                       </TouchableOpacity>
@@ -276,11 +287,13 @@ const styles = StyleSheet.create({
     borderTopLeftRadius: 24,
     borderTopRightRadius: 24,
     height: '85%',
+    width: '100%',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: -4 },
     shadowOpacity: 0.1,
     shadowRadius: 12,
     elevation: 10,
+    overflow: 'hidden',
   },
   header: {
     flexDirection: 'row',
@@ -325,6 +338,7 @@ const styles = StyleSheet.create({
   },
   scrollView: {
     flex: 1,
+    width: '100%',
   },
   scrollContent: {
     padding: 16,
@@ -352,13 +366,18 @@ const styles = StyleSheet.create({
   batchCard: {
     backgroundColor: '#FFFFFF',
     borderRadius: 16,
-    padding: 16,
+    paddingTop: 16,
+    paddingBottom: 16,
+    paddingHorizontal: 16,
     marginBottom: 16,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.08,
     shadowRadius: 8,
     elevation: 3,
+    overflow: 'hidden',
+    width: '100%',
+    alignSelf: 'center',
   },
   batchHeader: {
     flexDirection: 'row',
@@ -368,25 +387,35 @@ const styles = StyleSheet.create({
     paddingBottom: 16,
     borderBottomWidth: 1,
     borderBottomColor: '#F3F4F6',
+    width: '100%',
   },
   batchHeaderLeft: {
     flexDirection: 'row',
     alignItems: 'center',
+    flex: 1,
+    minWidth: 0,
   },
   batchIcon: {
-    width: 40,
-    height: 40,
-    borderRadius: 12,
+    width: 32,
+    height: 32,
+    borderRadius: 10,
     backgroundColor: '#F56B4C',
     alignItems: 'center',
     justifyContent: 'center',
-    marginRight: 12,
+    marginRight: 8,
+    flexShrink: 0,
+  },
+  batchHeaderText: {
+    flex: 1,
+    minWidth: 0,
+    flexShrink: 1,
   },
   batchNumber: {
     fontSize: 16,
     fontWeight: '700',
     color: '#111827',
     marginBottom: 4,
+    width: '100%',
   },
   mealWindowBadge: {
     flexDirection: 'row',
@@ -395,12 +424,20 @@ const styles = StyleSheet.create({
     paddingHorizontal: 8,
     paddingVertical: 3,
     borderRadius: 8,
-    gap: 4,
+    alignSelf: 'flex-start',
+    maxWidth: '100%',
+    flexShrink: 1,
+    marginLeft: -4,
+  },
+  mealWindowIcon: {
+    flexShrink: 0,
+    marginRight: 4,
   },
   mealWindowText: {
     fontSize: 11,
     fontWeight: '600',
     color: '#92400E',
+    flexShrink: 1,
   },
   infoSection: {
     marginBottom: 16,
@@ -461,6 +498,9 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     gap: 10,
   },
+  buttonIcon: {
+    flexShrink: 0,
+  },
   skipButton: {
     flex: 1,
     backgroundColor: '#FFFFFF',
@@ -468,6 +508,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     paddingVertical: 14,
+    paddingHorizontal: 8,
     borderRadius: 12,
     gap: 6,
     borderWidth: 1.5,
@@ -477,6 +518,8 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '600',
     color: '#EF4444',
+    flex: 1,
+    textAlign: 'center',
   },
   acceptButton: {
     flex: 1.2,
@@ -485,6 +528,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     paddingVertical: 14,
+    paddingHorizontal: 8,
     borderRadius: 12,
     gap: 8,
     shadowColor: '#10B981',
@@ -505,5 +549,7 @@ const styles = StyleSheet.create({
     fontSize: 15,
     fontWeight: '600',
     color: '#FFFFFF',
+    flex: 1,
+    textAlign: 'center',
   },
 });

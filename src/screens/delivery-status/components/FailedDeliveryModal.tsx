@@ -17,13 +17,12 @@ interface FailureReason {
 }
 
 const failureReasons: FailureReason[] = [
-  { id: "customer_unavailable", label: "Customer not available", icon: "account-off" },
-  { id: "wrong_address", label: "Wrong address", icon: "map-marker-off" },
-  { id: "customer_refused", label: "Customer refused delivery", icon: "hand-back-left" },
-  { id: "access_denied", label: "Access denied to location", icon: "lock" },
-  { id: "package_damaged", label: "Package damaged", icon: "package-variant-remove" },
-  { id: "business_closed", label: "Business closed", icon: "store-off" },
-  { id: "other", label: "Other", icon: "dots-horizontal" },
+  { id: "CUSTOMER_UNAVAILABLE", label: "Customer not available", icon: "account-off" },
+  { id: "WRONG_ADDRESS", label: "Wrong address", icon: "map-marker-off" },
+  { id: "CUSTOMER_REFUSED", label: "Customer refused delivery", icon: "hand-back-left" },
+  { id: "ADDRESS_NOT_FOUND", label: "Address not found", icon: "map-marker-off" },
+  { id: "CUSTOMER_UNREACHABLE", label: "Customer unreachable", icon: "phone-off" },
+  { id: "OTHER", label: "Other", icon: "dots-horizontal" },
 ];
 
 export default function FailedDeliveryModal({
@@ -40,9 +39,8 @@ export default function FailedDeliveryModal({
     if (!selectedReason) return;
 
     setIsSubmitting(true);
-    const reason = failureReasons.filter(r => r.id === selectedReason)[0];
-    const reasonLabel = reason ? reason.label : selectedReason;
-    onSubmit(reasonLabel, notes);
+    // Send the reason ID which is now the API enum value
+    onSubmit(selectedReason, notes);
     resetForm();
     setIsSubmitting(false);
   };
