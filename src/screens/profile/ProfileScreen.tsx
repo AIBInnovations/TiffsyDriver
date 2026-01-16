@@ -14,6 +14,7 @@ import { useNavigation, useFocusEffect } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import MaterialCommunityIcons from "react-native-vector-icons/MaterialCommunityIcons";
 import type { RootStackParamList, ProfileStackParamList } from "../../navigation/types";
+import type { UpdateVehicleRequest } from "../../types/api";
 import {
   useDriverProfileStore,
   getInitials,
@@ -24,6 +25,7 @@ import {
 import {
   getDriverProfile,
   updateDriverProfile as updateDriverProfileAPI,
+  updateDriverVehicle,
 } from "../../services/driverProfileService";
 import {
   ProfileAvatar,
@@ -255,7 +257,7 @@ export default function ProfileScreen() {
       await clearSessionData();
 
       // Small delay to ensure state is cleared
-      await new Promise(resolve => setTimeout(resolve, 100));
+      await new Promise<void>(resolve => setTimeout(() => resolve(), 100));
 
       // Navigate - this will unmount the screen and modal automatically
       navigation.reset({
@@ -349,13 +351,9 @@ export default function ProfileScreen() {
         {/* Profile Header Card */}
         <View style={styles.headerCard}>
           <View style={styles.headerCardContent}>
-            <ProfileAvatar
-              initials={getInitials(profile.fullName)}
-              size="lg"
-              isOnline={profile.availabilityStatus === "ONLINE"}
-            />
             <View style={styles.headerCardInfo}>
               <Text style={styles.profileName}>{profile.fullName}</Text>
+              <Text style={styles.profilePhoneHeader}>{profile.phone}</Text>
               <View style={[styles.statusBadge, profile.availabilityStatus === "ONLINE" ? styles.statusBadgeOnline : styles.statusBadgeOffline]}>
                 <View style={[styles.statusBadgeDot, profile.availabilityStatus === "ONLINE" ? styles.statusBadgeDotOnline : styles.statusBadgeDotOffline]} />
                 <Text style={[styles.statusBadgeText, profile.availabilityStatus === "ONLINE" ? styles.statusBadgeTextOnline : styles.statusBadgeTextOffline]}>
@@ -363,16 +361,16 @@ export default function ProfileScreen() {
                 </Text>
               </View>
             </View>
+            <ProfileAvatar
+              initials={getInitials(profile.fullName)}
+              size="lg"
+              isOnline={profile.availabilityStatus === "ONLINE"}
+            />
           </View>
           <View style={styles.headerCardMeta}>
-            <View style={[styles.metaItem, { gap: 6 }]}>
+            <View style={styles.metaItem}>
               <MaterialCommunityIcons name="card-account-details-outline" size={14} color="#6B7280" />
               <Text style={styles.metaText}>{profile.driverId}</Text>
-            </View>
-            <View style={styles.metaDivider} />
-            <View style={styles.metaItem}>
-              <MaterialCommunityIcons name="phone-outline" size={14} color="#6B7280" />
-              <Text style={styles.metaText}>{profile.phone}</Text>
             </View>
           </View>
           <Pressable
@@ -536,7 +534,7 @@ export default function ProfileScreen() {
                 apiCalls.push(updateDriverProfileAPI(profileUpdates));
               }
               if (Object.keys(vehicleUpdates).length > 0) {
-                apiCalls.push(updateDriverVehicle(vehicleUpdates));
+                apiCalls.push(updateDriverVehicle(vehicleUpdates as UpdateVehicleRequest));
               }
 
               if (apiCalls.length > 0) {
@@ -645,7 +643,13 @@ const styles = StyleSheet.create({
   },
   headerCardInfo: {
     flex: 1,
-    marginLeft: 16,
+    paddingRight: 16,
+  },
+  profilePhoneHeader: {
+    fontSize: 15,
+    color: "#4B5563",
+    fontWeight: "500",
+    marginBottom: 10,
   },
   profileName: {
     fontSize: 22,

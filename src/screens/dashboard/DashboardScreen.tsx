@@ -23,6 +23,8 @@ import { getMyBatch, getAvailableBatches, markBatchPickedUp, acceptBatch, getDri
 import { getCurrentUser } from '../../services/authService';
 import { getDriverStats } from '../../services/driverProfileService';
 import type { Batch, BatchSummary, AvailableBatch, DriverStats, HistoryBatch, HistorySingleOrder } from '../../types/api';
+import AvailableBatchItem from './components/AvailableBatchItem';
+
 
 export default function DashboardScreen() {
   const navigation = useNavigation<BottomTabNavigationProp<MainTabsParamList>>();
@@ -47,6 +49,7 @@ export default function DashboardScreen() {
   const [availableBatches, setAvailableBatches] = useState<AvailableBatch[]>([]);
   const [availableBatchesCount, setAvailableBatchesCount] = useState(0);
   const [acceptingBatch, setAcceptingBatch] = useState(false);
+  const [acceptingBatchId, setAcceptingBatchId] = useState<string | null>(null);
   const [driverStats, setDriverStats] = useState<DriverStats>({
     totalDeliveries: 0,
     deliveredCount: 0,
@@ -160,9 +163,6 @@ export default function DashboardScreen() {
       setAvailableBatches(batches);
       setAvailableBatchesCount(batches.length);
       console.log('✅ Available batches:', batches.length);
-      if (batches.length > 0) {
-        console.log('📊 First Available Batch Structure:', JSON.stringify(batches[0], null, 2));
-      }
     } catch (error: any) {
       console.error('❌ Error fetching available batches:', error);
       setAvailableBatches([]);
@@ -223,7 +223,6 @@ export default function DashboardScreen() {
       // Update profile store with latest data
       if (response.data.user) {
         console.log('✅ User profile updated');
-        console.log('👤 User Data received:', JSON.stringify(response.data.user, null, 2));
       }
     } catch (error: any) {
       console.error('❌ Error fetching user profile:', error);
@@ -322,6 +321,7 @@ export default function DashboardScreen() {
     if (acceptingBatch) return;
 
     setAcceptingBatch(true);
+    setAcceptingBatchId(batchId);
     try {
       console.log('📦 Accepting batch:', batchId);
       const response = await acceptBatch(batchId);
@@ -342,6 +342,7 @@ export default function DashboardScreen() {
       showToast(error.message || 'Failed to accept batch', 'error');
     } finally {
       setAcceptingBatch(false);
+      setAcceptingBatchId(null);
     }
   }, [acceptingBatch, fetchCurrentBatch, fetchAvailableBatches, navigation, showToast]);
 
@@ -628,6 +629,72 @@ export default function DashboardScreen() {
                   </TouchableOpacity>
                 </View>
               </View>
+            ) : availableBatches.length > 0 ? (
+              /* Available Batch Card */
+              <View style={styles.availableBatchCard}>
+                <View style={styles.availableBatchHeader}>
+                  <MaterialCommunityIcons name="package-variant-closed" size={48} color="#F56B4C" />
+                  <Text style={styles.availableBatchTitle}>New Batch Available!</Text>
+                </View>
+
+                <View style={styles.batchInfoSection}>
+                  <View style={styles.batchInfoRow}>
+                    <MaterialCommunityIcons name="store" size={20} color="#6B7280" />
+                    <Text style={styles.batchInfoLabel}>Kitchen:</Text>
+                    <Text style={styles.batchInfoValue}>{availableBatches[0].kitchen.name}</Text>
+                  </View>
+
+                  <View style={styles.batchInfoRow}>
+                    <MaterialCommunityIcons name="map-marker" size={20} color="#6B7280" />
+                    <Text style={styles.batchInfoLabel}>Zone:</Text>
+                    <Text style={styles.batchInfoValue}>{availableBatches[0].zone.name}</Text>
+                  </View>
+
+                  <View style={styles.batchInfoRow}>
+                    <MaterialCommunityIcons name="package" size={20} color="#6B7280" />
+                    <Text style={styles.batchInfoLabel}>Orders:</Text>
+                    <Text style={styles.batchInfoValue}>{availableBatches[0].orderCount}</Text>
+                  </View>
+
+                  <View style={styles.batchInfoRow}>
+                    <MaterialCommunityIcons name="cash" size={20} color="#6B7280" />
+                    <Text style={styles.batchInfoLabel}>Earnings:</Text>
+                    <Text style={[styles.batchInfoValue, { color: '#10B981', fontWeight: '700' }]}>
+                      ₹{availableBatches[0].estimatedEarnings}
+                    </Text>
+                  </View>
+
+                  <View style={styles.batchInfoRow}>
+                    <MaterialCommunityIcons name="silverware-fork-knife" size={20} color="#6B7280" />
+                    <Text style={styles.batchInfoLabel}>Meal:</Text>
+                    <Text style={styles.batchInfoValue}>{availableBatches[0].mealWindow}</Text>
+                  </View>
+                </View>
+
+                <View style={styles.batchActionButtons}>
+                  <TouchableOpacity
+                    style={styles.rejectButton}
+                    onPress={handleRejectBatch}
+                    activeOpacity={0.8}
+                    disabled={acceptingBatch}
+                  >
+                    <Text style={styles.rejectButtonText}>Reject</Text>
+                  </TouchableOpacity>
+
+                  <TouchableOpacity
+                    style={[styles.acceptButton, acceptingBatch && styles.buttonDisabled]}
+                    onPress={() => handleAcceptBatch(availableBatches[0]._id)}
+                    activeOpacity={0.8}
+                    disabled={acceptingBatch}
+                  >
+                    {acceptingBatch ? (
+                      <ActivityIndicator color="#FFFFFF" size="small" />
+                    ) : (
+                      <Text style={styles.acceptButtonText}>Accept Batch</Text>
+                    )}
+                  </TouchableOpacity>
+                </View>
+              </View>
             ) : (
               /* Empty State Message */
               <View style={styles.emptyBatchCard}>
@@ -649,130 +716,52 @@ export default function DashboardScreen() {
 
 
 
-          {/* Quick Actions */}
+
+
+
+          {/* Available Batches List Section */}
+          {/* Available Batches List Section */}
           <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Quick Actions</Text>
-            <View style={styles.quickActionsGrid}>
-              <TouchableOpacity
-                style={styles.quickActionCard}
-                onPress={handleFindBatches}
-                activeOpacity={0.8}
-              >
-                <View style={[styles.quickActionIcon, { backgroundColor: '#DBEAFE' }]}>
-                  <MaterialCommunityIcons name="package-variant" size={28} color="#3B82F6" />
+            <View style={styles.sectionTitleContainer}>
+              <Text style={styles.sectionTitle}>Available Batches</Text>
+              {availableBatches.length > 0 && (
+                <View style={styles.badgeContainer}>
+                  <Text style={styles.badgeText}>{availableBatches.length} new</Text>
                 </View>
-                <Text style={styles.quickActionLabel}>Available{'\n'}Batches</Text>
-                {availableBatchesCount > 0 && (
-                  <View style={styles.quickActionBadge}>
-                    <Text style={styles.quickActionBadgeText}>{availableBatchesCount}</Text>
-                  </View>
-                )}
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                style={styles.quickActionCard}
-                onPress={() => navigation.navigate('Deliveries', { screen: 'DeliveriesList' })}
-                activeOpacity={0.8}
-              >
-                <View style={[styles.quickActionIcon, { backgroundColor: '#D1FAE5' }]}>
-                  <MaterialCommunityIcons name="history" size={28} color="#10B981" />
-                </View>
-                <Text style={styles.quickActionLabel}>Delivery{'\n'}History</Text>
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                style={styles.quickActionCard}
-                onPress={() => navigation.navigate('Profile')}
-                activeOpacity={0.8}
-              >
-                <View style={[styles.quickActionIcon, { backgroundColor: '#FEE2E2' }]}>
-                  <MaterialCommunityIcons name="account" size={28} color="#EF4444" />
-                </View>
-                <Text style={styles.quickActionLabel}>Profile{'\n'}Settings</Text>
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                style={styles.quickActionCard}
-                activeOpacity={0.8}
-              >
-                <View style={[styles.quickActionIcon, { backgroundColor: '#FEF3C7' }]}>
-                  <MaterialCommunityIcons name="help-circle" size={28} color="#F59E0B" />
-                </View>
-                <Text style={styles.quickActionLabel}>Help &{'\n'}Support</Text>
-              </TouchableOpacity>
+              )}
             </View>
+            {availableBatches.length > 0 ? (
+              <View style={styles.batchListContainer}>
+                {availableBatches.map((batch) => (
+                  <AvailableBatchItem
+                    key={batch._id}
+                    batch={batch}
+                    onAccept={handleAcceptBatch}
+                    isAccepting={acceptingBatchId === batch._id}
+                    hasActiveBatch={!!currentBatch}
+                  />
+                ))}
+              </View>
+            ) : (
+              <View style={styles.emptyListContainer}>
+                <MaterialCommunityIcons name="package-variant" size={48} color="#D1D5DB" />
+                <Text style={styles.emptyListText}>No batches available right now</Text>
+              </View>
+            )}
           </View>
         </ScrollView>
-
-        {/* Available Batches List */}
-        {availableBatches.length > 0 && (
-          <View style={[styles.section, { marginBottom: 30 }]}>
-            <Text style={styles.sectionTitle}>Available Batches ({availableBatches.length})</Text>
-            <View style={{ gap: 16 }}>
-              {availableBatches.map((batch) => (
-                <View key={batch._id} style={styles.availableBatchCard}>
-                  <View style={[styles.availableBatchHeader, { flexDirection: 'row', alignItems: 'center', justifyContent: 'flex-start', marginBottom: 12 }]}>
-                    <View style={{ width: 48, height: 48, borderRadius: 24, backgroundColor: '#FEE2E2', alignItems: 'center', justifyContent: 'center', marginRight: 12 }}>
-                      <MaterialCommunityIcons name="store" size={24} color="#EF4444" />
-                    </View>
-                    <View style={{ flex: 1 }}>
-                      <Text style={[styles.availableBatchTitle, { marginTop: 0, fontSize: 16 }]}>{batch.kitchen.name}</Text>
-                      <Text style={{ fontSize: 13, color: '#6B7280' }}>Batch: {batch.batchNumber}</Text>
-                    </View>
-                    <View style={{ backgroundColor: '#D1FAE5', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 8 }}>
-                      <Text style={{ color: '#065F46', fontSize: 12, fontWeight: '700' }}>₹{batch.estimatedEarnings}</Text>
-                    </View>
-                  </View>
-
-                  <View style={styles.batchInfoSection}>
-                    <View style={styles.batchInfoRow}>
-                      <MaterialCommunityIcons name="map-marker" size={20} color="#6B7280" />
-                      <Text style={styles.batchInfoLabel}>Zone:</Text>
-                      <Text style={styles.batchInfoValue}>{batch.zone.name}</Text>
-                    </View>
-
-                    <View style={styles.batchInfoRow}>
-                      <MaterialCommunityIcons name="package" size={20} color="#6B7280" />
-                      <Text style={styles.batchInfoLabel}>Orders:</Text>
-                      <Text style={styles.batchInfoValue}>{batch.orderCount}</Text>
-                    </View>
-
-                    <View style={styles.batchInfoRow}>
-                      <MaterialCommunityIcons name="silverware-fork-knife" size={20} color="#6B7280" />
-                      <Text style={styles.batchInfoLabel}>Meal:</Text>
-                      <Text style={styles.batchInfoValue}>{batch.mealWindow}</Text>
-                    </View>
-                  </View>
-
-                  <View style={styles.batchActionButtons}>
-                    <TouchableOpacity
-                      style={[styles.acceptButton, acceptingBatch && styles.buttonDisabled]}
-                      onPress={() => handleAcceptBatch(batch._id)}
-                      activeOpacity={0.8}
-                      disabled={acceptingBatch}
-                    >
-                      {acceptingBatch ? (
-                        <ActivityIndicator color="#FFFFFF" size="small" />
-                      ) : (
-                        <Text style={styles.acceptButtonText}>Accept Batch</Text>
-                      )}
-                    </TouchableOpacity>
-                  </View>
-                </View>
-              ))}
-            </View>
-          </View>
-        )}
       </View>
 
       {/* Toast */}
-      {toastVisible && (
-        <Animated.View style={[styles.toast, { opacity: toastOpacity, backgroundColor: toastType === 'error' ? '#EF4444' : '#10B981' }]}>
-          <MaterialCommunityIcons name={toastType === 'error' ? 'close-circle' : 'check-circle'} size={20} color="#FFFFFF" />
-          <Text style={styles.toastText}>{toastMessage}</Text>
-        </Animated.View>
-      )}
-    </SafeAreaView>
+      {
+        toastVisible && (
+          <Animated.View style={[styles.toast, { opacity: toastOpacity, backgroundColor: toastType === 'error' ? '#EF4444' : '#10B981' }]}>
+            <MaterialCommunityIcons name={toastType === 'error' ? 'close-circle' : 'check-circle'} size={20} color="#FFFFFF" />
+            <Text style={styles.toastText}>{toastMessage}</Text>
+          </Animated.View>
+        )
+      }
+    </SafeAreaView >
   );
 }
 
@@ -1159,94 +1148,51 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     marginTop: 24,
   },
+  sectionTitleContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 12,
+    marginLeft: 4,
+  },
   sectionTitle: {
     fontSize: 18,
     fontWeight: '700',
     color: '#111827',
-    marginBottom: 16,
   },
-  availableBatchesBanner: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 12,
-    padding: 16,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.05,
-    shadowRadius: 4,
-    elevation: 2,
-  },
-  availableBatchesContent: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    flex: 1,
-  },
-  availableBatchesTextContainer: {
-    marginLeft: 12,
-    flex: 1,
-  },
-  availableBatchesTitle: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#111827',
-    marginBottom: 2,
-  },
-  availableBatchesSubtitle: {
-    fontSize: 13,
-    color: '#6B7280',
-  },
-  quickActionsGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 12,
-  },
-  quickActionCard: {
-    width: '48%',
-    backgroundColor: '#FFFFFF',
-    borderRadius: 12,
-    padding: 16,
-    alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.05,
-    shadowRadius: 4,
-    elevation: 2,
-    position: 'relative',
-  },
-  quickActionIcon: {
-    width: 56,
-    height: 56,
-    borderRadius: 28,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: 12,
-  },
-  quickActionLabel: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#374151',
-    textAlign: 'center',
-    lineHeight: 18,
-  },
-  quickActionBadge: {
-    position: 'absolute',
-    top: 8,
-    right: 8,
+  badgeContainer: {
     backgroundColor: '#F56B4C',
-    minWidth: 20,
-    height: 20,
-    borderRadius: 10,
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingHorizontal: 6,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 12,
+    marginLeft: 10,
   },
-  quickActionBadgeText: {
-    color: '#FFFFFF',
-    fontSize: 11,
+  badgeText: {
+    color: 'white',
+    fontSize: 12,
     fontWeight: '700',
   },
+  batchListContainer: {
+    marginBottom: 20,
+    paddingHorizontal: 4,
+  },
+  emptyListContainer: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 32,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 16,
+    borderStyle: 'dashed',
+    borderWidth: 1,
+    borderColor: '#D1D5DB',
+  },
+  emptyListText: {
+    marginTop: 8,
+    fontSize: 14,
+    color: '#6B7280',
+    textAlign: 'center',
+  },
+
+
   toast: {
     position: 'absolute',
     bottom: 100,

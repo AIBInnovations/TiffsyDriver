@@ -82,6 +82,7 @@ export default function DeliveriesScreen() {
   );
   const [viewingBatchId, setViewingBatchId] = useState<string | null>(selectedBatchId || null);
   const [showAvailableBatchesModal, setShowAvailableBatchesModal] = useState(false);
+  const [showSearchBar, setShowSearchBar] = useState(false);
   const [showNewBatchToast, setShowNewBatchToast] = useState(false);
   const [newBatchMessage, setNewBatchMessage] = useState('');
   const [showCompletionToast, setShowCompletionToast] = useState(false);
@@ -96,10 +97,33 @@ export default function DeliveriesScreen() {
   const [deliveredOrders, setDeliveredOrders] = useState<DriverOrder[]>([]);
   const [failedOrders, setFailedOrders] = useState<DriverOrder[]>([]);
 
+  // History Filter
+  type HistoryFilter = 'all' | 'COMPLETED' | 'PARTIAL_COMPLETE' | 'CANCELLED';
+  const [historyFilter, setHistoryFilter] = useState<HistoryFilter>('all');
+
   // History data
   const [historyBatches, setHistoryBatches] = useState<HistoryBatch[]>([]);
   const [historySingleOrders, setHistorySingleOrders] = useState<HistorySingleOrder[]>([]);
   const [expandedHistoryBatches, setExpandedHistoryBatches] = useState<string[]>([]);
+
+  // Filtered history batches
+  const filteredHistoryBatches = useMemo(() => {
+    console.log('🔍 Filtering history:', { filter: historyFilter, totalBatches: historyBatches.length });
+
+    if (historyFilter === 'all') return historyBatches;
+
+    // For 'FAILED' logic (user asked for 'Failed' filter but we used 'CANCELLED' in types)
+    // If the batches have explicit 'FAILED' status (unlikely for batches, usually CANCELLED)
+    // we should check what statuses actually exist.
+    // Assuming backend returns 'CANCELLED' for failed batches.
+
+    return historyBatches.filter(batch => {
+      // Direct match
+      if (batch.status === historyFilter) return true;
+
+      return false;
+    });
+  }, [historyBatches, historyFilter]);
 
   // Fetch current batch
   const fetchCurrentBatch = useCallback(async () => {
@@ -408,8 +432,8 @@ export default function DeliveriesScreen() {
           const address = batchOrder?.deliveryAddress || driverOrder?.deliveryAddress;
           const dropoffLocation = address
             ? [address.flatNumber, address.street, address.addressLine1, address.landmark, address.area, address.locality, address.city, address.state, address.pincode]
-                .filter(Boolean)
-                .join(', ')
+              .filter(Boolean)
+              .join(', ')
             : '';
 
           // Navigate to DeliveryStatus screen for completing delivery with OTP and POD
@@ -421,7 +445,7 @@ export default function DeliveriesScreen() {
             dropoffLocation,
             specialInstructions: driverOrder?.specialInstructions,
             currentStatus: (batchOrder || driverOrder)?.status === 'OUT_FOR_DELIVERY' ? 'in_progress' :
-                          (batchOrder || driverOrder)?.status === 'PICKED_UP' ? 'picked_up' : 'in_progress',
+              (batchOrder || driverOrder)?.status === 'PICKED_UP' ? 'picked_up' : 'in_progress',
             batchId: currentBatch?._id,
           });
         }
@@ -435,8 +459,8 @@ export default function DeliveriesScreen() {
         // Check if there are any active deliveries from current batch (excluding the one being started)
         const activeOrdersInCurrentBatch = currentOrders.filter(order => {
           const isActive = order.status === 'OUT_FOR_DELIVERY' ||
-                          order.status === 'PICKED_UP' ||
-                          order.status === 'ARRIVED';
+            order.status === 'PICKED_UP' ||
+            order.status === 'ARRIVED';
 
           return isActive && order._id !== deliveryId;
         });
@@ -444,7 +468,7 @@ export default function DeliveriesScreen() {
         // Also check driver orders for active deliveries
         const activeDriverOrders = driverOrders.filter(order => {
           return order.status === 'OUT_FOR_DELIVERY' ||
-                 order.status === 'PICKED_UP';
+            order.status === 'PICKED_UP';
         });
 
         const totalActiveOrders = activeOrdersInCurrentBatch.length + activeDriverOrders.length;
@@ -467,8 +491,8 @@ export default function DeliveriesScreen() {
           const address = batchOrder?.deliveryAddress || driverOrder?.deliveryAddress;
           const dropoffLocation = address
             ? [address.flatNumber, address.street, address.addressLine1, address.landmark, address.area, address.locality, address.city, address.state, address.pincode]
-                .filter(Boolean)
-                .join(', ')
+              .filter(Boolean)
+              .join(', ')
             : '';
 
           // Navigate to DeliveryStatus screen
@@ -793,6 +817,8 @@ export default function DeliveriesScreen() {
       const statusOrder: Record<OrderStatus, number> = {
         OUT_FOR_DELIVERY: 0,
         PICKED_UP: 1,
+        EN_ROUTE: 1,  // Treat same as Picked Up/In Transit
+        ARRIVED: 0,   // Treat same as Out For Delivery (Active)
         READY: 2,
         DELIVERED: 3,
         FAILED: 4,
@@ -871,15 +897,30 @@ export default function DeliveriesScreen() {
                 {activeTab === 'history'
                   ? `${historyBatches.length} batches • ${historySingleOrders.length} individual orders`
                   : filterStatus === 'DELIVERED'
-                  ? `${deliveredOrders.length} delivered orders`
-                  : filterStatus === 'FAILED'
-                  ? `${failedOrders.length} failed orders`
-                  : currentBatch
-                  ? `${activeDeliveriesCount} active • ${(deliveries || []).length} total`
-                  : 'No active deliveries'}
+                    ? `${deliveredOrders.length} delivered orders`
+                    : filterStatus === 'FAILED'
+                      ? `${failedOrders.length} failed orders`
+                      : currentBatch
+                        ? `${activeDeliveriesCount} active • ${(deliveries || []).length} total`
+                        : 'No active deliveries'}
               </Text>
             </View>
           </View>
+
+          {/* Search Icon */}
+          <TouchableOpacity
+            style={styles.headerIconButton}
+            onPress={() => setShowSearchBar(!showSearchBar)}
+            activeOpacity={0.7}
+          >
+            <View style={[styles.iconButtonCircle, showSearchBar && styles.iconButtonActive]}>
+              <MaterialCommunityIcons
+                name={showSearchBar ? "magnify-minus" : "magnify"}
+                size={24}
+                color={showSearchBar ? "#F56B4C" : "#374151"}
+              />
+            </View>
+          </TouchableOpacity>
         </View>
 
         {/* Tabs */}
@@ -904,8 +945,8 @@ export default function DeliveriesScreen() {
           </TouchableOpacity>
         </View>
 
-        {/* Search Bar - Only show for current tab */}
-        {activeTab === 'current' && (
+        {/* Search Bar - Only show for current tab when enabled */}
+        {activeTab === 'current' && showSearchBar && (
           <View style={styles.searchContainer}>
             <MaterialCommunityIcons name="magnify" size={20} color="#9CA3AF" />
             <TextInput
@@ -934,6 +975,36 @@ export default function DeliveriesScreen() {
         />
       )}
 
+      {/* History Filter Bar - Only show for history tab */}
+      {activeTab === 'history' && (
+        <View style={styles.historyFilterContainer}>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.historyFilterScroll}>
+            {(['all', 'COMPLETED', 'PARTIAL_COMPLETE', 'CANCELLED'] as const).map((filter) => (
+              <TouchableOpacity
+                key={filter}
+                style={[
+                  styles.historyFilterChip,
+                  historyFilter === filter && styles.historyFilterChipActive
+                ]}
+                onPress={() => {
+                  console.log('🔄 Selected filter:', filter);
+                  setHistoryFilter(filter);
+                }}
+              >
+                <Text style={[
+                  styles.historyFilterText,
+                  historyFilter === filter && styles.historyFilterTextActive
+                ]}>
+                  {filter === 'all' ? 'All' :
+                    filter === 'COMPLETED' ? 'Completed' :
+                      filter === 'PARTIAL_COMPLETE' ? 'Partial Complete' : 'Failed'}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </ScrollView>
+        </View>
+      )}
+
       {/* Delivery List */}
       <ScrollView
         style={styles.scrollView}
@@ -951,93 +1022,60 @@ export default function DeliveriesScreen() {
         {activeTab === 'current' ? (
           <>
             {!currentBatch ? (
-          // No batch state
-          <View style={styles.emptyState}>
-            <MaterialCommunityIcons name="package-variant" size={80} color="#D1D5DB" />
-            <Text style={styles.emptyTitle}>No Active Batch</Text>
-            <Text style={styles.emptySubtitle}>
-              Accept a batch from available batches to start delivering
-            </Text>
-            {availableBatches.length > 0 && (
-              <TouchableOpacity
-                style={styles.viewBatchesButton}
-                onPress={() => setShowAvailableBatchesModal(true)}
-              >
-                <MaterialCommunityIcons name="package-variant-closed" size={20} color="#FFFFFF" />
-                <Text style={styles.viewBatchesButtonText}>
-                  View {availableBatches.length} Available {availableBatches.length === 1 ? 'Batch' : 'Batches'}
+              // No batch state
+              <View style={styles.emptyState}>
+                <MaterialCommunityIcons name="package-variant" size={80} color="#D1D5DB" />
+                <Text style={styles.emptyTitle}>No Active Batch</Text>
+                <Text style={styles.emptySubtitle}>
+                  Accept a batch from available batches to start delivering
                 </Text>
-              </TouchableOpacity>
-            )}
-          </View>
-        ) : filteredAndSortedDeliveries.length === 0 ? (
-          // Filtered empty state
-          <View style={styles.emptyState}>
-            <MaterialCommunityIcons name="filter-off" size={80} color="#D1D5DB" />
-            <Text style={styles.emptyTitle}>
-              {filterStatus === 'DELIVERED'
-                ? 'No delivered orders found'
-                : filterStatus === 'FAILED'
-                ? 'No failed orders found'
-                : 'No deliveries found'}
-            </Text>
-            <Text style={styles.emptySubtitle}>
-              {filterStatus === 'DELIVERED'
-                ? 'You haven\'t delivered any orders yet'
-                : filterStatus === 'FAILED'
-                ? 'You haven\'t had any failed deliveries'
-                : 'Try adjusting your search or filters'}
-            </Text>
-            <TouchableOpacity
-              style={styles.refreshButton}
-              onPress={() => {
-                setSearchQuery('');
-                setFilterStatus('all');
-              }}
-            >
-              <MaterialCommunityIcons name="filter-remove" size={20} color="#FFFFFF" />
-              <Text style={styles.refreshButtonText}>Clear Filters</Text>
-            </TouchableOpacity>
-          </View>
-        ) : (
-          <>
-            {/* Show delivered orders without batch grouping */}
-            {filterStatus === 'DELIVERED' ? (
-              <View style={styles.deliveredOrdersList}>
-                {filteredAndSortedDeliveries.map(delivery => (
-                  <DeliveryCard
-                    key={delivery.id}
-                    delivery={delivery as any}
-                    onStatusChange={handleStatusChange as any}
-                    onCallCustomer={handleCallCustomer}
-                    onNavigate={handleNavigate}
-                  />
-                ))}
+                {availableBatches.length > 0 && (
+                  <TouchableOpacity
+                    style={styles.viewBatchesButton}
+                    onPress={() => setShowAvailableBatchesModal(true)}
+                  >
+                    <MaterialCommunityIcons name="package-variant-closed" size={20} color="#FFFFFF" />
+                    <Text style={styles.viewBatchesButtonText}>
+                      View {availableBatches.length} Available {availableBatches.length === 1 ? 'Batch' : 'Batches'}
+                    </Text>
+                  </TouchableOpacity>
+                )}
               </View>
-            ) : filterStatus === 'FAILED' ? (
-              <View style={styles.deliveredOrdersList}>
-                {filteredAndSortedDeliveries.map(delivery => (
-                  <DeliveryCard
-                    key={delivery.id}
-                    delivery={delivery as any}
-                    onStatusChange={handleStatusChange as any}
-                    onCallCustomer={handleCallCustomer}
-                    onNavigate={handleNavigate}
-                  />
-                ))}
+            ) : filteredAndSortedDeliveries.length === 0 ? (
+              // Filtered empty state
+              <View style={styles.emptyState}>
+                <MaterialCommunityIcons name="filter-off" size={80} color="#D1D5DB" />
+                <Text style={styles.emptyTitle}>
+                  {filterStatus === 'DELIVERED'
+                    ? 'No delivered orders found'
+                    : filterStatus === 'FAILED'
+                      ? 'No failed orders found'
+                      : 'No deliveries found'}
+                </Text>
+                <Text style={styles.emptySubtitle}>
+                  {filterStatus === 'DELIVERED'
+                    ? 'You haven\'t delivered any orders yet'
+                    : filterStatus === 'FAILED'
+                      ? 'You haven\'t had any failed deliveries'
+                      : 'Try adjusting your search or filters'}
+                </Text>
+                <TouchableOpacity
+                  style={styles.refreshButton}
+                  onPress={() => {
+                    setSearchQuery('');
+                    setFilterStatus('all');
+                  }}
+                >
+                  <MaterialCommunityIcons name="filter-remove" size={20} color="#FFFFFF" />
+                  <Text style={styles.refreshButtonText}>Clear Filters</Text>
+                </TouchableOpacity>
               </View>
             ) : (
               <>
-                {/* Batched Deliveries */}
-                {batchedDeliveries.map(({ batch, deliveries: batchDeliveries }) => (
-                  <BatchGroup
-                    key={batch._id}
-                    batchId={batch._id}
-                    deliveryCount={batchDeliveries.length}
-                    isExpanded={expandedBatches.includes(batch._id)}
-                    onToggle={() => toggleBatchExpand(batch._id)}
-                  >
-                    {batchDeliveries.map(delivery => (
+                {/* Show delivered orders without batch grouping */}
+                {filterStatus === 'DELIVERED' ? (
+                  <View style={styles.deliveredOrdersList}>
+                    {filteredAndSortedDeliveries.map(delivery => (
                       <DeliveryCard
                         key={delivery.id}
                         delivery={delivery as any}
@@ -1046,12 +1084,45 @@ export default function DeliveriesScreen() {
                         onNavigate={handleNavigate}
                       />
                     ))}
-                  </BatchGroup>
-                ))}
+                  </View>
+                ) : filterStatus === 'FAILED' ? (
+                  <View style={styles.deliveredOrdersList}>
+                    {filteredAndSortedDeliveries.map(delivery => (
+                      <DeliveryCard
+                        key={delivery.id}
+                        delivery={delivery as any}
+                        onStatusChange={handleStatusChange as any}
+                        onCallCustomer={handleCallCustomer}
+                        onNavigate={handleNavigate}
+                      />
+                    ))}
+                  </View>
+                ) : (
+                  <>
+                    {/* Batched Deliveries */}
+                    {batchedDeliveries.map(({ batch, deliveries: batchDeliveries }) => (
+                      <BatchGroup
+                        key={batch._id}
+                        batchId={batch._id}
+                        deliveryCount={batchDeliveries.length}
+                        isExpanded={expandedBatches.includes(batch._id)}
+                        onToggle={() => toggleBatchExpand(batch._id)}
+                      >
+                        {batchDeliveries.map(delivery => (
+                          <DeliveryCard
+                            key={delivery.id}
+                            delivery={delivery as any}
+                            onStatusChange={handleStatusChange as any}
+                            onCallCustomer={handleCallCustomer}
+                            onNavigate={handleNavigate}
+                          />
+                        ))}
+                      </BatchGroup>
+                    ))}
+                  </>
+                )}
               </>
             )}
-          </>
-        )}
           </>
         ) : (
           /* History Tab */
@@ -1067,10 +1138,10 @@ export default function DeliveriesScreen() {
             ) : (
               <View style={styles.historyContainer}>
                 {/* History Batches */}
-                {historyBatches.length > 0 && (
+                {filteredHistoryBatches.length > 0 && (
                   <View style={styles.historySection}>
                     <Text style={styles.historySectionTitle}>Batches</Text>
-                    {historyBatches.map((batch) => {
+                    {filteredHistoryBatches.map((batch) => {
                       const isExpanded = expandedHistoryBatches.includes(batch._id);
                       const batchOrders = batch.orders.map(order => convertHistoryOrderToDelivery(order, batch));
 
@@ -1081,8 +1152,19 @@ export default function DeliveriesScreen() {
                             activeOpacity={0.7}
                           >
                             <View style={styles.historyBatchHeader}>
-                              <View style={styles.historyBatchHeaderLeft}>
+                              {/* Top Row: Batch ID and Expand Icon */}
+                              <View style={styles.historyBatchHeaderTop}>
                                 <Text style={styles.historyBatchNumber}>{batch.batchId}</Text>
+                                <MaterialCommunityIcons
+                                  name={isExpanded ? "chevron-up" : "chevron-down"}
+                                  size={24}
+                                  color="#6B7280"
+                                  style={styles.expandIcon}
+                                />
+                              </View>
+
+                              {/* Bottom Row: Date and Status Badge */}
+                              <View style={styles.historyBatchHeaderBottom}>
                                 <Text style={styles.historyBatchDate}>
                                   {new Date(batch.date).toLocaleDateString('en-US', {
                                     month: 'short',
@@ -1090,18 +1172,14 @@ export default function DeliveriesScreen() {
                                     year: 'numeric',
                                   })}
                                 </Text>
-                              </View>
-                              <View style={styles.historyBatchHeaderRight}>
                                 <View
                                   style={[
                                     styles.historyBatchStatusBadge,
                                     {
                                       backgroundColor:
-                                        batch.status === 'COMPLETED'
-                                          ? '#D1FAE5'
-                                          : batch.status === 'PARTIAL_COMPLETE'
-                                          ? '#FEF3C7'
-                                          : '#FEE2E2',
+                                        batch.status === 'COMPLETED' ? '#D1FAE5' :
+                                          batch.status === 'PARTIAL_COMPLETE' ? '#DBEAFE' :
+                                            '#FEE2E2',
                                     },
                                   ]}
                                 >
@@ -1110,23 +1188,17 @@ export default function DeliveriesScreen() {
                                       styles.historyBatchStatusText,
                                       {
                                         color:
-                                          batch.status === 'COMPLETED'
-                                            ? '#065F46'
-                                            : batch.status === 'PARTIAL_COMPLETE'
-                                            ? '#92400E'
-                                            : '#991B1B',
+                                          batch.status === 'COMPLETED' ? '#065F46' :
+                                            batch.status === 'PARTIAL_COMPLETE' ? '#1E40AF' :
+                                              '#991B1B',
                                       },
                                     ]}
                                   >
-                                    {batch.status}
+                                    {batch.status === 'COMPLETED' ? 'Completed' :
+                                      batch.status === 'PARTIAL_COMPLETE' ? 'Partial' :
+                                        'Failed'}
                                   </Text>
                                 </View>
-                                <MaterialCommunityIcons
-                                  name={isExpanded ? 'chevron-up' : 'chevron-down'}
-                                  size={24}
-                                  color="#6B7280"
-                                  style={styles.expandIcon}
-                                />
                               </View>
                             </View>
 
@@ -1190,8 +1262,8 @@ export default function DeliveriesScreen() {
                                   order.status === 'DELIVERED'
                                     ? '#D1FAE5'
                                     : order.status === 'FAILED'
-                                    ? '#FEE2E2'
-                                    : '#FEF3C7',
+                                      ? '#FEE2E2'
+                                      : '#FEF3C7',
                               },
                             ]}
                           >
@@ -1203,8 +1275,8 @@ export default function DeliveriesScreen() {
                                     order.status === 'DELIVERED'
                                       ? '#065F46'
                                       : order.status === 'FAILED'
-                                      ? '#991B1B'
-                                      : '#92400E',
+                                        ? '#991B1B'
+                                        : '#92400E',
                                 },
                               ]}
                             >
@@ -1340,6 +1412,21 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     color: '#111827',
   },
+  headerIconButton: {
+    padding: 4,
+    marginLeft: 12,
+  },
+  iconButtonCircle: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: '#F3F4F6',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  iconButtonActive: {
+    backgroundColor: '#FFF0EB',
+  },
   subtitle: {
     fontSize: 14,
     color: '#6B7280',
@@ -1353,6 +1440,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     paddingVertical: 3,
   },
+
   searchInput: {
     flex: 1,
     marginLeft: 8,
@@ -1483,7 +1571,7 @@ const styles = StyleSheet.create({
   tabsContainer: {
     flexDirection: 'row',
     marginTop: 12,
-    marginBottom: 12,
+    marginBottom: 10,
     backgroundColor: '#F3F4F6',
     borderRadius: 10,
     padding: 4,
@@ -1537,18 +1625,18 @@ const styles = StyleSheet.create({
     elevation: 2,
   },
   historyBatchHeader: {
+    marginBottom: 12,
+  },
+  historyBatchHeaderTop: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'flex-start',
-    marginBottom: 12,
+    marginBottom: 0,
   },
-  historyBatchHeaderLeft: {
-    flex: 1,
-  },
-  historyBatchHeaderRight: {
+  historyBatchHeaderBottom: {
     flexDirection: 'row',
+    justifyContent: 'space-between',
     alignItems: 'center',
-    gap: 8,
   },
   historyBatchNumber: {
     fontSize: 16,
@@ -1619,11 +1707,14 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '700',
     color: '#111827',
+    flex: 1,
+    marginRight: 8,
   },
   historyOrderStatusBadge: {
     paddingHorizontal: 12,
     paddingVertical: 6,
     borderRadius: 12,
+    flexShrink: 0,
   },
   historyOrderStatusText: {
     fontSize: 12,
@@ -1642,5 +1733,32 @@ const styles = StyleSheet.create({
   historyOrderDate: {
     fontSize: 13,
     color: '#6B7280',
+  },
+  historyFilterContainer: {
+    paddingVertical: 4,
+    backgroundColor: 'white',
+    marginBottom: 8,
+  },
+  historyFilterScroll: {
+    paddingHorizontal: 16,
+  },
+  historyFilterChip: {
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 16,
+    backgroundColor: '#F3F4F6',
+    marginRight: 8,
+  },
+  historyFilterChipActive: {
+    backgroundColor: '#F56B4C',
+  },
+  historyFilterText: {
+    fontSize: 13,
+    color: '#6B7280',
+    fontWeight: '500',
+  },
+  historyFilterTextActive: {
+    color: 'white',
+    fontWeight: '600',
   },
 });
