@@ -118,70 +118,72 @@ export default function DeliveryStatusScreen() {
     try {
       console.log('📥 Fetching delivery data for status screen...');
 
-      if (route.params?.deliveryId) {
-        // Use params if provided
-        setDelivery({
-          deliveryId: route.params.deliveryId,
-          orderId: route.params.orderId || "Order #12345",
-          customerName: route.params.customerName || "Customer",
-          customerPhone: route.params.customerPhone || "",
-          pickupLocation: route.params.pickupLocation || "",
-          dropoffLocation: route.params.dropoffLocation || "",
-          deliveryWindow: route.params.deliveryWindow || "",
-          specialInstructions: route.params.specialInstructions || "",
-          currentStatus: route.params.currentStatus || "pending",
-          batchId: route.params.batchId,
-          stopNumber: route.params.stopNumber,
-          totalStops: route.params.totalStops,
-        });
-      } else {
-        // Fetch from API - get current batch and find active order
-        const response = await getMyBatch();
+      // Always fetch from API to get fresh data
+      const response = await getMyBatch();
 
-        if (response.data.batch && response.data.orders && response.data.orders.length > 0) {
-          const batch = response.data.batch;
-          const orders = response.data.orders;
+      if (response.data.batch && response.data.orders && response.data.orders.length > 0) {
+        const batch = response.data.batch;
+        const orders = response.data.orders;
 
-          // Find the first order that's not delivered or failed
-          const activeOrder = orders.find(
-            order => order.status !== 'DELIVERED' && order.status !== 'FAILED'
-          ) || orders[0];
+        // If we have a deliveryId from params or current state, try to find that specific order
+        const currentDeliveryId = route.params?.deliveryId || delivery?.deliveryId;
+        let targetOrder;
 
-          const kitchen = typeof batch.kitchenId === 'object' ? batch.kitchenId : null;
-          const kitchenAddress = kitchen?.address ?
-            `${kitchen.name}, ${kitchen.address.locality || kitchen.address.area}, ${kitchen.address.city}` :
-            'Kitchen';
-
-          const deliveryAddr = activeOrder.deliveryAddress;
-          const dropoffAddr = `${deliveryAddr.flatNumber || ''} ${deliveryAddr.street || deliveryAddr.addressLine1 || ''}, ${deliveryAddr.locality || deliveryAddr.area}, ${deliveryAddr.city}`.trim();
-
-          setDelivery({
-            deliveryId: activeOrder._id,
-            orderId: activeOrder.orderNumber,
-            customerName: deliveryAddr.name || 'Customer',
-            customerPhone: deliveryAddr.phone || '',
-            pickupLocation: kitchenAddress,
-            dropoffLocation: dropoffAddr,
-            deliveryWindow: batch.mealWindow,
-            specialInstructions: activeOrder.specialInstructions || '',
-            currentStatus: mapOrderStatusToDeliveryStatus(activeOrder.status),
-            batchId: batch._id,
-            stopNumber: activeOrder.sequenceNumber,
-            totalStops: orders.length,
-          });
-
-          console.log('✅ Delivery data loaded:', activeOrder.orderNumber);
-        } else {
-          console.log('ℹ️ No active batch/orders found');
-          setDelivery(null);
+        if (currentDeliveryId) {
+          // Find the specific order by ID to get its fresh status
+          targetOrder = orders.find(order => order._id === currentDeliveryId);
+          console.log('🔍 Looking for order:', currentDeliveryId);
+          console.log('🔍 Found order:', targetOrder ? targetOrder.orderNumber : 'Not found');
         }
+
+        // If we didn't find the specific order, fall back to finding the next active one
+        if (!targetOrder) {
+          targetOrder = orders.find(
+            order => order.status !== 'DELIVERED' && order.status !== 'FAILED'
+          );
+          if (targetOrder) {
+            console.log('🔍 Using active order:', targetOrder.orderNumber);
+          } else {
+            console.log('✅ All deliveries completed - no active orders');
+            setDelivery(null);
+            return;
+          }
+        }
+
+        const kitchen = typeof batch.kitchenId === 'object' ? batch.kitchenId : null;
+        const kitchenAddress = kitchen?.address ?
+          `${kitchen.name}, ${kitchen.address.locality || kitchen.address.area}, ${kitchen.address.city}` :
+          'Kitchen';
+
+        const deliveryAddr = targetOrder.deliveryAddress;
+        const dropoffAddr = `${deliveryAddr.flatNumber || ''} ${deliveryAddr.street || deliveryAddr.addressLine1 || ''}, ${deliveryAddr.locality || deliveryAddr.area}, ${deliveryAddr.city}`.trim();
+
+        setDelivery({
+          deliveryId: targetOrder._id,
+          orderId: targetOrder.orderNumber,
+          customerName: deliveryAddr.name || 'Customer',
+          customerPhone: deliveryAddr.phone || '',
+          pickupLocation: kitchenAddress,
+          dropoffLocation: dropoffAddr,
+          deliveryWindow: batch.mealWindow,
+          specialInstructions: targetOrder.specialInstructions || '',
+          currentStatus: mapOrderStatusToDeliveryStatus(targetOrder.status),
+          batchId: batch._id,
+          stopNumber: targetOrder.sequenceNumber,
+          totalStops: orders.length,
+        });
+
+        console.log('✅ Delivery data loaded:', targetOrder.orderNumber, 'Status:', targetOrder.status);
+      } else {
+        console.log('ℹ️ No active batch/orders found');
+        setDelivery(null);
       }
     } catch (error: any) {
       console.error('❌ Error loading delivery data:', error);
       Alert.alert('Error', 'Failed to load delivery data. Please try again.');
       setDelivery(null);
     }
-  }, [route.params]);
+  }, [route.params, delivery?.deliveryId]);
 
   const handleRefresh = useCallback(async () => {
     setIsRefreshing(true);
@@ -379,11 +381,11 @@ export default function DeliveryStatusScreen() {
         </View>
         <View style={styles.emptyContainer}>
           <View style={styles.emptyIcon}>
-            <MaterialCommunityIcons name="package-variant" size={48} color="#9CA3AF" />
+            <MaterialCommunityIcons name="check-circle-outline" size={48} color="#10B981" />
           </View>
-          <Text style={styles.emptyTitle}>No Delivery Assigned</Text>
+          <Text style={styles.emptyTitle}>No Active Delivery</Text>
           <Text style={styles.emptySubtitle}>
-            Waiting for delivery assignment. Check back soon!
+            All deliveries completed. Great work!
           </Text>
           <TouchableOpacity style={styles.refreshButton} onPress={handleRefresh}>
             <MaterialCommunityIcons name="refresh" size={18} color="#3B82F6" />

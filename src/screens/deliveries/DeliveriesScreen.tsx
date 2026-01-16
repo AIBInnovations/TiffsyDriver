@@ -105,6 +105,7 @@ export default function DeliveriesScreen() {
   const [historyBatches, setHistoryBatches] = useState<HistoryBatch[]>([]);
   const [historySingleOrders, setHistorySingleOrders] = useState<HistorySingleOrder[]>([]);
   const [expandedHistoryBatches, setExpandedHistoryBatches] = useState<string[]>([]);
+  const [historyLoading, setHistoryLoading] = useState(false);
 
   // Filtered history batches
   const filteredHistoryBatches = useMemo(() => {
@@ -217,6 +218,7 @@ export default function DeliveriesScreen() {
 
   // Fetch driver batch history
   const fetchDriverBatchHistory = useCallback(async () => {
+    setHistoryLoading(true);
     try {
       console.log('📥 Fetching driver batch history...');
       const response = await getDriverBatchHistory();
@@ -242,6 +244,8 @@ export default function DeliveriesScreen() {
       console.error('❌ Error fetching driver batch history:', error);
       setHistoryBatches([]);
       setHistorySingleOrders([]);
+    } finally {
+      setHistoryLoading(false);
     }
   }, []);
 
@@ -1127,7 +1131,12 @@ export default function DeliveriesScreen() {
         ) : (
           /* History Tab */
           <>
-            {historyBatches.length === 0 && historySingleOrders.length === 0 ? (
+            {historyLoading ? (
+              <View style={styles.emptyState}>
+                <ActivityIndicator size="large" color="#F56B4C" />
+                <Text style={styles.loadingText}>Loading history...</Text>
+              </View>
+            ) : historyBatches.length === 0 && historySingleOrders.length === 0 ? (
               <View style={styles.emptyState}>
                 <MaterialCommunityIcons name="history" size={80} color="#D1D5DB" />
                 <Text style={styles.emptyTitle}>No Delivery History</Text>
