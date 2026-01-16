@@ -159,6 +159,7 @@ export interface Order {
   items: OrderItem[];
   sequenceNumber?: number;
   assignmentStatus?: string;
+  specialInstructions?: string;
 }
 
 // Available Batch (simplified for list view)

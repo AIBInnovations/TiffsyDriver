@@ -13,19 +13,16 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 import MaterialCommunityIcons from "react-native-vector-icons/MaterialCommunityIcons";
 import { useNavigation } from "@react-navigation/native";
-
 import { useHelpSupportStore } from "./useHelpSupportStore";
+
 import {
   SearchInput,
-  Card,
   InlineBanner,
   SectionHeader,
   Skeleton,
   SkeletonCard,
 } from "./components/UIComponents";
 import { FAQAccordion } from "./components/FAQAccordion";
-import { NewRequestForm } from "./components/NewRequestForm";
-import { TicketHistory } from "./components/TicketHistory";
 import { ContactModal } from "./components/ContactModal";
 import { SafetyFlow } from "./components/SafetyFlow";
 
@@ -39,7 +36,6 @@ export default function HelpSupportScreen() {
     hydrationError,
     searchQuery,
     expandedFaqId,
-    tickets,
 
     // Actions
     hydrate,
@@ -47,19 +43,13 @@ export default function HelpSupportScreen() {
     setSearchQuery,
     setExpandedFaqId,
     getFilteredFaqs,
-    openNewRequest,
     openContactModal,
-    openHistory,
     openSafetyFlow,
 
     // Modal States
-    isNewRequestOpen,
     isContactModalOpen,
-    isHistoryOpen,
     isSafetyFlowOpen,
-    closeNewRequest,
     closeContactModal,
-    closeHistory,
     closeSafetyFlow,
   } = useHelpSupportStore();
 
@@ -71,7 +61,6 @@ export default function HelpSupportScreen() {
   }, [isHydrated, hydrate]);
 
   const filteredFaqs = getFilteredFaqs();
-  const draftCount = tickets.filter((t) => t.status === "draft").length;
 
   const handleRefresh = useCallback(() => {
     hydrate();
@@ -81,7 +70,7 @@ export default function HelpSupportScreen() {
   if (isLoading && !isHydrated) {
     return (
       <SafeAreaView style={styles.container} edges={["top"]}>
-        <StatusBar barStyle="dark-content" backgroundColor="#F9FAFB" />
+        <StatusBar barStyle="dark-content" backgroundColor="#FFFFFF" />
         <View style={styles.header}>
           <View style={styles.headerLeft}>
             <Skeleton width={180} height={24} borderRadius={6} />
@@ -116,7 +105,7 @@ export default function HelpSupportScreen() {
 
   return (
     <SafeAreaView style={styles.container} edges={["top"]}>
-      <StatusBar barStyle="dark-content" backgroundColor="#F9FAFB" />
+      <StatusBar barStyle="dark-content" backgroundColor="#FFFFFF" />
 
       {/* Header */}
       <View style={styles.header}>
@@ -133,19 +122,7 @@ export default function HelpSupportScreen() {
           </Pressable>
           <Text style={styles.headerTitle}>Help & Support</Text>
         </View>
-        <Pressable style={styles.historyButton} onPress={openHistory}>
-          <MaterialCommunityIcons
-            name="history"
-            size={20}
-            color="#F56B4C"
-          />
-          <Text style={styles.historyButtonText}>History</Text>
-          {draftCount > 0 && (
-            <View style={styles.draftBadge}>
-              <Text style={styles.draftBadgeText}>{draftCount}</Text>
-            </View>
-          )}
-        </Pressable>
+        <View style={{ width: 40 }} />
       </View>
 
       <ScrollView
@@ -174,20 +151,12 @@ export default function HelpSupportScreen() {
             onClear={() => setSearchQuery("")}
           />
           <Text style={styles.searchHint}>
-            Search FAQs or create a support request
+            Search FAQs for quick answers
           </Text>
         </View>
 
         {/* Quick Actions */}
         <View style={styles.quickActions}>
-          <Pressable style={styles.actionChip} onPress={openNewRequest}>
-            <MaterialCommunityIcons
-              name="plus-circle"
-              size={18}
-              color="#3B82F6"
-            />
-            <Text style={styles.actionChipText}>New Request</Text>
-          </Pressable>
 
           <Pressable
             style={[styles.actionChip, styles.safetyChip]}
@@ -222,42 +191,12 @@ export default function HelpSupportScreen() {
           />
         </View>
 
-        {/* Need More Help */}
-        {!searchQuery && (
-          <Card style={styles.helpCard}>
-            <View style={styles.helpCardContent}>
-              <View style={styles.helpCardIcon}>
-                <MaterialCommunityIcons
-                  name="headset"
-                  size={28}
-                  color="#F56B4C"
-                />
-              </View>
-              <View style={styles.helpCardText}>
-                <Text style={styles.helpCardTitle}>Still need help?</Text>
-                <Text style={styles.helpCardSubtitle}>
-                  Create a support request and we'll get back to you
-                </Text>
-              </View>
-            </View>
-            <Pressable style={styles.helpCardButton} onPress={openNewRequest}>
-              <Text style={styles.helpCardButtonText}>Create Request</Text>
-              <MaterialCommunityIcons
-                name="arrow-right"
-                size={18}
-                color="#F56B4C"
-              />
-            </Pressable>
-          </Card>
-        )}
 
         {/* Bottom Spacing */}
         <View style={{ height: 32 }} />
       </ScrollView>
 
       {/* Modals & Bottom Sheets */}
-      <NewRequestForm visible={isNewRequestOpen} onClose={closeNewRequest} />
-      <TicketHistory visible={isHistoryOpen} onClose={closeHistory} />
       <ContactModal visible={isContactModalOpen} onClose={closeContactModal} />
       <SafetyFlow visible={isSafetyFlowOpen} onClose={closeSafetyFlow} />
     </SafeAreaView>
@@ -275,7 +214,7 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     paddingHorizontal: 16,
     paddingVertical: 12,
-    backgroundColor: "#F9FAFB",
+    backgroundColor: "#FFFFFF",
     borderBottomWidth: 1,
     borderBottomColor: "#E5E7EB",
   },
@@ -291,36 +230,6 @@ const styles = StyleSheet.create({
     fontSize: 20,
     fontWeight: "700",
     color: "#111827",
-  },
-  historyButton: {
-    flexDirection: "row",
-    alignItems: "center",
-    paddingVertical: 8,
-    paddingHorizontal: 12,
-    borderRadius: 8,
-    backgroundColor: "#FEF2F2",
-    borderWidth: 1,
-    borderColor: "#FECACA",
-  },
-  historyButtonText: {
-    fontSize: 14,
-    fontWeight: "500",
-    color: "#F56B4C",
-    marginLeft: 6,
-  },
-  draftBadge: {
-    marginLeft: 6,
-    backgroundColor: "#F56B4C",
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    borderRadius: 10,
-    minWidth: 18,
-    alignItems: "center",
-  },
-  draftBadgeText: {
-    fontSize: 11,
-    fontWeight: "600",
-    color: "#FFFFFF",
   },
   scrollView: {
     flex: 1,
@@ -370,54 +279,5 @@ const styles = StyleSheet.create({
   },
   faqSection: {
     marginBottom: 24,
-  },
-  helpCard: {
-    backgroundColor: "#FEF2F2",
-    borderWidth: 1,
-    borderColor: "#FECACA",
-  },
-  helpCardContent: {
-    flexDirection: "row",
-    alignItems: "center",
-    marginBottom: 16,
-  },
-  helpCardIcon: {
-    width: 52,
-    height: 52,
-    borderRadius: 12,
-    backgroundColor: "#FFFFFF",
-    alignItems: "center",
-    justifyContent: "center",
-    marginRight: 12,
-  },
-  helpCardText: {
-    flex: 1,
-  },
-  helpCardTitle: {
-    fontSize: 16,
-    fontWeight: "600",
-    color: "#111827",
-    marginBottom: 4,
-  },
-  helpCardSubtitle: {
-    fontSize: 13,
-    color: "#6B7280",
-    lineHeight: 18,
-  },
-  helpCardButton: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    paddingVertical: 12,
-    borderRadius: 10,
-    backgroundColor: "#FFFFFF",
-    borderWidth: 1,
-    borderColor: "#F56B4C",
-  },
-  helpCardButtonText: {
-    fontSize: 14,
-    fontWeight: "600",
-    color: "#F56B4C",
-    marginRight: 6,
   },
 });

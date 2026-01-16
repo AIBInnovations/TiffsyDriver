@@ -1,14 +1,24 @@
-import { View, Text, ScrollView, StyleSheet } from "react-native";
+import { View, Text, ScrollView, StyleSheet, TouchableOpacity } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { useNavigation } from "@react-navigation/native";
+import MaterialCommunityIcons from "react-native-vector-icons/MaterialCommunityIcons";
 import SettingsOption from "./components/SettingsOption";
 import NotificationPreferences from "./components/NotificationPreferences";
 
 export default function SettingsScreen() {
+  const navigation = useNavigation();
   return (
     <SafeAreaView style={styles.container}>
       <ScrollView style={styles.scrollView}>
         <View style={styles.header}>
+          <TouchableOpacity
+            onPress={() => navigation.goBack()}
+            style={styles.backButton}
+          >
+            <MaterialCommunityIcons name="arrow-left" size={24} color="#374151" />
+          </TouchableOpacity>
           <Text style={styles.title}>Settings</Text>
+          <View style={styles.headerRight} />
         </View>
 
         <View style={styles.section}>
@@ -23,19 +33,19 @@ export default function SettingsScreen() {
               icon="🌙"
               label="Dark Mode"
               hasSwitch
-              onPress={() => {}}
+              onPress={() => { }}
             />
             <SettingsOption
               icon="🔊"
               label="Sound Effects"
               hasSwitch
-              onPress={() => {}}
+              onPress={() => { }}
             />
             <SettingsOption
               icon="📍"
               label="Location Services"
               value="Always"
-              onPress={() => {}}
+              onPress={() => { }}
             />
           </View>
         </View>
@@ -46,12 +56,12 @@ export default function SettingsScreen() {
             <SettingsOption
               icon="📥"
               label="Download Data"
-              onPress={() => {}}
+              onPress={() => { }}
             />
             <SettingsOption
               icon="🗑️"
               label="Clear Cache"
-              onPress={() => {}}
+              onPress={() => { }}
             />
           </View>
         </View>
@@ -71,8 +81,17 @@ const styles = StyleSheet.create({
   header: {
     backgroundColor: 'white',
     padding: 16,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
     borderBottomWidth: 1,
     borderBottomColor: '#F3F4F6',
+  },
+  backButton: {
+    padding: 4,
+  },
+  headerRight: {
+    width: 32,
   },
   title: {
     fontSize: 24,

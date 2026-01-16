@@ -1,5 +1,7 @@
 import { View, Text, ScrollView, TouchableOpacity, Linking, StyleSheet } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { useNavigation } from "@react-navigation/native";
+import MaterialCommunityIcons from "react-native-vector-icons/MaterialCommunityIcons";
 
 interface DeliveryDetailScreenProps {
   route?: {
@@ -10,6 +12,7 @@ interface DeliveryDetailScreenProps {
 }
 
 export default function DeliveryDetailScreen({ route }: DeliveryDetailScreenProps) {
+  const navigation = useNavigation();
   const deliveryId = route?.params?.deliveryId || "DEL-001";
 
   // Mock data - replace with actual data fetching
@@ -37,12 +40,21 @@ export default function DeliveryDetailScreen({ route }: DeliveryDetailScreenProp
 
   return (
     <SafeAreaView style={styles.container}>
-      <ScrollView style={styles.scrollView}>
-        {/* Header */}
-        <View style={styles.header}>
+      {/* Header */}
+      <View style={styles.header}>
+        <TouchableOpacity
+          onPress={() => navigation.goBack()}
+          style={styles.backButton}
+        >
+          <MaterialCommunityIcons name="arrow-left" size={24} color="#374151" />
+        </TouchableOpacity>
+        <View style={styles.headerTitleContainer}>
           <Text style={styles.deliveryId}>{delivery.id}</Text>
           <Text style={styles.customerName}>{delivery.customerName}</Text>
         </View>
+      </View>
+
+      <ScrollView style={styles.scrollView}>
 
         {/* Address */}
         <View style={styles.card}>
@@ -113,8 +125,17 @@ const styles = StyleSheet.create({
   header: {
     backgroundColor: 'white',
     padding: 16,
+    flexDirection: 'row',
+    alignItems: 'center',
     borderBottomWidth: 1,
     borderBottomColor: '#F3F4F6',
+  },
+  backButton: {
+    marginRight: 16,
+    padding: 4,
+  },
+  headerTitleContainer: {
+    flex: 1,
   },
   deliveryId: {
     fontSize: 14,

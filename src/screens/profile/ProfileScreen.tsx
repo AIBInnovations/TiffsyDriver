@@ -351,6 +351,11 @@ export default function ProfileScreen() {
         {/* Profile Header Card */}
         <View style={styles.headerCard}>
           <View style={styles.headerCardContent}>
+            <ProfileAvatar
+              initials={getInitials(profile.fullName)}
+              size="lg"
+              isOnline={profile.availabilityStatus === "ONLINE"}
+            />
             <View style={styles.headerCardInfo}>
               <Text style={styles.profileName}>{profile.fullName}</Text>
               <Text style={styles.profilePhoneHeader}>{profile.phone}</Text>
@@ -361,11 +366,6 @@ export default function ProfileScreen() {
                 </Text>
               </View>
             </View>
-            <ProfileAvatar
-              initials={getInitials(profile.fullName)}
-              size="lg"
-              isOnline={profile.availabilityStatus === "ONLINE"}
-            />
           </View>
           <View style={styles.headerCardMeta}>
             <View style={styles.metaItem}>
@@ -643,7 +643,7 @@ const styles = StyleSheet.create({
   },
   headerCardInfo: {
     flex: 1,
-    paddingRight: 16,
+    paddingLeft: 16,
   },
   profilePhoneHeader: {
     fontSize: 15,

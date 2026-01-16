@@ -1,5 +1,6 @@
 import { View, Text, TouchableOpacity, StyleSheet } from "react-native";
 import { useNavigation } from "@react-navigation/native";
+import MaterialCommunityIcons from "react-native-vector-icons/MaterialCommunityIcons";
 
 interface HeaderProps {
   title: string;
@@ -15,7 +16,7 @@ export default function Header({ title, showBack = false, rightElement }: Header
       <View style={styles.leftSection}>
         {showBack && (
           <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
-            <Text style={styles.backIcon}>←</Text>
+            <MaterialCommunityIcons name="arrow-left" size={24} color="#374151" />
           </TouchableOpacity>
         )}
         <Text style={styles.title} numberOfLines={1}>
@@ -33,7 +34,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: 16,
-    paddingVertical: 16,
+    paddingVertical: 12,
     backgroundColor: 'white',
     borderBottomWidth: 1,
     borderBottomColor: '#F3F4F6',
@@ -45,10 +46,7 @@ const styles = StyleSheet.create({
   },
   backButton: {
     marginRight: 12,
-  },
-  backIcon: {
-    fontSize: 24,
-    color: '#3B82F6',
+    padding: 4,
   },
   title: {
     fontSize: 20,

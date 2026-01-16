@@ -339,13 +339,13 @@ export default function DeliveryStatusScreen() {
     setShowCompleteModal(false);
     // Pass completed order info to Deliveries screen
     // Navigate to Deliveries tab with nested screen params
-    navigation.navigate("Deliveries" as never, {
+    navigation.navigate("Deliveries" as any, {
       screen: 'DeliveriesList',
       params: {
         completedOrderId: delivery?.deliveryId,
         completedOrderNumber: delivery?.orderId,
       },
-    } as never);
+    });
   };
 
   const handleCloseCompleteModal = () => {
@@ -400,7 +400,14 @@ export default function DeliveryStatusScreen() {
 
       {/* Header */}
       <View style={styles.header}>
+        <TouchableOpacity
+          onPress={() => navigation.goBack()}
+          style={styles.backButton}
+        >
+          <MaterialCommunityIcons name="arrow-left" size={24} color="#374151" />
+        </TouchableOpacity>
         <Text style={styles.headerTitle}>Delivery Status</Text>
+        <View style={styles.headerRight} />
       </View>
 
       {/* Notification Banner */}
@@ -510,11 +517,8 @@ const styles = StyleSheet.create({
     borderBottomColor: "#F3F4F6",
   },
   backButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    alignItems: "center",
-    justifyContent: "center",
+    padding: 8,
+    marginRight: 8,
   },
   headerTitle: {
     fontSize: 24,
