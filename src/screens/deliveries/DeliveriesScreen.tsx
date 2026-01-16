@@ -24,8 +24,8 @@ import DeliveryCard from './components/DeliveryCard';
 import FilterBar from './components/FilterBar';
 import BatchGroup from './components/BatchGroup';
 import AvailableBatchesModal from './components/AvailableBatchesModal';
-import { getMyBatch, getAvailableBatches, updateDeliveryStatus as apiUpdateDeliveryStatus, acceptBatch, getDriverOrders } from '../../services/deliveryService';
-import type { Batch, Order, OrderStatus, AvailableBatch, DriverOrder } from '../../types/api';
+import { getMyBatch, getAvailableBatches, updateDeliveryStatus as apiUpdateDeliveryStatus, acceptBatch, getDriverOrders, getDriverBatchHistory } from '../../services/deliveryService';
+import type { Batch, Order, OrderStatus, AvailableBatch, DriverOrder, HistoryBatch, HistorySingleOrder } from '../../types/api';
 
 type FilterStatus = 'all' | 'READY' | 'EN_ROUTE' | 'ARRIVED' | 'DELIVERED' | 'FAILED' | 'RETURNED' | 'PICKED_UP' | 'OUT_FOR_DELIVERY';
 type SortOption = 'sequence' | 'distance' | 'status';
@@ -71,6 +71,7 @@ export default function DeliveriesScreen() {
   });
 
   // State
+  const [activeTab, setActiveTab] = useState<'current' | 'history'>('current');
   const [searchQuery, setSearchQuery] = useState('');
   const [filterStatus, setFilterStatus] = useState<FilterStatus>('all');
   const [sortBy, setSortBy] = useState<SortOption>('sequence');
@@ -94,6 +95,11 @@ export default function DeliveriesScreen() {
   const [driverOrders, setDriverOrders] = useState<DriverOrder[]>([]);
   const [deliveredOrders, setDeliveredOrders] = useState<DriverOrder[]>([]);
   const [failedOrders, setFailedOrders] = useState<DriverOrder[]>([]);
+
+  // History data
+  const [historyBatches, setHistoryBatches] = useState<HistoryBatch[]>([]);
+  const [historySingleOrders, setHistorySingleOrders] = useState<HistorySingleOrder[]>([]);
+  const [expandedHistoryBatches, setExpandedHistoryBatches] = useState<string[]>([]);
 
   // Fetch current batch
   const fetchCurrentBatch = useCallback(async () => {
@@ -185,6 +191,36 @@ export default function DeliveriesScreen() {
     }
   }, []);
 
+  // Fetch driver batch history
+  const fetchDriverBatchHistory = useCallback(async () => {
+    try {
+      console.log('📥 Fetching driver batch history...');
+      const response = await getDriverBatchHistory();
+
+      const allBatches = response.data.batches || [];
+      const singleOrders = response.data.singleOrders || [];
+
+      // Filter out DISPATCHED batches (they're still active, not historical)
+      // Only show COMPLETED, PARTIAL_COMPLETE, and CANCELLED batches in history
+      const historicalBatches = allBatches.filter(batch =>
+        batch.status !== 'DISPATCHED' &&
+        batch.status !== 'COLLECTING' &&
+        batch.status !== 'READY_FOR_DISPATCH' &&
+        batch.status !== 'IN_PROGRESS'
+      );
+
+      setHistoryBatches(historicalBatches);
+      setHistorySingleOrders(singleOrders);
+
+      console.log('✅ History loaded - Total Batches:', allBatches.length, 'Historical Batches:', historicalBatches.length, 'Single Orders:', singleOrders.length);
+      console.log('📋 Filtered out active batches:', allBatches.length - historicalBatches.length);
+    } catch (error: any) {
+      console.error('❌ Error fetching driver batch history:', error);
+      setHistoryBatches([]);
+      setHistorySingleOrders([]);
+    }
+  }, []);
+
   // Fetch available batches
   const fetchAvailableBatches = useCallback(async () => {
     try {
@@ -257,6 +293,13 @@ export default function DeliveriesScreen() {
     }
   }, [filterStatus, fetchFailedOrders]);
 
+  // Fetch history when History tab is selected
+  useEffect(() => {
+    if (activeTab === 'history') {
+      fetchDriverBatchHistory();
+    }
+  }, [activeTab, fetchDriverBatchHistory]);
+
   // Update filter and batch when screen comes into focus
   useFocusEffect(
     useCallback(() => {
@@ -324,25 +367,30 @@ export default function DeliveriesScreen() {
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
     try {
-      const promises = [fetchCurrentBatch(), fetchAvailableBatches(), fetchDriverOrders()];
+      if (activeTab === 'current') {
+        const promises = [fetchCurrentBatch(), fetchAvailableBatches(), fetchDriverOrders()];
 
-      // Also fetch delivered orders if filter is set to DELIVERED
-      if (filterStatus === 'DELIVERED') {
-        promises.push(fetchDeliveredOrders());
+        // Also fetch delivered orders if filter is set to DELIVERED
+        if (filterStatus === 'DELIVERED') {
+          promises.push(fetchDeliveredOrders());
+        }
+
+        // Also fetch failed orders if filter is set to FAILED
+        if (filterStatus === 'FAILED') {
+          promises.push(fetchFailedOrders());
+        }
+
+        await Promise.all(promises);
+      } else {
+        // Refresh history tab
+        await fetchDriverBatchHistory();
       }
-
-      // Also fetch failed orders if filter is set to FAILED
-      if (filterStatus === 'FAILED') {
-        promises.push(fetchFailedOrders());
-      }
-
-      await Promise.all(promises);
     } catch (error) {
       console.error('❌ Error refreshing:', error);
     } finally {
       setRefreshing(false);
     }
-  }, [filterStatus, fetchCurrentBatch, fetchAvailableBatches, fetchDriverOrders, fetchDeliveredOrders, fetchFailedOrders]);
+  }, [activeTab, filterStatus, fetchCurrentBatch, fetchAvailableBatches, fetchDriverOrders, fetchDeliveredOrders, fetchFailedOrders, fetchDriverBatchHistory]);
 
   // Handle status change
   const handleStatusChange = async (deliveryId: string, newStatus: OrderStatus) => {
@@ -458,6 +506,12 @@ export default function DeliveriesScreen() {
 
   const toggleBatchExpand = (batchId: string) => {
     setExpandedBatches(prev =>
+      prev.includes(batchId) ? prev.filter(id => id !== batchId) : [...prev, batchId]
+    );
+  };
+
+  const toggleHistoryBatchExpand = (batchId: string) => {
+    setExpandedHistoryBatches(prev =>
       prev.includes(batchId) ? prev.filter(id => id !== batchId) : [...prev, batchId]
     );
   };
@@ -596,6 +650,38 @@ export default function DeliveriesScreen() {
       eta: '15 mins',
       deliveryWindow: 'LUNCH',
       distance: '5 km',
+      deliveryAddress: order.deliveryAddress ? {
+        latitude: order.deliveryAddress.latitude,
+        longitude: order.deliveryAddress.longitude,
+        coordinates: order.deliveryAddress.coordinates,
+      } : undefined,
+    };
+  };
+
+  // Convert history batch order to local delivery format
+  const convertHistoryOrderToDelivery = (order: Order, batch: HistoryBatch): LocalDelivery => {
+    // Build address string with available fields
+    const addressParts = [
+      order.deliveryAddress?.street,
+      order.deliveryAddress?.area,
+      order.deliveryAddress?.city
+    ].filter(Boolean);
+
+    const dropoffLocation = addressParts.length > 0 ? addressParts.join(', ') : 'Address not available';
+
+    return {
+      id: order._id,
+      orderId: order.orderNumber,
+      customerName: order.deliveryAddress?.name || 'Customer',
+      customerPhone: order.deliveryAddress?.phone || '',
+      pickupLocation: `${batch.kitchen.name}, ${batch.kitchen.address.area}`,
+      dropoffLocation,
+      status: order.status,
+      eta: 'Completed',
+      deliveryWindow: 'LUNCH',
+      batchId: batch._id,
+      distance: '-',
+      sequenceNumber: order.sequenceNumber,
       deliveryAddress: order.deliveryAddress ? {
         latitude: order.deliveryAddress.latitude,
         longitude: order.deliveryAddress.longitude,
@@ -782,7 +868,9 @@ export default function DeliveriesScreen() {
                   : 'Your Deliveries'}
               </Text>
               <Text style={styles.subtitle}>
-                {filterStatus === 'DELIVERED'
+                {activeTab === 'history'
+                  ? `${historyBatches.length} batches • ${historySingleOrders.length} individual orders`
+                  : filterStatus === 'DELIVERED'
                   ? `${deliveredOrders.length} delivered orders`
                   : filterStatus === 'FAILED'
                   ? `${failedOrders.length} failed orders`
@@ -794,31 +882,57 @@ export default function DeliveriesScreen() {
           </View>
         </View>
 
-        {/* Search Bar */}
-        <View style={styles.searchContainer}>
-          <MaterialCommunityIcons name="magnify" size={20} color="#9CA3AF" />
-          <TextInput
-            style={styles.searchInput}
-            placeholder="Search by Order ID or Customer Name"
-            placeholderTextColor="#9CA3AF"
-            value={searchQuery}
-            onChangeText={setSearchQuery}
-          />
-          {searchQuery.length > 0 && (
-            <TouchableOpacity onPress={() => setSearchQuery('')}>
-              <MaterialCommunityIcons name="close-circle" size={20} color="#9CA3AF" />
-            </TouchableOpacity>
-          )}
+        {/* Tabs */}
+        <View style={styles.tabsContainer}>
+          <TouchableOpacity
+            style={[styles.tab, activeTab === 'current' && styles.activeTab]}
+            onPress={() => setActiveTab('current')}
+            activeOpacity={0.7}
+          >
+            <Text style={[styles.tabText, activeTab === 'current' && styles.activeTabText]}>
+              Current
+            </Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.tab, activeTab === 'history' && styles.activeTab]}
+            onPress={() => setActiveTab('history')}
+            activeOpacity={0.7}
+          >
+            <Text style={[styles.tabText, activeTab === 'history' && styles.activeTabText]}>
+              History
+            </Text>
+          </TouchableOpacity>
         </View>
+
+        {/* Search Bar - Only show for current tab */}
+        {activeTab === 'current' && (
+          <View style={styles.searchContainer}>
+            <MaterialCommunityIcons name="magnify" size={20} color="#9CA3AF" />
+            <TextInput
+              style={styles.searchInput}
+              placeholder="Search by Order ID or Customer Name"
+              placeholderTextColor="#9CA3AF"
+              value={searchQuery}
+              onChangeText={setSearchQuery}
+            />
+            {searchQuery.length > 0 && (
+              <TouchableOpacity onPress={() => setSearchQuery('')}>
+                <MaterialCommunityIcons name="close-circle" size={20} color="#9CA3AF" />
+              </TouchableOpacity>
+            )}
+          </View>
+        )}
       </View>
 
-      {/* Filter Bar */}
-      <FilterBar
-        filterStatus={filterStatus as any}
-        sortBy={sortBy as any}
-        onFilterChange={setFilterStatus as any}
-        onSortChange={setSortBy as any}
-      />
+      {/* Filter Bar - Only show for current tab */}
+      {activeTab === 'current' && (
+        <FilterBar
+          filterStatus={filterStatus as any}
+          sortBy={sortBy as any}
+          onFilterChange={setFilterStatus as any}
+          onSortChange={setSortBy as any}
+        />
+      )}
 
       {/* Delivery List */}
       <ScrollView
@@ -834,7 +948,9 @@ export default function DeliveriesScreen() {
         }
         showsVerticalScrollIndicator={false}
       >
-        {!currentBatch ? (
+        {activeTab === 'current' ? (
+          <>
+            {!currentBatch ? (
           // No batch state
           <View style={styles.emptyState}>
             <MaterialCommunityIcons name="package-variant" size={80} color="#D1D5DB" />
@@ -933,6 +1049,189 @@ export default function DeliveriesScreen() {
                   </BatchGroup>
                 ))}
               </>
+            )}
+          </>
+        )}
+          </>
+        ) : (
+          /* History Tab */
+          <>
+            {historyBatches.length === 0 && historySingleOrders.length === 0 ? (
+              <View style={styles.emptyState}>
+                <MaterialCommunityIcons name="history" size={80} color="#D1D5DB" />
+                <Text style={styles.emptyTitle}>No Delivery History</Text>
+                <Text style={styles.emptySubtitle}>
+                  Your completed deliveries and batches will appear here
+                </Text>
+              </View>
+            ) : (
+              <View style={styles.historyContainer}>
+                {/* History Batches */}
+                {historyBatches.length > 0 && (
+                  <View style={styles.historySection}>
+                    <Text style={styles.historySectionTitle}>Batches</Text>
+                    {historyBatches.map((batch) => {
+                      const isExpanded = expandedHistoryBatches.includes(batch._id);
+                      const batchOrders = batch.orders.map(order => convertHistoryOrderToDelivery(order, batch));
+
+                      return (
+                        <View key={batch._id} style={styles.historyBatchCard}>
+                          <TouchableOpacity
+                            onPress={() => toggleHistoryBatchExpand(batch._id)}
+                            activeOpacity={0.7}
+                          >
+                            <View style={styles.historyBatchHeader}>
+                              <View style={styles.historyBatchHeaderLeft}>
+                                <Text style={styles.historyBatchNumber}>{batch.batchId}</Text>
+                                <Text style={styles.historyBatchDate}>
+                                  {new Date(batch.date).toLocaleDateString('en-US', {
+                                    month: 'short',
+                                    day: 'numeric',
+                                    year: 'numeric',
+                                  })}
+                                </Text>
+                              </View>
+                              <View style={styles.historyBatchHeaderRight}>
+                                <View
+                                  style={[
+                                    styles.historyBatchStatusBadge,
+                                    {
+                                      backgroundColor:
+                                        batch.status === 'COMPLETED'
+                                          ? '#D1FAE5'
+                                          : batch.status === 'PARTIAL_COMPLETE'
+                                          ? '#FEF3C7'
+                                          : '#FEE2E2',
+                                    },
+                                  ]}
+                                >
+                                  <Text
+                                    style={[
+                                      styles.historyBatchStatusText,
+                                      {
+                                        color:
+                                          batch.status === 'COMPLETED'
+                                            ? '#065F46'
+                                            : batch.status === 'PARTIAL_COMPLETE'
+                                            ? '#92400E'
+                                            : '#991B1B',
+                                      },
+                                    ]}
+                                  >
+                                    {batch.status}
+                                  </Text>
+                                </View>
+                                <MaterialCommunityIcons
+                                  name={isExpanded ? 'chevron-up' : 'chevron-down'}
+                                  size={24}
+                                  color="#6B7280"
+                                  style={styles.expandIcon}
+                                />
+                              </View>
+                            </View>
+
+                            <View style={styles.historyBatchInfo}>
+                              <View style={styles.historyBatchInfoRow}>
+                                <MaterialCommunityIcons name="store" size={16} color="#6B7280" />
+                                <Text style={styles.historyBatchInfoText}>
+                                  {batch.kitchen.name}
+                                </Text>
+                              </View>
+                              <View style={styles.historyBatchInfoRow}>
+                                <MaterialCommunityIcons name="map-marker" size={16} color="#6B7280" />
+                                <Text style={styles.historyBatchInfoText}>
+                                  {batch.zone.name}
+                                </Text>
+                              </View>
+                              <View style={styles.historyBatchInfoRow}>
+                                <MaterialCommunityIcons name="package-variant" size={16} color="#6B7280" />
+                                <Text style={styles.historyBatchInfoText}>
+                                  {batch.totalOrders} orders
+                                </Text>
+                              </View>
+                            </View>
+                          </TouchableOpacity>
+
+                          {/* Expanded Orders */}
+                          {isExpanded && batchOrders.length > 0 && (
+                            <View style={styles.historyBatchOrders}>
+                              <View style={styles.historyBatchOrdersDivider} />
+                              <Text style={styles.historyBatchOrdersTitle}>Orders in this batch:</Text>
+                              {batchOrders.map(delivery => (
+                                <DeliveryCard
+                                  key={delivery.id}
+                                  delivery={delivery as any}
+                                  onStatusChange={handleStatusChange as any}
+                                  onCallCustomer={handleCallCustomer}
+                                  onNavigate={handleNavigate}
+                                />
+                              ))}
+                            </View>
+                          )}
+                        </View>
+                      );
+                    })}
+                  </View>
+                )}
+
+                {/* Single Orders */}
+                {historySingleOrders.length > 0 && (
+                  <View style={styles.historySection}>
+                    <Text style={styles.historySectionTitle}>Individual Orders</Text>
+                    {historySingleOrders.map((order) => (
+                      <View key={order._id} style={styles.historyOrderCard}>
+                        <View style={styles.historyOrderHeader}>
+                          <Text style={styles.historyOrderNumber}>{order.orderNumber}</Text>
+                          <View
+                            style={[
+                              styles.historyOrderStatusBadge,
+                              {
+                                backgroundColor:
+                                  order.status === 'DELIVERED'
+                                    ? '#D1FAE5'
+                                    : order.status === 'FAILED'
+                                    ? '#FEE2E2'
+                                    : '#FEF3C7',
+                              },
+                            ]}
+                          >
+                            <Text
+                              style={[
+                                styles.historyOrderStatusText,
+                                {
+                                  color:
+                                    order.status === 'DELIVERED'
+                                      ? '#065F46'
+                                      : order.status === 'FAILED'
+                                      ? '#991B1B'
+                                      : '#92400E',
+                                },
+                              ]}
+                            >
+                              {order.status}
+                            </Text>
+                          </View>
+                        </View>
+                        <View style={styles.historyOrderInfo}>
+                          <MaterialCommunityIcons name="store" size={16} color="#6B7280" />
+                          <Text style={styles.historyOrderInfoText}>
+                            {order.kitchenId.name}
+                          </Text>
+                        </View>
+                        <Text style={styles.historyOrderDate}>
+                          {new Date(order.placedAt).toLocaleDateString('en-US', {
+                            month: 'short',
+                            day: 'numeric',
+                            year: 'numeric',
+                            hour: 'numeric',
+                            minute: '2-digit',
+                          })}
+                        </Text>
+                      </View>
+                    ))}
+                  </View>
+                )}
+              </View>
             )}
           </>
         )}
@@ -1180,5 +1479,168 @@ const styles = StyleSheet.create({
   },
   successToastIcon: {
     backgroundColor: 'rgba(255, 255, 255, 0.2)',
+  },
+  tabsContainer: {
+    flexDirection: 'row',
+    marginTop: 12,
+    marginBottom: 12,
+    backgroundColor: '#F3F4F6',
+    borderRadius: 10,
+    padding: 4,
+  },
+  tab: {
+    flex: 1,
+    paddingVertical: 10,
+    paddingHorizontal: 16,
+    borderRadius: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  activeTab: {
+    backgroundColor: '#FFFFFF',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 2,
+    elevation: 1,
+  },
+  tabText: {
+    fontSize: 15,
+    fontWeight: '500',
+    color: '#6B7280',
+  },
+  activeTabText: {
+    color: '#111827',
+    fontWeight: '600',
+  },
+  historyContainer: {
+    paddingHorizontal: 16,
+  },
+  historySection: {
+    marginBottom: 24,
+  },
+  historySectionTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: '#111827',
+    marginBottom: 12,
+  },
+  historyBatchCard: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 12,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 4,
+    elevation: 2,
+  },
+  historyBatchHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+    marginBottom: 12,
+  },
+  historyBatchHeaderLeft: {
+    flex: 1,
+  },
+  historyBatchHeaderRight: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  historyBatchNumber: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#111827',
+    marginBottom: 4,
+  },
+  historyBatchDate: {
+    fontSize: 13,
+    color: '#6B7280',
+  },
+  historyBatchStatusBadge: {
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 12,
+  },
+  historyBatchStatusText: {
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  expandIcon: {
+    marginLeft: 4,
+  },
+  historyBatchInfo: {
+    gap: 8,
+  },
+  historyBatchInfoRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  historyBatchInfoText: {
+    fontSize: 14,
+    color: '#374151',
+  },
+  historyBatchOrders: {
+    marginTop: 12,
+  },
+  historyBatchOrdersDivider: {
+    height: 1,
+    backgroundColor: '#E5E7EB',
+    marginBottom: 12,
+  },
+  historyBatchOrdersTitle: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#374151',
+    marginBottom: 12,
+  },
+  historyOrderCard: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 12,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 4,
+    elevation: 2,
+  },
+  historyOrderHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  historyOrderNumber: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#111827',
+  },
+  historyOrderStatusBadge: {
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 12,
+  },
+  historyOrderStatusText: {
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  historyOrderInfo: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginBottom: 8,
+  },
+  historyOrderInfoText: {
+    fontSize: 14,
+    color: '#374151',
+  },
+  historyOrderDate: {
+    fontSize: 13,
+    color: '#6B7280',
   },
 });

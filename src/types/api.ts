@@ -392,3 +392,36 @@ export interface DocumentUpdateRequestData {
   };
   message: string;
 }
+
+// ============================================
+// Driver Batch History Types
+// ============================================
+
+// History Batch with Orders
+export interface HistoryBatch {
+  batchId: string;
+  _id: string;
+  status: BatchStatus;
+  date: string;
+  totalOrders: number;
+  kitchen: Kitchen;
+  zone: Zone;
+  orders: Order[];
+  driverAssignedAt: string;
+  completedAt?: string;
+}
+
+// Single Order (not in batch)
+export interface HistorySingleOrder {
+  _id: string;
+  orderNumber: string;
+  status: OrderStatus;
+  kitchenId: Kitchen;
+  placedAt: string;
+}
+
+// Driver Batch History Response
+export interface DriverBatchHistoryData {
+  batches: HistoryBatch[];
+  singleOrders: HistorySingleOrder[];
+}

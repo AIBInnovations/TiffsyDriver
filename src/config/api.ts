@@ -25,6 +25,7 @@ export const API_CONFIG = {
     COMPLETE_BATCH: (batchId: string) => `/delivery/batches/${batchId}/complete`,
     GET_BATCH: (batchId: string) => `/delivery/batches/${batchId}`,
     DRIVER_ORDERS: '/orders/driver',
+    DRIVER_BATCH_HISTORY: '/delivery/batches/driver/history',
 
     // Driver Profile endpoints
     DRIVER_PROFILE: '/driver/profile',

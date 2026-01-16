@@ -17,8 +17,6 @@ import MaterialCommunityIcons from "react-native-vector-icons/MaterialCommunityI
 import {
   DriverProfile,
   VehicleType,
-  Language,
-  languageLabels,
 } from "../useDriverProfileStore";
 import { SegmentedControl } from "./ProfileUIComponents";
 
@@ -42,10 +40,10 @@ export default function EditProfileSheet({
   onSave,
 }: EditProfileSheetProps) {
   const [fullName, setFullName] = useState(profile.fullName);
+  const [phone, setPhone] = useState(profile.phone);
   const [email, setEmail] = useState(profile.email);
   const [vehicleType, setVehicleType] = useState<VehicleType>(profile.vehicleType);
   const [vehicleNumber, setVehicleNumber] = useState(profile.vehicleNumber);
-  const [preferredLanguage, setPreferredLanguage] = useState<Language>(profile.preferredLanguage);
   const [errors, setErrors] = useState<FormErrors>({});
   const [isSaving, setIsSaving] = useState(false);
 
@@ -53,10 +51,10 @@ export default function EditProfileSheet({
   useEffect(() => {
     if (visible) {
       setFullName(profile.fullName);
+      setPhone(profile.phone);
       setEmail(profile.email);
       setVehicleType(profile.vehicleType);
       setVehicleNumber(profile.vehicleNumber);
-      setPreferredLanguage(profile.preferredLanguage);
       setErrors({});
     }
   }, [visible, profile]);
@@ -78,10 +76,6 @@ export default function EditProfileSheet({
       newErrors.email = "Invalid email format";
     }
 
-    if (!vehicleNumber.trim()) {
-      newErrors.vehicleNumber = "Vehicle number is required";
-    }
-
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
@@ -92,12 +86,13 @@ export default function EditProfileSheet({
     setIsSaving(true);
     try {
       await new Promise<void>((resolve) => setTimeout(() => resolve(), 600)); // Simulate delay
+
       await onSave({
         fullName: fullName.trim(),
+        phone: phone.trim(),
         email: email.trim(),
         vehicleType,
-        vehicleNumber: vehicleNumber.toUpperCase().trim(),
-        preferredLanguage,
+        vehicleNumber,
       });
       onClose();
     } catch (e) {
@@ -111,11 +106,6 @@ export default function EditProfileSheet({
     { value: "BIKE", label: "Bike" },
     { value: "SCOOTER", label: "Scooter" },
     { value: "CAR", label: "Car" },
-  ];
-
-  const languageOptions: { value: Language; label: string }[] = [
-    { value: "EN", label: "English" },
-    { value: "HI", label: "Hindi" },
   ];
 
   return (
@@ -183,18 +173,21 @@ export default function EditProfileSheet({
               </View>
             </View>
 
-            {/* Read-only Fields */}
+            {/* Account Details */}
             <View style={styles.section}>
               <Text style={styles.sectionTitle}>Account Details</Text>
 
               <View style={styles.inputGroup}>
                 <Text style={styles.inputLabel}>Phone</Text>
                 <TextInput
-                  style={[styles.input, styles.inputDisabled]}
-                  value={profile.phone}
-                  editable={false}
+                  style={styles.input}
+                  value={phone}
+                  onChangeText={setPhone}
+                  placeholder="Enter your phone number"
+                  placeholderTextColor="#9CA3AF"
+                  keyboardType="phone-pad"
+                  editable={!isSaving}
                 />
-                <Text style={styles.hintText}>Contact support to change</Text>
               </View>
 
               <View style={styles.inputGroup}>
@@ -222,59 +215,16 @@ export default function EditProfileSheet({
               </View>
 
               <View style={styles.inputGroup}>
-                <Text style={styles.inputLabel}>Vehicle Number *</Text>
+                <Text style={styles.inputLabel}>Vehicle Number</Text>
                 <TextInput
-                  style={[styles.input, errors.vehicleNumber && styles.inputError]}
+                  style={[styles.input, styles.inputDisabled]}
                   value={vehicleNumber}
-                  onChangeText={(text) => setVehicleNumber(text.toUpperCase())}
-                  placeholder="e.g., MH 12 AB 1234"
-                  placeholderTextColor="#9CA3AF"
-                  autoCapitalize="characters"
-                  editable={!isSaving}
+                  editable={false}
                 />
-                {errors.vehicleNumber && (
-                  <Text style={styles.errorText}>{errors.vehicleNumber}</Text>
-                )}
+                <Text style={styles.hintText}>Contact support to change</Text>
               </View>
             </View>
 
-            {/* Language Section */}
-            <View style={styles.section}>
-              <Text style={styles.sectionTitle}>Preferred Language</Text>
-
-              <View style={styles.radioGroup}>
-                {languageOptions.map((option) => (
-                  <Pressable
-                    key={option.value}
-                    style={[
-                      styles.radioOption,
-                      preferredLanguage === option.value && styles.radioOptionActive,
-                    ]}
-                    onPress={() => setPreferredLanguage(option.value)}
-                    disabled={isSaving}
-                  >
-                    <View
-                      style={[
-                        styles.radioCircle,
-                        preferredLanguage === option.value && styles.radioCircleActive,
-                      ]}
-                    >
-                      {preferredLanguage === option.value && (
-                        <View style={styles.radioInner} />
-                      )}
-                    </View>
-                    <Text
-                      style={[
-                        styles.radioLabel,
-                        preferredLanguage === option.value && styles.radioLabelActive,
-                      ]}
-                    >
-                      {languageLabels[option.value]}
-                    </Text>
-                  </Pressable>
-                ))}
-              </View>
-            </View>
           </ScrollView>
 
           {/* Footer Buttons */}
@@ -388,50 +338,6 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: "#9CA3AF",
     marginTop: 4,
-  },
-  radioGroup: {
-    gap: 8,
-  },
-  radioOption: {
-    flexDirection: "row",
-    alignItems: "center",
-    paddingVertical: 12,
-    paddingHorizontal: 14,
-    borderRadius: 12,
-    borderWidth: 1.5,
-    borderColor: "#E5E7EB",
-    backgroundColor: "#FFFFFF",
-  },
-  radioOptionActive: {
-    borderColor: "#3B82F6",
-    backgroundColor: "#EFF6FF",
-  },
-  radioCircle: {
-    width: 20,
-    height: 20,
-    borderRadius: 10,
-    borderWidth: 2,
-    borderColor: "#D1D5DB",
-    alignItems: "center",
-    justifyContent: "center",
-    marginRight: 12,
-  },
-  radioCircleActive: {
-    borderColor: "#3B82F6",
-  },
-  radioInner: {
-    width: 10,
-    height: 10,
-    borderRadius: 5,
-    backgroundColor: "#3B82F6",
-  },
-  radioLabel: {
-    fontSize: 15,
-    color: "#374151",
-  },
-  radioLabelActive: {
-    color: "#1E40AF",
-    fontWeight: "500",
   },
   footer: {
     flexDirection: "row",

@@ -8,6 +8,7 @@ import type {
   DeliveryStatusUpdateRequest,
   DeliveryStatusUpdateData,
   DriverOrdersData,
+  DriverBatchHistoryData,
 } from '../types/api';
 
 // Create authorized headers with Firebase token
@@ -342,6 +343,40 @@ export const getDriverOrders = async (status?: string): Promise<ApiResponse<Driv
     return data;
   } catch (error: any) {
     console.error('❌ Error getting driver orders:', error);
+    throw error;
+  }
+};
+
+// Get driver batch history (past and current batches and orders)
+export const getDriverBatchHistory = async (): Promise<ApiResponse<DriverBatchHistoryData>> => {
+  try {
+    console.log('📡 Calling /delivery/batches/driver/history endpoint...');
+
+    const headers = await createHeaders();
+
+    const response = await fetch(
+      `${API_CONFIG.BASE_URL}${API_CONFIG.ENDPOINTS.DRIVER_BATCH_HISTORY}`,
+      {
+        method: 'GET',
+        headers,
+      }
+    );
+
+    console.log('📡 Response status:', response.status);
+
+    const data: ApiResponse<DriverBatchHistoryData> = await response.json();
+
+    if (!response.ok) {
+      throw new Error(data.error || data.message || 'Failed to get driver batch history');
+    }
+
+    console.log('✅ Driver batch history retrieved');
+    console.log('📦 Batches count:', data?.data?.batches?.length || 0);
+    console.log('📦 Single orders count:', data?.data?.singleOrders?.length || 0);
+
+    return data;
+  } catch (error: any) {
+    console.error('❌ Error getting driver batch history:', error);
     throw error;
   }
 };

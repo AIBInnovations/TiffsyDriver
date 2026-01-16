@@ -24,7 +24,6 @@ import {
 import {
   getDriverProfile,
   updateDriverProfile as updateDriverProfileAPI,
-  updateDriverVehicle,
 } from "../../services/driverProfileService";
 import {
   ProfileAvatar,
@@ -32,17 +31,12 @@ import {
   ListRow,
   SwitchRow,
   Toast,
-  QuickActionTile,
   ErrorBanner,
   SkeletonAvatar,
   SkeletonText,
 } from "./components/ProfileUIComponents";
 import EditProfileSheet from "./components/EditProfileSheet";
 import {
-  LanguageModal,
-  SecurityModal,
-  VehicleModal,
-  DocumentsModal,
   ConfirmationModal,
   LegalModal,
 } from "./components/ProfileModals";
@@ -65,10 +59,6 @@ export default function ProfileScreen() {
 
   // Modal states
   const [showEditProfile, setShowEditProfile] = useState(false);
-  const [showLanguageModal, setShowLanguageModal] = useState(false);
-  const [showSecurityModal, setShowSecurityModal] = useState(false);
-  const [showVehicleModal, setShowVehicleModal] = useState(false);
-  const [showDocumentsModal, setShowDocumentsModal] = useState(false);
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
   const [isLoggingOut, setIsLoggingOut] = useState(false);
   const [showTermsModal, setShowTermsModal] = useState(false);
@@ -110,18 +100,33 @@ export default function ProfileScreen() {
       console.log('📥 Backend response received');
       console.log('📥 Response keys:', Object.keys(response || {}));
       console.log('📥 Response.data keys:', Object.keys(response?.data || {}));
+      console.log('📥 Response.data type:', typeof response?.data);
 
       // Validate response structure
       if (!response || !response.data) {
         console.error('❌ Invalid response structure - missing data');
+        console.error('❌ response:', response);
         throw new Error('Invalid response structure from backend');
       }
 
       const { user, driverDetails, statistics } = response.data;
 
-      console.log('📥 User exists:', !!user);
-      console.log('📥 DriverDetails exists:', !!driverDetails);
-      console.log('📥 Statistics exists:', !!statistics);
+      console.log('📥 Destructured data check:');
+      console.log('  - user exists:', !!user);
+      console.log('  - user type:', typeof user);
+      console.log('  - user is object:', user && typeof user === 'object');
+      console.log('  - driverDetails exists:', !!driverDetails);
+      console.log('  - statistics exists:', !!statistics);
+
+      // Check old structure (should not exist)
+      const oldProfile = (response?.data as any)?.profile;
+      const oldStats = (response?.data as any)?.stats;
+      if (oldProfile || oldStats) {
+        console.warn('⚠️ DETECTED OLD RESPONSE STRUCTURE!');
+        console.warn('  - response.data.profile exists:', !!oldProfile);
+        console.warn('  - response.data.stats exists:', !!oldStats);
+        console.warn('  - This indicates backend is still using old response format');
+      }
 
       // Update local store with backend data only if we have valid user data
       // driverDetails might not exist if the backend hasn't implemented it yet
@@ -130,12 +135,23 @@ export default function ProfileScreen() {
       };
 
       if (user) {
+        console.log('✅ Processing user data:');
+        console.log('  - user._id:', user._id);
+        console.log('  - user.name:', user.name);
+        console.log('  - user.phone:', user.phone);
+        console.log('  - user.email:', user.email);
+
         if (user._id) updates.driverId = user._id;
         if (user.name) updates.fullName = user.name;
         if (user.phone) updates.phone = user.phone;
         if (user.email !== undefined) updates.email = user.email || '';
+
+        console.log('✅ Updates to be applied:', updates);
       } else {
-        console.warn('⚠️ No user data in backend response');
+        console.error('❌ No user data in backend response');
+        console.error('❌ response.data:', response.data);
+        console.error('❌ response.data keys:', Object.keys(response.data));
+        console.error('❌ Possible cause: Backend returned old structure with "profile" instead of "user"');
         throw new Error('User data not found in backend response');
       }
 
@@ -368,44 +384,6 @@ export default function ProfileScreen() {
           </Pressable>
         </View>
 
-        {/* Quick Actions Grid */}
-        <SectionCard title="Quick Actions" compact={profile.appSettings.compactMode}>
-          <View style={styles.quickActionsGrid}>
-            <QuickActionTile
-              icon="file-document-multiple-outline"
-              iconColor="#3B82F6"
-              iconBgColor="#EFF6FF"
-              title="My Documents"
-              onPress={() => setShowDocumentsModal(true)}
-              disabled={!isHydrated}
-            />
-            <QuickActionTile
-              icon="motorbike"
-              iconColor="#10B981"
-              iconBgColor="#F0FDF4"
-              title="Vehicle"
-              onPress={() => setShowVehicleModal(true)}
-              disabled={!isHydrated}
-            />
-            <QuickActionTile
-              icon="translate"
-              iconColor="#F59E0B"
-              iconBgColor="#FFFBEB"
-              title="Language"
-              onPress={() => setShowLanguageModal(true)}
-              disabled={!isHydrated}
-            />
-            <QuickActionTile
-              icon="shield-lock-outline"
-              iconColor="#8B5CF6"
-              iconBgColor="#F5F3FF"
-              title="Security"
-              onPress={() => setShowSecurityModal(true)}
-              disabled={!isHydrated}
-            />
-          </View>
-        </SectionCard>
-
         {/* Profile Details Card */}
         <SectionCard title="Profile Details" compact={profile.appSettings.compactMode}>
           <ListRow
@@ -585,59 +563,6 @@ export default function ProfileScreen() {
         }}
       />
 
-      <LanguageModal
-        visible={showLanguageModal}
-        onClose={() => setShowLanguageModal(false)}
-        currentLanguage={profile.preferredLanguage}
-        onSave={async (language) => {
-          await updateProfile({ preferredLanguage: language });
-          showToast("Language updated", "success");
-        }}
-      />
-
-      <SecurityModal
-        visible={showSecurityModal}
-        onClose={() => setShowSecurityModal(false)}
-      />
-
-      <VehicleModal
-        visible={showVehicleModal}
-        onClose={() => setShowVehicleModal(false)}
-        currentVehicleType={profile.vehicleType}
-        currentVehicleNumber={profile.vehicleNumber}
-        onSave={async (vehicleType, vehicleNumber) => {
-          try {
-            // Try to call backend API to update vehicle
-            let backendSuccess = false;
-            try {
-              await updateDriverVehicle({ vehicleType, vehicleNumber });
-              backendSuccess = true;
-            } catch (backendError: any) {
-              console.error('❌ Backend update failed:', backendError);
-              // Continue to save locally even if backend fails
-              showToast("Saved locally (server sync failed)", "info");
-            }
-
-            // Always update local store
-            await updateProfile({ vehicleType, vehicleNumber });
-
-            if (backendSuccess) {
-              showToast("Vehicle updated", "success");
-            }
-          } catch (error: any) {
-            console.error('❌ Error updating vehicle:', error);
-            showToast(error.message || "Failed to update vehicle", "error");
-            throw error;
-          }
-        }}
-      />
-
-      <DocumentsModal
-        visible={showDocumentsModal}
-        onClose={() => setShowDocumentsModal(false)}
-      />
-
-
       <LegalModal
         visible={showTermsModal}
         onClose={() => setShowTermsModal(false)}
@@ -801,13 +726,6 @@ const styles = StyleSheet.create({
     fontSize: 15,
     fontWeight: "600",
     color: "#F56B4C",
-  },
-  quickActionsGrid: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    justifyContent: "space-between",
-    rowGap: 20,
-    paddingLeft: 32,
   },
   editLinkContainer: {
     paddingTop: 8,
