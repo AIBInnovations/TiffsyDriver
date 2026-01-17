@@ -10,7 +10,6 @@ export type AuthStackParamList = {
     phoneNumber: string;
     confirmation: FirebaseAuthTypes.ConfirmationResult;
   };
-  RoleSelection: { phoneNumber: string };
   DriverRegistration: { phoneNumber: string; reapply?: boolean };
   ApprovalWaiting: { phoneNumber: string };
   Rejection: {

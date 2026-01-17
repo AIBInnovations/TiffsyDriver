@@ -103,9 +103,9 @@ const OTPVerificationScreen = ({ navigation, route }: Props) => {
 
         // Step 5: Handle response based on user status
         if (syncResponse.data.isNewUser) {
-          // New user - navigate to role selection
-          console.log('👤 New user detected, navigating to role selection...');
-          navigation.replace('RoleSelection', { phoneNumber });
+          // New user - navigate directly to driver registration
+          console.log('👤 New user detected, navigating to driver registration...');
+          navigation.replace('DriverRegistration', { phoneNumber });
         } else if (syncResponse.data.user?.role !== 'DRIVER') {
           // User exists but is not a driver
           Alert.alert(
