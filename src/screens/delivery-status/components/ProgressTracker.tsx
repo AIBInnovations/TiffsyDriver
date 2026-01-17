@@ -16,16 +16,15 @@ interface ProgressTrackerProps {
 
 const steps: ProgressStep[] = [
   { key: "pending", label: "Pending", icon: "clock-outline" },
-  { key: "picked_up", label: "Picked Up", icon: "package-variant" },
   { key: "in_progress", label: "En Route", icon: "truck-fast" },
   { key: "delivered", label: "Delivered", icon: "check-circle" },
 ];
 
 const statusOrder: Record<DeliveryStatusType, number> = {
   pending: 0,
-  picked_up: 1,
-  in_progress: 2,
-  delivered: 3,
+  picked_up: 1, // Keep for backward compatibility with old data
+  in_progress: 1,
+  delivered: 2,
   failed: -1,
 };
 

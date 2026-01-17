@@ -307,57 +307,6 @@ const OTPVerificationScreen = ({ navigation, route }: Props) => {
               paddingBottom: 15,
             }}
           >
-            {/* Login / Register Switch */}
-            <View
-              style={{
-                backgroundColor: '#F3F4F6',
-                borderRadius: 100,
-                flexDirection: 'row',
-                padding: 4,
-                marginBottom: 20,
-              }}
-            >
-              <View
-                style={{
-                  flex: 1,
-                  backgroundColor: 'white',
-                  borderRadius: 100,
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  paddingVertical: 12,
-                }}
-              >
-                <Text
-                  style={{
-                    color: '#111827',
-                    fontSize: 16,
-                    fontWeight: '600',
-                  }}
-                >
-                  Login
-                </Text>
-              </View>
-              <View
-                style={{
-                  flex: 1,
-                  borderRadius: 100,
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  paddingVertical: 12,
-                }}
-              >
-                <Text
-                  style={{
-                    color: '#9CA3AF',
-                    fontSize: 16,
-                    fontWeight: '500',
-                  }}
-                >
-                  Register
-                </Text>
-              </View>
-            </View>
-
             {/* Verify OTP title */}
             <Text
               style={{

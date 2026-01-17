@@ -18,7 +18,6 @@ type Props = AuthStackScreenProps<'Login'>;
 const LoginScreen = ({ navigation }: Props) => {
   const [phone, setPhone] = useState('');
   const [remember, setRemember] = useState(false);
-  const [selectedTab, setSelectedTab] = useState<'login' | 'register'>('login');
   const [loading, setLoading] = useState(false);
 
   const handleGetOtp = async () => {
@@ -65,42 +64,6 @@ const LoginScreen = ({ navigation }: Props) => {
 
       {/* Bottom white card */}
       <View style={styles.card}>
-        {/* Login / Register Switch */}
-        <View style={styles.tabContainer}>
-          <TouchableOpacity
-            onPress={() => setSelectedTab('login')}
-            style={[
-              styles.tab,
-              selectedTab === 'login' && styles.activeTab,
-            ]}
-          >
-            <Text
-              style={[
-                styles.tabText,
-                selectedTab === 'login' && styles.activeTabText,
-              ]}
-            >
-              Login
-            </Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            onPress={() => setSelectedTab('register')}
-            style={[
-              styles.tab,
-              selectedTab === 'register' && styles.activeTab,
-            ]}
-          >
-            <Text
-              style={[
-                styles.tabText,
-                selectedTab === 'register' && styles.activeTabText,
-              ]}
-            >
-              Register
-            </Text>
-          </TouchableOpacity>
-        </View>
-
         {/* Your Number label */}
         <Text style={styles.label}>Your Number</Text>
 
@@ -229,32 +192,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     paddingTop: 20,
     paddingBottom: 50,
-  },
-  tabContainer: {
-    backgroundColor: '#F3F4F6',
-    borderRadius: 100,
-    flexDirection: 'row',
-    padding: 4,
-    marginBottom: 20,
-  },
-  tab: {
-    flex: 1,
-    borderRadius: 100,
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 12,
-  },
-  activeTab: {
-    backgroundColor: 'white',
-  },
-  tabText: {
-    color: '#9CA3AF',
-    fontSize: 16,
-    fontWeight: '500',
-  },
-  activeTabText: {
-    color: '#111827',
-    fontWeight: '600',
   },
   label: {
     color: '#111827',

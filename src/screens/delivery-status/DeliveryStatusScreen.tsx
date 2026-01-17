@@ -302,10 +302,6 @@ export default function DeliveryStatusScreen() {
     updateDeliveryStatus("in_progress");
   };
 
-  const handleMarkPickedUp = () => {
-    updateDeliveryStatus("picked_up");
-  };
-
   const handleMarkDelivered = () => {
     setShowPODModal(true);
   };
@@ -466,7 +462,6 @@ export default function DeliveryStatusScreen() {
         <ActionButtons
           currentStatus={delivery.currentStatus}
           onStartDelivery={handleStartDelivery}
-          onMarkPickedUp={handleMarkPickedUp}
           onMarkDelivered={handleMarkDelivered}
           onMarkFailed={handleMarkFailed}
           isLoading={isUpdating}

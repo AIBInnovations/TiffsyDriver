@@ -5,7 +5,6 @@ import { DeliveryStatusType } from "../../../navigation/types";
 interface ActionButtonsProps {
   currentStatus: DeliveryStatusType;
   onStartDelivery: () => void;
-  onMarkPickedUp: () => void;
   onMarkDelivered: () => void;
   onMarkFailed: () => void;
   isLoading?: boolean;
@@ -23,7 +22,6 @@ interface ActionButton {
 export default function ActionButtons({
   currentStatus,
   onStartDelivery,
-  onMarkPickedUp,
   onMarkDelivered,
   onMarkFailed,
   isLoading = false,
@@ -41,13 +39,14 @@ export default function ActionButtons({
         };
       case "in_progress":
         return {
-          label: "Mark as Picked Up",
-          icon: "package-variant",
-          color: "#F59E0B",
-          shadowColor: "#F59E0B",
-          onPress: onMarkPickedUp,
+          label: "Mark as Delivered",
+          icon: "check-circle",
+          color: "#10B981",
+          shadowColor: "#10B981",
+          onPress: onMarkDelivered,
         };
       case "picked_up":
+        // Legacy support - redirect to delivered action
         return {
           label: "Mark as Delivered",
           icon: "check-circle",
@@ -61,7 +60,7 @@ export default function ActionButtons({
   };
 
   const primaryAction = getActionButton();
-  const showFailButton = currentStatus === "in_progress" || currentStatus === "picked_up";
+  const showFailButton = currentStatus === "in_progress";
   const isCompleted = currentStatus === "delivered";
   const isFailed = currentStatus === "failed";
 
@@ -152,15 +151,7 @@ export default function ActionButtons({
           <View style={styles.helperRow}>
             <MaterialCommunityIcons name="truck-fast-outline" size={14} color="#6B7280" />
             <Text style={styles.helperText}>
-              Navigate to pickup location and collect the package
-            </Text>
-          </View>
-        )}
-        {currentStatus === "picked_up" && (
-          <View style={styles.helperRow}>
-            <MaterialCommunityIcons name="map-marker-check-outline" size={14} color="#6B7280" />
-            <Text style={styles.helperText}>
-              Navigate to drop-off location to complete delivery
+              Navigate to delivery location to complete the order
             </Text>
           </View>
         )}
