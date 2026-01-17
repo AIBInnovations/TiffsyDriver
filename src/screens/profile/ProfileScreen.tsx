@@ -742,7 +742,7 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
     paddingHorizontal: 16,
     backgroundColor: "#FEF2F2",
-    borderRadius: 8,
+    borderRadius: 7,
   },
   savingLabel: {
     fontSize: 12,
