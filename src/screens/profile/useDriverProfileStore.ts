@@ -56,7 +56,7 @@ const defaultProfile: DriverProfile = {
     batchUpdates: true,
     promotions: false,
   },
-  availabilityStatus: "OFFLINE",
+  availabilityStatus: "ONLINE",
   appSettings: {
     darkMode: "SYSTEM",
     haptics: true,

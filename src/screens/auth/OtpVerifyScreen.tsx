@@ -17,6 +17,8 @@ import auth from '@react-native-firebase/auth';
 import { AuthStackScreenProps } from "../../navigation/types";
 import { syncUser, getFirebaseToken } from '../../services/authService';
 import { tokenStorage } from '../../utils/tokenStorage';
+import { useDriverProfileStore } from '../profile/useDriverProfileStore';
+import { registerFCMToken } from '../../services/fcmService';
 
 type Props = AuthStackScreenProps<'OtpVerify'>;
 
@@ -26,6 +28,9 @@ const OTPVerificationScreen = ({ navigation, route }: Props) => {
   const [timer, setTimer] = useState(30);
   const [canResend, setCanResend] = useState(false);
   const [verifying, setVerifying] = useState(false);
+
+  // Get profile store to set availability status
+  const { setAvailabilityStatus } = useDriverProfileStore();
 
   // Refs for input fields
   const inputRefs = useRef<(TextInput | null)[]>([]);
@@ -101,7 +106,17 @@ const OTPVerificationScreen = ({ navigation, route }: Props) => {
         // ⚠️ DEBUG: Show full backend response
         console.log('🔍 FULL BACKEND RESPONSE:', JSON.stringify(syncResponse, null, 2));
 
-        // Step 5: Handle response based on user status
+        // Step 5: Register FCM token for push notifications
+        console.log('🔔 Registering FCM token for push notifications...');
+        try {
+          await registerFCMToken();
+          console.log('✅ FCM token registered successfully');
+        } catch (fcmError) {
+          console.error('⚠️ Failed to register FCM token (non-critical):', fcmError);
+          // Don't block login if FCM registration fails
+        }
+
+        // Step 6: Handle response based on user status
         if (syncResponse.data.isNewUser) {
           // New user - navigate directly to driver registration
           console.log('👤 New user detected, navigating to driver registration...');
@@ -147,7 +162,8 @@ const OTPVerificationScreen = ({ navigation, route }: Props) => {
                 console.log('📝 Profile incomplete, navigating to profile completion...');
                 navigation.replace('ProfileOnboarding', { phoneNumber });
               } else {
-                console.log('✅ Profile complete, navigating to main app...');
+                console.log('✅ Profile complete, setting driver to ONLINE and navigating to main app...');
+                await setAvailabilityStatus('ONLINE');
                 navigation.getParent()?.navigate('Main');
               }
               break;
@@ -159,7 +175,8 @@ const OTPVerificationScreen = ({ navigation, route }: Props) => {
                 console.log('📝 Profile incomplete, navigating to profile completion...');
                 navigation.replace('ProfileOnboarding', { phoneNumber });
               } else {
-                console.log('✅ Profile complete, navigating to main app...');
+                console.log('✅ Profile complete, setting driver to ONLINE and navigating to main app...');
+                await setAvailabilityStatus('ONLINE');
                 navigation.getParent()?.navigate('Main');
               }
           }

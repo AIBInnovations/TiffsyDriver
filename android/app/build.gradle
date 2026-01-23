@@ -128,6 +128,9 @@ dependencies {
     // Firebase Auth for phone authentication
     implementation 'com.google.firebase:firebase-auth'
 
+    // Firebase Cloud Messaging for push notifications
+    implementation 'com.google.firebase:firebase-messaging'
+
     // Firebase Analytics (optional but recommended)
     implementation 'com.google.firebase:firebase-analytics'
 }

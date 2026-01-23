@@ -27,6 +27,7 @@ import {
   updateDriverProfile as updateDriverProfileAPI,
   updateDriverVehicle,
 } from "../../services/driverProfileService";
+import { removeFCMToken } from "../../services/fcmService";
 import {
   ProfileAvatar,
   SectionCard,
@@ -253,6 +254,16 @@ export default function ProfileScreen() {
     setIsLoggingOut(true);
 
     try {
+      // Remove FCM token from backend before logout
+      console.log('🔔 Removing FCM token from backend...');
+      try {
+        await removeFCMToken();
+        console.log('✅ FCM token removed successfully');
+      } catch (fcmError) {
+        console.error('⚠️ Failed to remove FCM token (non-critical):', fcmError);
+        // Don't block logout if FCM removal fails
+      }
+
       // Clear session data
       await clearSessionData();
 
