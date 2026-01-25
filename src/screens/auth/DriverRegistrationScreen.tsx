@@ -204,7 +204,7 @@ export default function DriverRegistrationScreen({
 
       // ⚠️ TEMPORARY WORKAROUND: Backend /auth/register-driver endpoint not implemented yet
       // TODO: Remove this mock when backend is ready
-      const USE_MOCK_FOR_TESTING = true; // Set to false when backend endpoint is ready
+      const USE_MOCK_FOR_TESTING = false; // Set to false when backend endpoint is ready
 
       if (USE_MOCK_FOR_TESTING) {
         console.log('🧪 MOCK MODE: Simulating successful registration');

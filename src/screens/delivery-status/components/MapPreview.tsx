@@ -1,11 +1,17 @@
-import { View, Text, StyleSheet, TouchableOpacity, Linking, Platform, Alert } from "react-native";
+import { View, Text, StyleSheet, TouchableOpacity, Linking, Platform } from "react-native";
+import { useState } from "react";
 import MaterialCommunityIcons from "react-native-vector-icons/MaterialCommunityIcons";
+import { DeliveryStatusType } from "../../../navigation/types";
+import ActionSheet from "../../../components/common/ActionSheet";
 
 interface MapPreviewProps {
   pickupLocation?: string;
   dropoffLocation?: string;
   showRoutePreview?: boolean;
   isLoading?: boolean;
+  currentStatus?: DeliveryStatusType;
+  onStartDelivery?: () => void;
+  isUpdating?: boolean;
 }
 
 export default function MapPreview({
@@ -13,7 +19,12 @@ export default function MapPreview({
   dropoffLocation,
   showRoutePreview = true,
   isLoading = false,
+  currentStatus,
+  onStartDelivery,
+  isUpdating = false,
 }: MapPreviewProps) {
+  const [showNavigationSheet, setShowNavigationSheet] = useState(false);
+
   const openInMaps = async (destination: string, mode: "directions" | "location" = "directions") => {
     const encodedDestination = encodeURIComponent(destination);
 
@@ -34,15 +45,9 @@ export default function MapPreview({
         await Linking.openURL(webUrl);
       }
     } else {
-      // Android - Use Google Maps intent
-      const googleMapsUrl = `google.navigation:q=${encodedDestination}`;
-      const webUrl = `https://www.google.com/maps/dir/?api=1&destination=${encodedDestination}`;
-
-      try {
-        await Linking.openURL(googleMapsUrl);
-      } catch {
-        await Linking.openURL(webUrl);
-      }
+      // Android - Use Google Maps search URL for accurate address matching
+      const googleMapsUrl = `https://www.google.com/maps/search/?api=1&query=${encodedDestination}`;
+      await Linking.openURL(googleMapsUrl);
     }
   };
 
@@ -56,30 +61,31 @@ export default function MapPreview({
 
   const showNavigationOptions = () => {
     if (!pickupLocation && !dropoffLocation) return;
+    setShowNavigationSheet(true);
+  };
 
+  const getNavigationOptions = () => {
     const options = [];
 
     if (pickupLocation) {
       options.push({
-        text: "Navigate to Pickup",
+        label: "Navigate to Pickup",
+        icon: "package-variant",
+        iconColor: "#10B981",
         onPress: () => openInMaps(pickupLocation, "directions"),
       });
     }
 
     if (dropoffLocation) {
       options.push({
-        text: "Navigate to Drop-off",
+        label: "Navigate to Drop-off",
+        icon: "map-marker",
+        iconColor: "#EF4444",
         onPress: () => openInMaps(dropoffLocation, "directions"),
       });
     }
 
-    options.push({ text: "Cancel", style: "cancel" as const });
-
-    Alert.alert(
-      "Open Navigation",
-      "Choose a destination",
-      options
-    );
+    return options;
   };
 
   if (isLoading) {
@@ -159,36 +165,33 @@ export default function MapPreview({
         </View>
       </TouchableOpacity>
 
-      {/* Quick Navigation Button */}
-      <TouchableOpacity style={styles.navigateButton} onPress={handleNavigatePress}>
-        <MaterialCommunityIcons name="navigation" size={18} color="#FFFFFF" />
-        <Text style={styles.navigateButtonText}>Start Navigation</Text>
-      </TouchableOpacity>
-
-      {/* Navigation Options */}
-      <View style={styles.navigationOptions}>
+      {/* Start Delivery Button - only show when status is pending */}
+      {currentStatus === "pending" && onStartDelivery && (
         <TouchableOpacity
-          style={styles.navigationOption}
-          onPress={() => pickupLocation && openInMaps(pickupLocation)}
+          style={[styles.startDeliveryButton, isUpdating && styles.buttonDisabled]}
+          onPress={onStartDelivery}
+          disabled={isUpdating}
+          activeOpacity={0.8}
         >
-          <View style={[styles.optionIcon, styles.pickupIcon]}>
-            <MaterialCommunityIcons name="package-variant" size={14} color="#10B981" />
-          </View>
-          <Text style={styles.optionText}>To Pickup</Text>
+          <MaterialCommunityIcons
+            name={isUpdating ? "loading" : "play"}
+            size={22}
+            color="#FFFFFF"
+          />
+          <Text style={styles.startDeliveryButtonText}>
+            {isUpdating ? "Processing..." : "Start Delivery"}
+          </Text>
         </TouchableOpacity>
+      )}
 
-        <View style={styles.optionDivider} />
-
-        <TouchableOpacity
-          style={styles.navigationOption}
-          onPress={() => dropoffLocation && openInMaps(dropoffLocation)}
-        >
-          <View style={[styles.optionIcon, styles.dropoffIcon]}>
-            <MaterialCommunityIcons name="map-marker" size={14} color="#EF4444" />
-          </View>
-          <Text style={styles.optionText}>To Drop-off</Text>
-        </TouchableOpacity>
-      </View>
+      {/* Navigation Action Sheet */}
+      <ActionSheet
+        visible={showNavigationSheet}
+        title="Open Navigation"
+        message="Choose a destination"
+        options={getNavigationOptions()}
+        onClose={() => setShowNavigationSheet(false)}
+      />
     </View>
   );
 }
@@ -314,60 +317,28 @@ const styles = StyleSheet.create({
     fontSize: 11,
     color: "#6B7280",
   },
-  navigateButton: {
+  startDeliveryButton: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
-    backgroundColor: "#10B981",
-    paddingVertical: 12,
-    borderRadius: 10,
-    gap: 6,
-    shadowColor: "#10B981",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.2,
-    shadowRadius: 4,
-    elevation: 3,
+    backgroundColor: "#3B82F6",
+    paddingVertical: 16,
+    borderRadius: 12,
+    gap: 10,
+    shadowColor: "#3B82F6",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 4,
   },
-  navigateButtonText: {
-    fontSize: 14,
-    fontWeight: "600",
+  startDeliveryButtonText: {
+    fontSize: 16,
+    fontWeight: "700",
     color: "#FFFFFF",
   },
-  navigationOptions: {
-    flexDirection: "row",
-    marginTop: 12,
-    backgroundColor: "#F9FAFB",
-    borderRadius: 10,
-    overflow: "hidden",
-  },
-  navigationOption: {
-    flex: 1,
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    paddingVertical: 10,
-    gap: 6,
-  },
-  optionDivider: {
-    width: 1,
-    backgroundColor: "#E5E7EB",
-  },
-  optionIcon: {
-    width: 24,
-    height: 24,
-    borderRadius: 12,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  pickupIcon: {
-    backgroundColor: "#D1FAE5",
-  },
-  dropoffIcon: {
-    backgroundColor: "#FEE2E2",
-  },
-  optionText: {
-    fontSize: 13,
-    fontWeight: "500",
-    color: "#374151",
+  buttonDisabled: {
+    opacity: 0.6,
+    shadowOpacity: 0,
+    elevation: 0,
   },
 });

@@ -1,47 +1,45 @@
-import { View, Text, TouchableOpacity, Modal, TextInput, StyleSheet, ScrollView, Alert } from "react-native";
-import { useState } from "react";
+import { View, Text, TouchableOpacity, Modal, TextInput, StyleSheet, ScrollView } from "react-native";
+import { useState, useEffect } from "react";
 import { SafeAreaView } from "react-native-safe-area-context";
 import MaterialCommunityIcons from "react-native-vector-icons/MaterialCommunityIcons";
 import { OTPVerification } from "./OTPInput";
 
-type PODStep = "otp" | "notes";
-
 interface PODCaptureProps {
   visible: boolean;
   onClose: () => void;
-  onSubmit: (data: {
-    otpVerified: boolean;
-    otp: string;
-    notes?: string;
-    recipientName?: string;
-  }) => void;
+  onVerifyOTP: (otp: string, notes?: string, recipientName?: string) => Promise<boolean>;
   customerPhone?: string;
   orderId?: string;
+  isVerifying?: boolean;
+  verifyError?: string | null;
 }
 
 export default function PODCapture({
   visible,
   onClose,
-  onSubmit,
+  onVerifyOTP,
   customerPhone,
   orderId,
+  isVerifying = false,
+  verifyError,
 }: PODCaptureProps) {
-  const [step, setStep] = useState<PODStep>("otp");
-  const [otpVerified, setOtpVerified] = useState(false);
   const [otpError, setOtpError] = useState<string | undefined>();
-  const [isVerifying, setIsVerifying] = useState(false);
   const [notes, setNotes] = useState("");
   const [recipientName, setRecipientName] = useState("");
-  const [enteredOtp, setEnteredOtp] = useState("");
+  const [showNotesSection, setShowNotesSection] = useState(false);
+
+  // Sync external error to local state
+  useEffect(() => {
+    if (verifyError) {
+      setOtpError(verifyError);
+    }
+  }, [verifyError]);
 
   const resetForm = () => {
-    setStep("otp");
-    setOtpVerified(false);
     setOtpError(undefined);
-    setIsVerifying(false);
     setNotes("");
     setRecipientName("");
-    setEnteredOtp("");
+    setShowNotesSection(false);
   };
 
   const handleClose = () => {
@@ -49,127 +47,100 @@ export default function PODCapture({
     onClose();
   };
 
-  const handleOTPVerify = (otp: string) => {
+  const handleOTPVerify = async (otp: string) => {
+    console.log('🔑 PODCapture - handleOTPVerify called with OTP:', otp);
+    console.log('🔑 PODCapture - OTP type:', typeof otp);
+    console.log('🔑 PODCapture - OTP length:', otp.length);
+
     setOtpError(undefined);
 
     // Validate OTP format (must be 4 digits)
     if (!/^\d{4}$/.test(otp)) {
+      console.log('❌ PODCapture - OTP validation failed: not 4 digits');
       setOtpError("Please enter a valid 4-digit OTP");
       return;
     }
 
-    // Save the entered OTP and proceed to notes step
-    // Backend will verify the OTP when we submit
-    setEnteredOtp(otp);
-    setIsVerifying(true);
+    // Trim and ensure clean OTP string
+    const cleanOtp = otp.trim();
+    console.log('🔑 PODCapture - Clean OTP to send:', cleanOtp);
 
-    // Show brief loading animation for better UX
-    setTimeout(() => {
-      setOtpVerified(true);
-      setStep("notes");
-      setIsVerifying(false);
-    }, 500);
-  };
-
-  const handleOTPResend = () => {
-    setOtpError(undefined);
-    Alert.alert("OTP Sent", "A new OTP has been sent to the customer.");
-  };
-
-  const handleSubmit = () => {
-    onSubmit({
-      otpVerified,
-      otp: enteredOtp,
-      notes: notes || undefined,
-      recipientName: recipientName || undefined,
-    });
-    resetForm();
-  };
-
-  const renderOTPVerification = () => (
-    <OTPVerification
-      customerPhone={customerPhone}
-      onVerify={handleOTPVerify}
-      onResend={handleOTPResend}
-      isVerifying={isVerifying}
-      error={otpError}
-    />
-  );
-
-  const renderNotesInput = () => (
-    <View style={styles.stepContent}>
-      <View style={styles.stepHeader}>
-        <View style={styles.successIcon}>
-          <MaterialCommunityIcons name="check-circle" size={48} color="#10B981" />
-        </View>
-        <Text style={styles.stepTitle}>OTP Verified!</Text>
-        <Text style={styles.stepSubtitle}>
-          Add any additional information about the delivery
-        </Text>
-      </View>
-
-      <View style={styles.inputGroup}>
-        <Text style={styles.inputLabel}>Recipient Name (Optional)</Text>
-        <TextInput
-          style={styles.textInput}
-          placeholder="Who received the package?"
-          placeholderTextColor="#9CA3AF"
-          value={recipientName}
-          onChangeText={setRecipientName}
-        />
-      </View>
-
-      <View style={styles.inputGroup}>
-        <Text style={styles.inputLabel}>Delivery Notes (Optional)</Text>
-        <TextInput
-          style={[styles.textInput, styles.textArea]}
-          placeholder="Any notes about the delivery..."
-          placeholderTextColor="#9CA3AF"
-          multiline
-          textAlignVertical="top"
-          value={notes}
-          onChangeText={setNotes}
-          maxLength={300}
-        />
-        <Text style={styles.charCount}>{notes.length}/300</Text>
-      </View>
-
-      {/* Summary */}
-      <View style={styles.summaryCard}>
-        <Text style={styles.summaryTitle}>Verification Summary</Text>
-        <View style={styles.summaryRow}>
-          <MaterialCommunityIcons
-            name="check-circle"
-            size={18}
-            color="#10B981"
-          />
-          <Text style={styles.summaryTextComplete}>
-            OTP verified successfully
-          </Text>
-        </View>
-      </View>
-
-      <TouchableOpacity
-        style={styles.submitButton}
-        onPress={handleSubmit}
-        activeOpacity={0.8}
-      >
-        <MaterialCommunityIcons name="check-all" size={20} color="#FFFFFF" />
-        <Text style={styles.submitButtonText}>Complete Delivery</Text>
-      </TouchableOpacity>
-    </View>
-  );
-
-  const renderContent = () => {
-    switch (step) {
-      case "otp":
-        return renderOTPVerification();
-      case "notes":
-        return renderNotesInput();
-      default:
-        return renderOTPVerification();
+    // Call the backend to verify OTP and complete delivery
+    try {
+      console.log('🔑 PODCapture - Calling onVerifyOTP...');
+      const success = await onVerifyOTP(cleanOtp, notes || undefined, recipientName || undefined);
+      console.log('🔑 PODCapture - onVerifyOTP returned:', success);
+      if (success) {
+        // Success - parent will close modal and show completion
+        resetForm();
+      }
+      // If not successful, error will be shown via verifyError prop
+    } catch (error: any) {
+      console.log('❌ PODCapture - Error caught:', error.message);
+      setOtpError(error.message || "Failed to verify OTP. Please try again.");
     }
   };
+
+  const renderContent = () => (
+    <View style={styles.stepContent}>
+      {/* OTP Verification */}
+      <OTPVerification
+        onVerify={handleOTPVerify}
+        isVerifying={isVerifying}
+        error={otpError || verifyError || undefined}
+      />
+
+      {/* Optional Notes Section Toggle */}
+      {!showNotesSection ? (
+        <TouchableOpacity
+          style={styles.addNotesButton}
+          onPress={() => setShowNotesSection(true)}
+          disabled={isVerifying}
+        >
+          <MaterialCommunityIcons name="note-plus-outline" size={18} color="#6B7280" />
+          <Text style={styles.addNotesButtonText}>Add delivery notes (optional)</Text>
+        </TouchableOpacity>
+      ) : (
+        <View style={styles.notesSection}>
+          <View style={styles.inputGroup}>
+            <Text style={styles.inputLabel}>Recipient Name (Optional)</Text>
+            <TextInput
+              style={styles.textInput}
+              placeholder="Who received the package?"
+              placeholderTextColor="#9CA3AF"
+              value={recipientName}
+              onChangeText={setRecipientName}
+              editable={!isVerifying}
+            />
+          </View>
+
+          <View style={styles.inputGroup}>
+            <Text style={styles.inputLabel}>Delivery Notes (Optional)</Text>
+            <TextInput
+              style={[styles.textInput, styles.textArea]}
+              placeholder="Any notes about the delivery..."
+              placeholderTextColor="#9CA3AF"
+              multiline
+              textAlignVertical="top"
+              value={notes}
+              onChangeText={setNotes}
+              maxLength={300}
+              editable={!isVerifying}
+            />
+            <Text style={styles.charCount}>{notes.length}/300</Text>
+          </View>
+
+          <TouchableOpacity
+            style={styles.hideNotesButton}
+            onPress={() => setShowNotesSection(false)}
+            disabled={isVerifying}
+          >
+            <Text style={styles.hideNotesButtonText}>Hide notes</Text>
+          </TouchableOpacity>
+        </View>
+      )}
+    </View>
+  );
 
   return (
     <Modal visible={visible} animationType="slide" presentationStyle="pageSheet">
@@ -192,12 +163,12 @@ export default function PODCapture({
             <View
               style={[
                 styles.progressFill,
-                { width: step === "otp" ? "50%" : "100%" },
+                { width: "100%" },
               ]}
             />
           </View>
           <Text style={styles.progressText}>
-            Step {step === "otp" ? 1 : 2} of 2
+            Enter OTP to complete delivery
           </Text>
         </View>
 
@@ -210,8 +181,7 @@ export default function PODCapture({
         >
           {renderContent()}
         </ScrollView>
-
-              </SafeAreaView>
+      </SafeAreaView>
     </Modal>
   );
 }
@@ -377,5 +347,31 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: "600",
     color: "#FFFFFF",
+  },
+  addNotesButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    paddingVertical: 12,
+    marginTop: 16,
+    gap: 8,
+  },
+  addNotesButtonText: {
+    fontSize: 14,
+    color: "#6B7280",
+  },
+  notesSection: {
+    marginTop: 16,
+    paddingTop: 16,
+    borderTopWidth: 1,
+    borderTopColor: "#E5E7EB",
+  },
+  hideNotesButton: {
+    alignItems: "center",
+    paddingVertical: 8,
+  },
+  hideNotesButtonText: {
+    fontSize: 13,
+    color: "#9CA3AF",
   },
 });

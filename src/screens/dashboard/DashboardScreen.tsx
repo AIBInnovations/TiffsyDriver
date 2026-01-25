@@ -9,7 +9,8 @@ import {
   Switch,
   Animated,
   ActivityIndicator,
-  Alert,
+  Linking,
+  Platform,
 } from 'react-native';
 import { useState, useCallback, useEffect, useRef } from 'react';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -18,6 +19,7 @@ import type { BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
 import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons';
 import type { MainTabsParamList } from '../../navigation/types';
 import StatsCard from './components/StatsCard';
+import CustomAlert from '../../components/common/CustomAlert';
 import { useDriverProfileStore } from '../profile/useDriverProfileStore';
 import { getMyBatch, getAvailableBatches, markBatchPickedUp, acceptBatch, getDriverBatchHistory } from '../../services/deliveryService';
 import { getCurrentUser } from '../../services/authService';
@@ -59,6 +61,18 @@ export default function DashboardScreen() {
   });
   const [historyBatches, setHistoryBatches] = useState<HistoryBatch[]>([]);
   const [historySingleOrders, setHistorySingleOrders] = useState<HistorySingleOrder[]>([]);
+
+  // Custom alert states
+  const [showPickupConfirm, setShowPickupConfirm] = useState(false);
+  const [showNavigateConfirm, setShowNavigateConfirm] = useState(false);
+  const [navigationKitchen, setNavigationKitchen] = useState<{ name: string; address: string; coordinates?: { latitude: number; longitude: number } } | null>(null);
+  const [alertConfig, setAlertConfig] = useState<{
+    visible: boolean;
+    title: string;
+    message: string;
+    icon?: string;
+    iconColor?: string;
+  }>({ visible: false, title: '', message: '' });
 
   const isOnline = profile.availabilityStatus === 'ONLINE';
   const driverName = profile.fullName || 'Driver';
@@ -274,9 +288,21 @@ export default function DashboardScreen() {
 
   // Toggle online/offline status
   const handleToggleOnline = useCallback((value: boolean) => {
+    // Prevent going offline if there are active deliveries
+    if (!value && batchSummary.pending > 0) {
+      setAlertConfig({
+        visible: true,
+        title: 'Cannot Go Offline',
+        message: `You have ${batchSummary.pending} active ${batchSummary.pending === 1 ? 'delivery' : 'deliveries'}.\n\nPlease complete all active deliveries before going offline.`,
+        icon: 'truck-alert',
+        iconColor: '#F59E0B',
+      });
+      return;
+    }
+
     setAvailabilityStatus(value ? 'ONLINE' : 'OFFLINE');
     showToast(value ? 'You are now online' : 'You are now offline');
-  }, [setAvailabilityStatus, showToast]);
+  }, [setAvailabilityStatus, showToast, batchSummary.pending]);
 
   // Pull to refresh
   const onRefresh = useCallback(async () => {
@@ -351,47 +377,96 @@ export default function DashboardScreen() {
     showToast('Batch declined');
   }, [showToast]);
 
+  // Handle pickup confirmation
+  const handlePickupConfirm = useCallback(async () => {
+    if (!currentBatch) return;
+    setShowPickupConfirm(false);
+    try {
+      await markBatchPickedUp(currentBatch._id);
+      showToast('Batch marked as picked up!', 'success');
+      fetchCurrentBatch();
+    } catch (error: any) {
+      showToast(error.message || 'Failed to mark batch as picked up', 'error');
+    }
+  }, [currentBatch, showToast, fetchCurrentBatch]);
+
+  // Handle navigation to kitchen
+  const handleNavigateToKitchen = useCallback(() => {
+    if (!navigationKitchen) return;
+    setShowNavigateConfirm(false);
+
+    const { coordinates, address } = navigationKitchen;
+
+    // Use coordinates for precise location when available
+    if (coordinates?.latitude && coordinates?.longitude) {
+      const lat = coordinates.latitude;
+      const lng = coordinates.longitude;
+
+      if (Platform.OS === 'ios') {
+        const appleMapsUrl = `maps://?daddr=${lat},${lng}`;
+        Linking.canOpenURL(appleMapsUrl)
+          .then(supported => {
+            if (supported) {
+              return Linking.openURL(appleMapsUrl);
+            } else {
+              return Linking.openURL(`https://www.google.com/maps/dir/?api=1&destination=${lat},${lng}`);
+            }
+          })
+          .catch(err => {
+            console.error('Error opening maps:', err);
+            showToast('Failed to open maps', 'error');
+          });
+      } else {
+        // Android - Use Google Maps search URL for accurate address matching
+        const encodedAddress = encodeURIComponent(address);
+        const googleMapsUrl = `https://www.google.com/maps/search/?api=1&query=${encodedAddress}`;
+        Linking.openURL(googleMapsUrl);
+      }
+    } else {
+      // Fallback to address if coordinates not available
+      const encodedAddress = encodeURIComponent(address);
+
+      if (Platform.OS === 'ios') {
+        const appleMapsUrl = `maps://?daddr=${encodedAddress}`;
+        Linking.openURL(appleMapsUrl).catch(() => {
+          Linking.openURL(`https://www.google.com/maps/dir/?api=1&destination=${encodedAddress}`);
+        });
+      } else {
+        const googleMapsUrl = `https://www.google.com/maps/search/?api=1&query=${encodedAddress}`;
+        Linking.openURL(googleMapsUrl);
+      }
+    }
+  }, [navigationKitchen, showToast]);
+
   // Navigate to kitchen or continue deliveries
   const handlePrimaryAction = useCallback(async () => {
     if (!currentBatch) return;
 
     if (currentBatch.status === 'READY_FOR_DISPATCH') {
-      // Mark batch as picked up from kitchen
-      Alert.alert(
-        'Pickup Batch',
-        'Have you picked up all items from the kitchen?',
-        [
-          { text: 'Cancel', style: 'cancel' },
-          {
-            text: 'Yes, Picked Up',
-            onPress: async () => {
-              try {
-                await markBatchPickedUp(currentBatch._id);
-                showToast('Batch marked as picked up!', 'success');
-                fetchCurrentBatch();
-              } catch (error: any) {
-                showToast(error.message || 'Failed to mark batch as picked up', 'error');
-              }
-            }
-          },
-        ]
-      );
+      // Show pickup confirmation dialog
+      setShowPickupConfirm(true);
     } else if (currentBatch.status === 'DISPATCHED') {
       // Navigate to kitchen pickup screen
-      Alert.alert(
-        'Navigate to Kitchen',
-        'Open maps to navigate to the kitchen?',
-        [
-          { text: 'Cancel', style: 'cancel' },
-          {
-            text: 'Open Maps',
-            onPress: () => {
-              // TODO: Open maps with kitchen coordinates
-              showToast('Opening maps...');
-            }
-          },
-        ]
-      );
+      const kitchen = typeof currentBatch.kitchenId === 'object' ? currentBatch.kitchenId : null;
+      if (!kitchen) {
+        showToast('Kitchen information not available', 'error');
+        return;
+      }
+
+      const coordinates = kitchen.address?.coordinates;
+      const kitchenAddress = [
+        kitchen.address?.addressLine1,
+        kitchen.address?.locality,
+        kitchen.address?.city
+      ].filter(Boolean).join(', ');
+
+      // Set navigation data and show confirmation
+      setNavigationKitchen({
+        name: kitchen.name,
+        address: kitchenAddress,
+        coordinates: coordinates ? { latitude: coordinates.latitude, longitude: coordinates.longitude } : undefined,
+      });
+      setShowNavigateConfirm(true);
     } else if (currentBatch.status === 'IN_PROGRESS') {
       // Navigate to active delivery screen
       navigation.navigate('Deliveries', {
@@ -596,7 +671,11 @@ export default function DashboardScreen() {
                         {currentBatch.kitchenId.name}
                       </Text>
                       <Text style={styles.kitchenArea} numberOfLines={1} ellipsizeMode="tail">
-                        {currentBatch.kitchenId.address.area}
+                        {[
+                          currentBatch.kitchenId.address?.addressLine1,
+                          currentBatch.kitchenId.address?.locality,
+                          currentBatch.kitchenId.address?.city
+                        ].filter(Boolean).join(', ')}
                       </Text>
                     </View>
                   </View>
@@ -761,6 +840,45 @@ export default function DashboardScreen() {
           </Animated.View>
         )
       }
+
+      {/* Pickup Confirmation Alert */}
+      <CustomAlert
+        visible={showPickupConfirm}
+        title="Pickup Batch"
+        message="Have you picked up all items from the kitchen?"
+        icon="package-variant"
+        iconColor="#F56B4C"
+        buttons={[
+          { text: 'Cancel', style: 'cancel', onPress: () => setShowPickupConfirm(false) },
+          { text: 'Yes, Picked Up', style: 'default', onPress: handlePickupConfirm },
+        ]}
+        onClose={() => setShowPickupConfirm(false)}
+      />
+
+      {/* Navigate to Kitchen Confirmation Alert */}
+      <CustomAlert
+        visible={showNavigateConfirm}
+        title="Navigate to Kitchen"
+        message={navigationKitchen ? `Open maps to navigate to ${navigationKitchen.name}?` : ''}
+        icon="navigation"
+        iconColor="#3B82F6"
+        buttons={[
+          { text: 'Cancel', style: 'cancel', onPress: () => setShowNavigateConfirm(false) },
+          { text: 'Open Maps', style: 'default', onPress: handleNavigateToKitchen },
+        ]}
+        onClose={() => setShowNavigateConfirm(false)}
+      />
+
+      {/* General Alert */}
+      <CustomAlert
+        visible={alertConfig.visible}
+        title={alertConfig.title}
+        message={alertConfig.message}
+        icon={alertConfig.icon}
+        iconColor={alertConfig.iconColor}
+        buttons={[{ text: 'OK', style: 'default' }]}
+        onClose={() => setAlertConfig({ visible: false, title: '', message: '' })}
+      />
     </SafeAreaView >
   );
 }

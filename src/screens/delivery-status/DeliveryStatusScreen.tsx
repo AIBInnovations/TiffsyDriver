@@ -6,7 +6,6 @@ import {
   TouchableOpacity,
   RefreshControl,
   StatusBar,
-  Alert,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useState, useCallback, useEffect } from "react";
@@ -21,6 +20,7 @@ import PODCapture from "./components/PODCapture";
 import FailedDeliveryModal from "./components/FailedDeliveryModal";
 import DeliveryCompleteModal from "./components/DeliveryCompleteModal";
 import NotificationBanner, { NotificationType } from "./components/NotificationBanner";
+import CustomAlert from "../../components/common/CustomAlert";
 import { getMyBatch, updateDeliveryStatus as apiUpdateDeliveryStatus } from "../../services/deliveryService";
 import type { Order, OrderStatus } from "../../types/api";
 
@@ -100,6 +100,7 @@ export default function DeliveryStatusScreen() {
   const [showFailedModal, setShowFailedModal] = useState(false);
   const [showCompleteModal, setShowCompleteModal] = useState(false);
   const [notification, setNotification] = useState<Notification | null>(null);
+  const [errorAlert, setErrorAlert] = useState<{ visible: boolean; message: string }>({ visible: false, message: '' });
 
   // Set status bar colors when screen is focused
   useFocusEffect(
@@ -131,12 +132,20 @@ export default function DeliveryStatusScreen() {
 
         if (currentDeliveryId) {
           // Find the specific order by ID to get its fresh status
-          targetOrder = orders.find(order => order._id === currentDeliveryId);
+          const foundOrder = orders.find(order => order._id === currentDeliveryId);
           console.log('🔍 Looking for order:', currentDeliveryId);
-          console.log('🔍 Found order:', targetOrder ? targetOrder.orderNumber : 'Not found');
+          console.log('🔍 Found order:', foundOrder ? foundOrder.orderNumber : 'Not found');
+          console.log('🔍 Order status:', foundOrder?.status);
+
+          // Only use this order if it's still active (not DELIVERED or FAILED)
+          if (foundOrder && foundOrder.status !== 'DELIVERED' && foundOrder.status !== 'FAILED') {
+            targetOrder = foundOrder;
+          } else if (foundOrder) {
+            console.log('🔍 Order is completed/failed, finding next active order');
+          }
         }
 
-        // If we didn't find the specific order, fall back to finding the next active one
+        // If we didn't find an active specific order, fall back to finding the next active one
         if (!targetOrder) {
           targetOrder = orders.find(
             order => order.status !== 'DELIVERED' && order.status !== 'FAILED'
@@ -151,18 +160,35 @@ export default function DeliveryStatusScreen() {
         }
 
         const kitchen = typeof batch.kitchenId === 'object' ? batch.kitchenId : null;
-        const kitchenAddress = kitchen?.address ?
-          `${kitchen.name}, ${kitchen.address.locality || kitchen.address.area}, ${kitchen.address.city}` :
+        // Use full address for Google Maps navigation
+        const kitchenAddr = kitchen?.address;
+        const kitchenAddress = kitchenAddr ?
+          [
+            kitchenAddr.addressLine1 || kitchenAddr.line1 || kitchenAddr.street,
+            kitchenAddr.addressLine2 || kitchenAddr.line2,
+            kitchenAddr.locality || kitchenAddr.area,
+            kitchenAddr.city,
+            kitchenAddr.state,
+            kitchenAddr.pincode || kitchenAddr.postalCode || kitchenAddr.zipCode
+          ].filter(Boolean).join(', ') :
           'Kitchen';
 
         const deliveryAddr = targetOrder.deliveryAddress;
-        const dropoffAddr = `${deliveryAddr.flatNumber || ''} ${deliveryAddr.street || deliveryAddr.addressLine1 || ''}, ${deliveryAddr.locality || deliveryAddr.area}, ${deliveryAddr.city}`.trim();
+        const dropoffAddr = [
+          deliveryAddr.flatNumber,
+          deliveryAddr.street || deliveryAddr.addressLine1,
+          deliveryAddr.addressLine2,
+          deliveryAddr.landmark,
+          deliveryAddr.locality || deliveryAddr.area,
+          deliveryAddr.city,
+          deliveryAddr.pincode
+        ].filter(Boolean).join(', ');
 
         setDelivery({
           deliveryId: targetOrder._id,
           orderId: targetOrder.orderNumber,
-          customerName: deliveryAddr.name || 'Customer',
-          customerPhone: deliveryAddr.phone || '',
+          customerName: deliveryAddr.contactName || deliveryAddr.name || 'Customer',
+          customerPhone: deliveryAddr.contactPhone || deliveryAddr.phone || '',
           pickupLocation: kitchenAddress,
           dropoffLocation: dropoffAddr,
           deliveryWindow: batch.mealWindow,
@@ -180,7 +206,7 @@ export default function DeliveryStatusScreen() {
       }
     } catch (error: any) {
       console.error('❌ Error loading delivery data:', error);
-      Alert.alert('Error', 'Failed to load delivery data. Please try again.');
+      setErrorAlert({ visible: true, message: 'Failed to load delivery data. Please try again.' });
       setDelivery(null);
     }
   }, [route.params, delivery?.deliveryId]);
@@ -276,6 +302,13 @@ export default function DeliveryStatusScreen() {
         newStatus === "failed" ? "error" : "success",
         statusMessages[newStatus]
       );
+
+      // For failed status, reload to show next active order after a short delay
+      if (newStatus === "failed") {
+        setTimeout(() => {
+          loadDeliveryData();
+        }, 1500); // Wait for notification to be visible
+      }
     } catch (error: any) {
       console.error('❌ Error updating status:', error);
       console.error('❌ Error details:', JSON.stringify(error, null, 2));
@@ -292,7 +325,7 @@ export default function DeliveryStatusScreen() {
         errorMessage = 'Invalid OTP. Please verify with customer and try again.';
       }
 
-      Alert.alert('Error', errorMessage, [{ text: 'OK' }]);
+      setErrorAlert({ visible: true, message: errorMessage });
     } finally {
       setIsUpdating(false);
     }
@@ -306,9 +339,96 @@ export default function DeliveryStatusScreen() {
     setShowPODModal(true);
   };
 
-  const handlePODSubmit = (podData: { otpVerified: boolean; otp: string; notes?: string; recipientName?: string }) => {
-    setShowPODModal(false);
-    updateDeliveryStatus("delivered", podData);
+  // Handle OTP verification - called when user clicks "Verify OTP" button
+  const handleVerifyOTP = async (otp: string, notes?: string, recipientName?: string): Promise<boolean> => {
+    console.log('='.repeat(50));
+    console.log('🔑 handleVerifyOTP CALLED');
+    console.log('🔑 OTP received:', otp);
+    console.log('🔑 OTP type:', typeof otp);
+    console.log('🔑 OTP length:', otp.length);
+    console.log('🔑 OTP char codes:', [...otp].map(c => c.charCodeAt(0)));
+    console.log('🔑 Notes:', notes);
+    console.log('🔑 Recipient:', recipientName);
+    console.log('='.repeat(50));
+
+    if (!delivery) {
+      throw new Error('No delivery data available');
+    }
+
+    setIsUpdating(true);
+
+    try {
+      console.log('📝 Verifying OTP and completing delivery:', delivery.deliveryId);
+      console.log('📝 Order ID (orderNumber):', delivery.orderId);
+
+      // Map local status to API status
+      const apiStatus = mapDeliveryStatusToOrderStatus("delivered");
+      console.log('📝 API Status:', apiStatus);
+
+      // Prepare request body with OTP - ensure OTP is clean
+      const cleanOtp = otp.trim();
+      const requestBody: any = {
+        status: apiStatus,
+        proofOfDelivery: {
+          type: 'OTP',
+          otp: cleanOtp,
+        },
+      };
+
+      if (notes) {
+        requestBody.notes = notes;
+      }
+
+      console.log('📦 FULL Request body:', JSON.stringify(requestBody, null, 2));
+      console.log('📦 Delivery ID being used:', delivery.deliveryId);
+
+      // Call the API to update status with OTP
+      await apiUpdateDeliveryStatus(delivery.deliveryId, requestBody);
+
+      console.log('✅ OTP verified and delivery completed');
+
+      // Update local state
+      setDelivery({ ...delivery, currentStatus: "delivered" });
+
+      // Close POD modal and show completion modal
+      setShowPODModal(false);
+      setShowCompleteModal(true);
+      setIsUpdating(false);
+
+      return true;
+    } catch (error: any) {
+      console.error('❌ Error verifying OTP:', error);
+      console.error('❌ Full error object:', JSON.stringify(error, null, 2));
+      console.error('❌ Error message:', error?.message);
+      console.error('❌ Delivery ID used:', delivery.deliveryId);
+      console.error('❌ Order ID used:', delivery.orderId);
+      setIsUpdating(false);
+
+      // Get the actual error message from backend
+      let errorMessage = error.message || 'Failed to verify OTP. Please try again.';
+
+      // Backend returns generic "Failed to update delivery status" for OTP errors
+      // So we need to provide better user feedback
+      const lowerMessage = errorMessage.toLowerCase();
+      if (
+        lowerMessage.includes('invalid otp') ||
+        lowerMessage.includes('incorrect otp') ||
+        lowerMessage.includes('wrong otp') ||
+        lowerMessage.includes('otp mismatch') ||
+        lowerMessage.includes('otp verification failed')
+      ) {
+        errorMessage = 'Invalid OTP. Please verify with customer and try again.';
+      } else if (
+        lowerMessage.includes('failed to update delivery status') ||
+        lowerMessage.includes('500')
+      ) {
+        // Backend returns generic error for OTP failures
+        errorMessage = 'OTP verification failed. Please check the OTP with customer and try again.';
+      }
+
+      // Throw the error so it's caught by PODCapture and displayed in the OTP input
+      throw new Error(errorMessage);
+    }
   };
 
   const handleMarkFailed = () => {
@@ -456,6 +576,9 @@ export default function DeliveryStatusScreen() {
         <MapPreview
           pickupLocation={delivery.pickupLocation}
           dropoffLocation={delivery.dropoffLocation}
+          currentStatus={delivery.currentStatus}
+          onStartDelivery={handleStartDelivery}
+          isUpdating={isUpdating}
         />
 
         {/* Action Buttons */}
@@ -472,9 +595,10 @@ export default function DeliveryStatusScreen() {
       <PODCapture
         visible={showPODModal}
         onClose={() => setShowPODModal(false)}
-        onSubmit={handlePODSubmit}
+        onVerifyOTP={handleVerifyOTP}
         customerPhone={delivery?.customerPhone}
         orderId={delivery?.orderId}
+        isVerifying={isUpdating}
       />
 
       <FailedDeliveryModal
@@ -493,6 +617,17 @@ export default function DeliveryStatusScreen() {
         onNextDelivery={handleNextDelivery}
         onViewAllDeliveries={handleViewAllDeliveries}
         onClose={handleCloseCompleteModal}
+      />
+
+      {/* Error Alert */}
+      <CustomAlert
+        visible={errorAlert.visible}
+        title="Error"
+        message={errorAlert.message}
+        icon="alert-circle"
+        iconColor="#EF4444"
+        buttons={[{ text: "OK", style: "default" }]}
+        onClose={() => setErrorAlert({ visible: false, message: '' })}
       />
     </SafeAreaView>
   );

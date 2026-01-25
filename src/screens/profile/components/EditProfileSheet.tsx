@@ -92,7 +92,7 @@ export default function EditProfileSheet({
         phone: phone.trim(),
         email: email.trim(),
         vehicleType,
-        vehicleNumber,
+        // Note: vehicleNumber is not included as it cannot be changed after registration
       });
       onClose();
     } catch (e) {

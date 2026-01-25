@@ -1,8 +1,10 @@
-import { View, Text, StyleSheet, TouchableOpacity, Linking, Platform, Alert } from "react-native";
+import { View, Text, StyleSheet, TouchableOpacity, Linking, Platform } from "react-native";
 import { useState, useEffect } from "react";
 import MaterialCommunityIcons from "react-native-vector-icons/MaterialCommunityIcons";
 import { Delivery } from "../../../context/DeliveryContext";
 import type { OrderStatus } from "../../../types/api";
+import ActionSheet from "../../../components/common/ActionSheet";
+import CustomAlert from "../../../components/common/CustomAlert";
 
 interface DeliveryCardProps {
   delivery: Delivery | any; // Allow both old Delivery and API order types
@@ -36,6 +38,8 @@ const statusConfig: Record<string, { bg: string; text: string; label: string; ic
 export default function DeliveryCard({ delivery, onStatusChange, onCallCustomer, onNavigate: onNavigateProp }: DeliveryCardProps) {
   const [showPhone, setShowPhone] = useState(false);
   const [elapsedTime, setElapsedTime] = useState(0);
+  const [showNavigationSheet, setShowNavigationSheet] = useState(false);
+  const [showPhoneError, setShowPhoneError] = useState(false);
 
   const status = statusConfig[delivery.status] || {
     bg: "#F3F4F6",
@@ -85,28 +89,55 @@ export default function DeliveryCard({ delivery, onStatusChange, onCallCustomer,
           if (supported) {
             return Linking.openURL(phoneUrl);
           } else {
-            Alert.alert('Error', 'Phone dialer is not available');
+            setShowPhoneError(true);
           }
         })
         .catch(err => console.error('Error opening phone dialer:', err));
     }
   };
 
+  const openInMaps = (address: string) => {
+    const encodedAddress = encodeURIComponent(address);
+    if (Platform.OS === 'ios') {
+      const appleMapsUrl = `maps://?daddr=${encodedAddress}`;
+      const webUrl = `https://www.google.com/maps/dir/?api=1&destination=${encodedAddress}`;
+      Linking.canOpenURL(appleMapsUrl)
+        .then(supported => {
+          if (supported) {
+            return Linking.openURL(appleMapsUrl);
+          } else {
+            return Linking.openURL(webUrl);
+          }
+        })
+        .catch(() => {
+          Linking.openURL(webUrl);
+        });
+    } else {
+      // Android - Use Google Maps search URL for accurate address matching
+      const googleMapsUrl = `https://www.google.com/maps/search/?api=1&query=${encodedAddress}`;
+      Linking.openURL(googleMapsUrl);
+    }
+  };
+
   const handleNavigate = () => {
+    // Show action sheet to choose destination
+    setShowNavigationSheet(true);
+  };
+
+  const handleNavigateToPickup = () => {
+    if (delivery.pickupLocation) {
+      openInMaps(delivery.pickupLocation);
+    }
+  };
+
+  const handleNavigateToDropoff = () => {
     if (onNavigateProp) {
       // Use enhanced navigation with coordinates if available
       const latitude = delivery.deliveryAddress?.latitude || delivery.deliveryAddress?.coordinates?.latitude;
       const longitude = delivery.deliveryAddress?.longitude || delivery.deliveryAddress?.coordinates?.longitude;
       onNavigateProp(latitude, longitude, delivery.dropoffLocation);
     } else {
-      // Fallback to simple Google Maps navigation
-      const address = encodeURIComponent(delivery.dropoffLocation);
-      const url = Platform.OS === 'ios'
-        ? `maps:0,0?q=${address}`
-        : `geo:0,0?q=${address}`;
-      Linking.openURL(url).catch(() => {
-        Linking.openURL(`https://www.google.com/maps/search/?api=1&query=${address}`);
-      });
+      openInMaps(delivery.dropoffLocation);
     }
   };
 
@@ -195,19 +226,11 @@ export default function DeliveryCard({ delivery, onStatusChange, onCallCustomer,
     <View style={styles.card}>
       {/* Header with Order ID and Status */}
       <View style={styles.cardHeader}>
-        <View style={styles.orderInfo}>
-          <Text style={styles.orderId}>{delivery.orderId}</Text>
-          <View style={[styles.statusBadge, { backgroundColor: status.bg }]}>
-            <MaterialCommunityIcons name={status.icon} size={14} color={status.text} />
-            <Text style={[styles.statusText, { color: status.text }]}>{status.label}</Text>
-          </View>
+        <Text style={styles.orderId}>{delivery.orderId}</Text>
+        <View style={[styles.statusBadge, { backgroundColor: status.bg }]}>
+          <MaterialCommunityIcons name={status.icon} size={14} color={status.text} />
+          <Text style={[styles.statusText, { color: status.text }]}>{status.label}</Text>
         </View>
-        {delivery.distance && (
-          <View style={styles.distanceBadge}>
-            <MaterialCommunityIcons name="map-marker-distance" size={14} color="#6B7280" />
-            <Text style={styles.distanceText}>{delivery.distance}</Text>
-          </View>
-        )}
       </View>
 
       {/* Timer for active deliveries */}
@@ -222,11 +245,6 @@ export default function DeliveryCard({ delivery, onStatusChange, onCallCustomer,
       <View style={styles.deliveryWindow}>
         <MaterialCommunityIcons name="clock-outline" size={16} color="#6B7280" />
         <Text style={styles.deliveryWindowText}>Delivery Window: {delivery.deliveryWindow}</Text>
-        {delivery.eta !== "-" && (
-          <View style={styles.etaBadge}>
-            <Text style={styles.etaText}>ETA: {delivery.eta}</Text>
-          </View>
-        )}
       </View>
 
       {/* Locations */}
@@ -248,11 +266,37 @@ export default function DeliveryCard({ delivery, onStatusChange, onCallCustomer,
         </View>
       </View>
 
-      {/* Map Preview Placeholder */}
-      <TouchableOpacity style={styles.mapPreview} onPress={handleNavigate}>
-        <View style={styles.mapPlaceholder}>
-          <MaterialCommunityIcons name="map" size={32} color="#9CA3AF" />
-          <Text style={styles.mapPlaceholderText}>Tap to view route</Text>
+      {/* Route Preview */}
+      <TouchableOpacity style={styles.routePreview} onPress={handleNavigate} activeOpacity={0.8}>
+        <View style={styles.routeVisualization}>
+          {/* Pickup marker */}
+          <View style={styles.markerContainer}>
+            <View style={[styles.marker, styles.pickupMarker]}>
+              <MaterialCommunityIcons name="package-variant" size={16} color="#FFFFFF" />
+            </View>
+            <Text style={styles.markerLabel}>Pickup</Text>
+          </View>
+
+          {/* Route line */}
+          <View style={styles.routeLine}>
+            <View style={styles.routeLineDashed} />
+            <MaterialCommunityIcons name="truck-fast-outline" size={20} color="#3B82F6" />
+            <View style={styles.routeLineDashed} />
+          </View>
+
+          {/* Dropoff marker */}
+          <View style={styles.markerContainer}>
+            <View style={[styles.marker, styles.dropoffMarker]}>
+              <MaterialCommunityIcons name="map-marker" size={16} color="#FFFFFF" />
+            </View>
+            <Text style={styles.markerLabel}>Drop-off</Text>
+          </View>
+        </View>
+
+        {/* Tap hint */}
+        <View style={styles.tapHint}>
+          <MaterialCommunityIcons name="cursor-default-click" size={14} color="#6B7280" />
+          <Text style={styles.tapHintText}>Tap to open in maps</Text>
         </View>
       </TouchableOpacity>
 
@@ -272,9 +316,6 @@ export default function DeliveryCard({ delivery, onStatusChange, onCallCustomer,
           </TouchableOpacity>
           <TouchableOpacity style={styles.iconButton} onPress={handleCall}>
             <MaterialCommunityIcons name="phone" size={20} color="#3B82F6" />
-          </TouchableOpacity>
-          <TouchableOpacity style={styles.iconButton} onPress={handleNavigate}>
-            <MaterialCommunityIcons name="navigation" size={20} color="#3B82F6" />
           </TouchableOpacity>
         </View>
       </View>
@@ -306,6 +347,39 @@ export default function DeliveryCard({ delivery, onStatusChange, onCallCustomer,
           </TouchableOpacity>
         )}
       </View>
+
+      {/* Navigation Action Sheet */}
+      <ActionSheet
+        visible={showNavigationSheet}
+        title="Open Navigation"
+        message="Choose a destination"
+        options={[
+          {
+            label: "Navigate to Pickup",
+            icon: "package-variant",
+            iconColor: "#10B981",
+            onPress: handleNavigateToPickup,
+          },
+          {
+            label: "Navigate to Drop-off",
+            icon: "map-marker",
+            iconColor: "#EF4444",
+            onPress: handleNavigateToDropoff,
+          },
+        ]}
+        onClose={() => setShowNavigationSheet(false)}
+      />
+
+      {/* Phone Error Alert */}
+      <CustomAlert
+        visible={showPhoneError}
+        title="Error"
+        message="Phone dialer is not available"
+        icon="phone-off"
+        iconColor="#EF4444"
+        buttons={[{ text: "OK", style: "default" }]}
+        onClose={() => setShowPhoneError(false)}
+      />
     </View>
   );
 }
@@ -326,15 +400,8 @@ const styles = StyleSheet.create({
   cardHeader: {
     flexDirection: "row",
     justifyContent: "space-between",
-    alignItems: "flex-start",
-    marginBottom: -26,
-  },
-  orderInfo: {
-    flexDirection: "column",
-    alignItems: "flex-start",
-    flex: 1,
-    minWidth: 0,
-    gap: 8,
+    alignItems: "center",
+    marginBottom: 12,
   },
   orderId: {
     fontSize: 16,
@@ -348,24 +415,10 @@ const styles = StyleSheet.create({
     paddingVertical: 4,
     borderRadius: 12,
     gap: 4,
-    flexShrink: 0,
-    alignSelf: "flex-end",
-    marginRight: -24,
   },
   statusText: {
     fontSize: 12,
     fontWeight: "600",
-  },
-  distanceBadge: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 4,
-    flexShrink: 0,
-  },
-  distanceText: {
-    fontSize: 12,
-    color: "#6B7280",
-    flexShrink: 0,
   },
   timerContainer: {
     flexDirection: "row",
@@ -393,17 +446,6 @@ const styles = StyleSheet.create({
     fontSize: 13,
     color: "#6B7280",
     flexShrink: 1,
-  },
-  etaBadge: {
-    backgroundColor: "#DBEAFE",
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 8,
-  },
-  etaText: {
-    fontSize: 12,
-    fontWeight: "600",
-    color: "#1E40AF",
   },
   locationsContainer: {
     marginBottom: 12,
@@ -445,23 +487,75 @@ const styles = StyleSheet.create({
     lineHeight: 20,
     flexWrap: "wrap",
   },
-  mapPreview: {
+  routePreview: {
     marginBottom: 12,
-  },
-  mapPlaceholder: {
-    backgroundColor: "#F3F4F6",
+    backgroundColor: "#F0F9FF",
     borderRadius: 12,
     height: 100,
+    borderWidth: 1,
+    borderColor: "#BFDBFE",
+    borderStyle: "dashed",
+    justifyContent: "center",
+  },
+  routeVisualization: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingHorizontal: 24,
+  },
+  markerContainer: {
+    alignItems: "center",
+  },
+  marker: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
     alignItems: "center",
     justifyContent: "center",
-    borderWidth: 1,
-    borderColor: "#E5E7EB",
-    borderStyle: "dashed",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.15,
+    shadowRadius: 3,
+    elevation: 3,
   },
-  mapPlaceholderText: {
-    fontSize: 12,
-    color: "#9CA3AF",
+  pickupMarker: {
+    backgroundColor: "#10B981",
+  },
+  dropoffMarker: {
+    backgroundColor: "#EF4444",
+  },
+  markerLabel: {
+    fontSize: 10,
+    fontWeight: "500",
+    color: "#6B7280",
     marginTop: 4,
+  },
+  routeLine: {
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    marginHorizontal: 8,
+    gap: 8,
+  },
+  routeLineDashed: {
+    flex: 1,
+    height: 2,
+    backgroundColor: "#BFDBFE",
+    borderRadius: 1,
+  },
+  tapHint: {
+    position: "absolute",
+    bottom: 8,
+    left: 0,
+    right: 0,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 4,
+  },
+  tapHintText: {
+    fontSize: 11,
+    color: "#6B7280",
   },
   customerContainer: {
     flexDirection: "row",

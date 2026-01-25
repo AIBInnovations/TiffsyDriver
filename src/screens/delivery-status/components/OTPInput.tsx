@@ -139,52 +139,34 @@ export default function OTPInput({
 }
 
 interface OTPVerificationProps {
-  customerPhone?: string;
   onVerify: (otp: string) => void;
-  onResend?: () => void;
   onSkip?: () => void;
   isVerifying?: boolean;
   error?: string;
-  canResend?: boolean;
-  resendCooldown?: number;
+  customerPhone?: string; // Keep for compatibility but not used for display
 }
 
 export function OTPVerification({
-  customerPhone,
   onVerify,
-  onResend,
   onSkip,
   isVerifying = false,
   error,
-  canResend = true,
-  resendCooldown = 30,
 }: OTPVerificationProps) {
   const [otp, setOtp] = useState("");
-  const [countdown, setCountdown] = useState(0);
 
+  // Clear OTP when error occurs so user can easily re-enter
   useEffect(() => {
-    if (countdown > 0) {
-      const timer = setTimeout(() => setCountdown(countdown - 1), 1000);
-      return () => clearTimeout(timer);
+    if (error) {
+      setOtp("");
     }
-  }, [countdown]);
-
-  const handleResend = () => {
-    if (countdown > 0 || !onResend) return;
-    setCountdown(resendCooldown);
-    setOtp("");
-    onResend();
-  };
+  }, [error]);
 
   const handleVerify = () => {
     if (otp.length === 4) {
+      console.log('🔑 OTP Verification - Submitting OTP:', otp);
       onVerify(otp);
     }
   };
-
-  const maskedPhone = customerPhone
-    ? customerPhone.replace(/(\d{3})(\d+)(\d{2})/, "$1****$3")
-    : "customer";
 
   return (
     <View style={styles.verificationContainer}>
@@ -195,7 +177,7 @@ export function OTPVerification({
         </View>
         <Text style={styles.verificationTitle}>OTP Verification</Text>
         <Text style={styles.verificationSubtitle}>
-          Enter the 4-digit code sent to {maskedPhone}
+          Ask customer for the 4-digit OTP{"\n"}displayed on their app
         </Text>
       </View>
 
@@ -211,26 +193,13 @@ export function OTPVerification({
         />
       </View>
 
-      {/* Resend */}
-      {canResend && (
-        <View style={styles.resendContainer}>
-          <Text style={styles.resendLabel}>Didn't receive the code?</Text>
-          <TouchableOpacity
-            onPress={handleResend}
-            disabled={countdown > 0}
-            style={styles.resendButton}
-          >
-            <Text
-              style={[
-                styles.resendText,
-                countdown > 0 && styles.resendTextDisabled,
-              ]}
-            >
-              {countdown > 0 ? `Resend in ${countdown}s` : "Resend OTP"}
-            </Text>
-          </TouchableOpacity>
-        </View>
-      )}
+      {/* Help Text */}
+      <View style={styles.helpContainer}>
+        <MaterialCommunityIcons name="information-outline" size={16} color="#6B7280" />
+        <Text style={styles.helpText}>
+          Customer can find OTP in their app under "Track Order"
+        </Text>
+      </View>
 
       {/* Verify Button */}
       <TouchableOpacity
@@ -359,27 +328,19 @@ const styles = StyleSheet.create({
   otpSection: {
     marginBottom: 20,
   },
-  resendContainer: {
+  helpContainer: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
     marginBottom: 24,
-    gap: 4,
+    gap: 6,
+    paddingHorizontal: 12,
   },
-  resendLabel: {
+  helpText: {
     fontSize: 13,
     color: "#6B7280",
-  },
-  resendButton: {
-    padding: 4,
-  },
-  resendText: {
-    fontSize: 13,
-    fontWeight: "600",
-    color: "#3B82F6",
-  },
-  resendTextDisabled: {
-    color: "#9CA3AF",
+    flex: 1,
+    textAlign: "center",
   },
   verifyButton: {
     flexDirection: "row",

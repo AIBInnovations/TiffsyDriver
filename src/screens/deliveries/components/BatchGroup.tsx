@@ -91,7 +91,7 @@ const styles = StyleSheet.create({
     minWidth: 0,
   },
   batchId: {
-    fontSize: 16,
+    fontSize: 14,
     fontWeight: "700",
     color: "#111827",
   },

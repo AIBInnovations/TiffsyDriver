@@ -16,7 +16,6 @@ interface FilterBarProps {
 const statusFilters: { value: FilterStatus; label: string; icon: string }[] = [
   { value: "all", label: "All", icon: "view-grid" },
   { value: "READY", label: "Ready", icon: "clock-outline" },
-  { value: "PICKED_UP", label: "Picked Up", icon: "package-variant" },
   { value: "OUT_FOR_DELIVERY", label: "Out for Delivery", icon: "truck-fast" },
   { value: "DELIVERED", label: "Delivered", icon: "check-circle" },
   { value: "FAILED", label: "Failed", icon: "close-circle" },

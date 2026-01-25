@@ -6,11 +6,11 @@ import {
   TouchableOpacity,
   ScrollView,
   ActivityIndicator,
-  Alert,
 } from 'react-native';
 import { useState, useEffect, useMemo } from 'react';
 import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons';
 import type { AvailableBatch } from '../../../types/api';
+import CustomAlert from '../../../components/common/CustomAlert';
 
 interface AvailableBatchesModalProps {
   visible: boolean;
@@ -27,6 +27,14 @@ export default function AvailableBatchesModal({
 }: AvailableBatchesModalProps) {
   const [acceptingBatchId, setAcceptingBatchId] = useState<string | null>(null);
   const [skippedBatchIds, setSkippedBatchIds] = useState<string[]>([]);
+  const [confirmBatch, setConfirmBatch] = useState<AvailableBatch | null>(null);
+  const [alertConfig, setAlertConfig] = useState<{
+    visible: boolean;
+    title: string;
+    message: string;
+    icon?: string;
+    iconColor?: string;
+  }>({ visible: false, title: '', message: '' });
 
   // Debug logging when modal opens (using useEffect to avoid re-render loops)
   useEffect(() => {
@@ -36,53 +44,51 @@ export default function AvailableBatchesModal({
     }
   }, [visible, batches]);
 
-  const handleAcceptBatch = async (batch: AvailableBatch) => {
-    Alert.alert(
-      '🎯 Accept Batch',
-      `${batch.batchNumber}\n\n` +
-      `📦 Orders: ${batch.orderCount}\n` +
-      `💰 Estimated Earnings: ₹${batch.estimatedEarnings}\n` +
-      `🍽️ Meal Window: ${batch.mealWindow}\n` +
-      `📍 Zone: ${batch.zone.name}\n\n` +
-      `Accept this batch and head to ${batch.kitchen.name}?`,
-      [
-        {
-          text: 'Cancel',
-          style: 'cancel',
-        },
-        {
-          text: 'Accept Batch',
-          style: 'default',
-          onPress: async () => {
-            try {
-              setAcceptingBatchId(batch._id);
-              await onAcceptBatch(batch._id);
-              // Modal will be closed by parent component after successful acceptance
-              Alert.alert(
-                '✅ Batch Accepted!',
-                `${batch.batchNumber} has been assigned to you.\n\n` +
-                `Head to ${batch.kitchen.name} to pick up ${batch.orderCount} ${batch.orderCount === 1 ? 'order' : 'orders'}.`,
-                [{ text: 'Start Delivery', style: 'default' }]
-              );
-            } catch (error: any) {
-              const errorMsg = error.message || 'Failed to accept batch';
+  const handleAcceptBatch = (batch: AvailableBatch) => {
+    // Show confirmation dialog
+    setConfirmBatch(batch);
+  };
 
-              // Check if batch was already taken
-              if (errorMsg.includes('already taken') || errorMsg.includes('not available')) {
-                Alert.alert(
-                  '⚠️ Batch Already Taken',
-                  'Another driver has already accepted this batch. Please check other available batches.',
-                  [{ text: 'OK' }]
-                );
-              } else {
-                Alert.alert('❌ Error', errorMsg, [{ text: 'OK' }]);
-              }
-              setAcceptingBatchId(null);
-            }
-          },
-        },
-      ]
-    );
+  const confirmAcceptBatch = async () => {
+    if (!confirmBatch) return;
+
+    const batch = confirmBatch;
+    setConfirmBatch(null);
+
+    try {
+      setAcceptingBatchId(batch._id);
+      await onAcceptBatch(batch._id);
+      // Modal will be closed by parent component after successful acceptance
+      setAlertConfig({
+        visible: true,
+        title: 'Batch Accepted!',
+        message: `${batch.batchNumber} has been assigned to you.\n\nHead to ${batch.kitchen.name} to pick up ${batch.orderCount} ${batch.orderCount === 1 ? 'order' : 'orders'}.`,
+        icon: 'check-circle',
+        iconColor: '#10B981',
+      });
+    } catch (error: any) {
+      const errorMsg = error.message || 'Failed to accept batch';
+
+      // Check if batch was already taken
+      if (errorMsg.includes('already taken') || errorMsg.includes('not available')) {
+        setAlertConfig({
+          visible: true,
+          title: 'Batch Already Taken',
+          message: 'Another driver has already accepted this batch. Please check other available batches.',
+          icon: 'alert',
+          iconColor: '#F59E0B',
+        });
+      } else {
+        setAlertConfig({
+          visible: true,
+          title: 'Error',
+          message: errorMsg,
+          icon: 'alert-circle',
+          iconColor: '#EF4444',
+        });
+      }
+      setAcceptingBatchId(null);
+    }
   };
 
   const handleSkipBatch = (batchId: string) => {
@@ -272,6 +278,31 @@ export default function AvailableBatchesModal({
           </ScrollView>
         </View>
       </View>
+
+      {/* Confirmation Alert */}
+      <CustomAlert
+        visible={!!confirmBatch}
+        title="Accept Batch"
+        message={confirmBatch ? `${confirmBatch.batchNumber}\n\nOrders: ${confirmBatch.orderCount}\nEstimated Earnings: ₹${confirmBatch.estimatedEarnings}\nMeal Window: ${confirmBatch.mealWindow}\nZone: ${confirmBatch.zone.name}\n\nAccept this batch and head to ${confirmBatch.kitchen.name}?` : ''}
+        icon="package-variant-closed"
+        iconColor="#F56B4C"
+        buttons={[
+          { text: 'Cancel', style: 'cancel', onPress: () => setConfirmBatch(null) },
+          { text: 'Accept Batch', style: 'default', onPress: confirmAcceptBatch },
+        ]}
+        onClose={() => setConfirmBatch(null)}
+      />
+
+      {/* Status Alert */}
+      <CustomAlert
+        visible={alertConfig.visible}
+        title={alertConfig.title}
+        message={alertConfig.message}
+        icon={alertConfig.icon}
+        iconColor={alertConfig.iconColor}
+        buttons={[{ text: 'OK', style: 'default' }]}
+        onClose={() => setAlertConfig({ visible: false, title: '', message: '' })}
+      />
     </Modal>
   );
 }

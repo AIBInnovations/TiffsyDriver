@@ -10,7 +10,6 @@ import {
   KeyboardAvoidingView,
   ScrollView,
   Platform,
-  Alert,
   ActivityIndicator,
 } from 'react-native';
 import auth from '@react-native-firebase/auth';
@@ -19,6 +18,7 @@ import { syncUser, getFirebaseToken } from '../../services/authService';
 import { tokenStorage } from '../../utils/tokenStorage';
 import { useDriverProfileStore } from '../profile/useDriverProfileStore';
 import { registerFCMToken } from '../../services/fcmService';
+import CustomAlert from '../../components/common/CustomAlert';
 
 type Props = AuthStackScreenProps<'OtpVerify'>;
 
@@ -28,6 +28,14 @@ const OTPVerificationScreen = ({ navigation, route }: Props) => {
   const [timer, setTimer] = useState(30);
   const [canResend, setCanResend] = useState(false);
   const [verifying, setVerifying] = useState(false);
+  const [alertConfig, setAlertConfig] = useState<{
+    visible: boolean;
+    title: string;
+    message: string;
+    icon?: string;
+    iconColor?: string;
+    onConfirm?: () => void;
+  }>({ visible: false, title: '', message: '' });
 
   // Get profile store to set availability status
   const { setAvailabilityStatus } = useDriverProfileStore();
@@ -123,20 +131,18 @@ const OTPVerificationScreen = ({ navigation, route }: Props) => {
           navigation.replace('DriverRegistration', { phoneNumber });
         } else if (syncResponse.data.user?.role !== 'DRIVER') {
           // User exists but is not a driver
-          Alert.alert(
-            'Access Denied',
-            'This app is only for drivers. Your account has a different role.',
-            [
-              {
-                text: 'OK',
-                onPress: async () => {
-                  await auth().signOut();
-                  await tokenStorage.clearAll();
-                  navigation.goBack();
-                }
-              }
-            ]
-          );
+          setAlertConfig({
+            visible: true,
+            title: 'Access Denied',
+            message: 'This app is only for drivers. Your account has a different role.',
+            icon: 'account-cancel',
+            iconColor: '#EF4444',
+            onConfirm: async () => {
+              await auth().signOut();
+              await tokenStorage.clearAll();
+              navigation.goBack();
+            },
+          });
         } else {
           // User is a DRIVER - check approval status
           const { approvalStatus, rejectionReason } = syncResponse.data;
@@ -187,10 +193,13 @@ const OTPVerificationScreen = ({ navigation, route }: Props) => {
 
         // Check if it's a Firebase OTP error or backend error
         if (error.code?.includes('auth/')) {
-          Alert.alert(
-            'Invalid OTP',
-            'The code you entered is incorrect. Please try again.'
-          );
+          setAlertConfig({
+            visible: true,
+            title: 'Invalid OTP',
+            message: 'The code you entered is incorrect. Please try again.',
+            icon: 'lock-alert',
+            iconColor: '#EF4444',
+          });
         } else {
           // Backend connection error
           let errorMessage = error.message || 'Failed to connect to server.';
@@ -199,7 +208,13 @@ const OTPVerificationScreen = ({ navigation, route }: Props) => {
             errorMessage = 'Cannot connect to backend server.\n\nPlease check:\n1. Backend server is running\n2. Backend URL is correct in src/config/api.ts\n3. Network connection is stable\n\nSee console logs for details.';
           }
 
-          Alert.alert('Backend Connection Error', errorMessage);
+          setAlertConfig({
+            visible: true,
+            title: 'Backend Connection Error',
+            message: errorMessage,
+            icon: 'server-network-off',
+            iconColor: '#EF4444',
+          });
         }
 
         // Clear OTP fields on error
@@ -235,13 +250,22 @@ const OTPVerificationScreen = ({ navigation, route }: Props) => {
         setOtp(['', '', '', '', '', '']);
         inputRefs.current[0]?.focus();
 
-        Alert.alert('Success', 'OTP has been resent to your phone.');
+        setAlertConfig({
+          visible: true,
+          title: 'Success',
+          message: 'OTP has been resent to your phone.',
+          icon: 'check-circle',
+          iconColor: '#10B981',
+        });
       } catch (error: any) {
         console.error('❌ Error resending OTP:', error);
-        Alert.alert(
-          'Error',
-          error.message || 'Failed to resend OTP. Please try again.'
-        );
+        setAlertConfig({
+          visible: true,
+          title: 'Error',
+          message: error.message || 'Failed to resend OTP. Please try again.',
+          icon: 'alert-circle',
+          iconColor: '#EF4444',
+        });
       } finally {
         setVerifying(false);
       }
@@ -472,6 +496,21 @@ const OTPVerificationScreen = ({ navigation, route }: Props) => {
             </Text>
           </View>
       </ScrollView>
+
+      {/* Custom Alert */}
+      <CustomAlert
+        visible={alertConfig.visible}
+        title={alertConfig.title}
+        message={alertConfig.message}
+        icon={alertConfig.icon}
+        iconColor={alertConfig.iconColor}
+        buttons={[{
+          text: 'OK',
+          style: 'default',
+          onPress: alertConfig.onConfirm,
+        }]}
+        onClose={() => setAlertConfig({ visible: false, title: '', message: '' })}
+      />
     </KeyboardAvoidingView>
   );
 };

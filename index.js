@@ -11,8 +11,6 @@ import { name as appName } from './app.json';
 // This must be registered outside of the app lifecycle (before AppRegistry.registerComponent)
 messaging().setBackgroundMessageHandler(async remoteMessage => {
   console.log('🔔 Background notification received:', remoteMessage);
-  // Handle notification data if needed
-  // Note: Background handlers run in a separate JS context and have limited capabilities
 });
 
 AppRegistry.registerComponent(appName, () => App);

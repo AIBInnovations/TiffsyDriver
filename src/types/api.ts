@@ -86,9 +86,12 @@ export type MealWindow = 'LUNCH' | 'DINNER';
 export interface Address {
   name?: string;
   phone?: string;
+  contactName?: string; // Customer name from order schema
+  contactPhone?: string; // Customer phone from order schema
   flatNumber?: string;
   street?: string;
   addressLine1?: string;
+  addressLine2?: string;
   landmark?: string;
   area?: string;
   locality?: string; // Backend uses "locality" for area

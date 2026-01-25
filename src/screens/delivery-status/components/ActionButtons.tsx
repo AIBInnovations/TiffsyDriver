@@ -30,13 +30,8 @@ export default function ActionButtons({
   const getActionButton = (): ActionButton | null => {
     switch (currentStatus) {
       case "pending":
-        return {
-          label: "Start Delivery",
-          icon: "play",
-          color: "#3B82F6",
-          shadowColor: "#3B82F6",
-          onPress: onStartDelivery,
-        };
+        // Start Delivery button is now in MapPreview
+        return null;
       case "in_progress":
         return {
           label: "Mark as Delivered",
@@ -63,6 +58,12 @@ export default function ActionButtons({
   const showFailButton = currentStatus === "in_progress";
   const isCompleted = currentStatus === "delivered";
   const isFailed = currentStatus === "failed";
+  const isPending = currentStatus === "pending";
+
+  // Start Delivery button is now in MapPreview for pending status
+  if (isPending) {
+    return null;
+  }
 
   if (isCompleted) {
     return (
@@ -138,24 +139,16 @@ export default function ActionButtons({
       )}
 
       {/* Status-specific helper text */}
-      <View style={styles.helperContainer}>
-        {currentStatus === "pending" && (
-          <View style={styles.helperRow}>
-            <MaterialCommunityIcons name="information-outline" size={14} color="#6B7280" />
-            <Text style={styles.helperText}>
-              Tap "Start Delivery" to begin this delivery
-            </Text>
-          </View>
-        )}
-        {currentStatus === "in_progress" && (
+      {currentStatus === "in_progress" && (
+        <View style={styles.helperContainer}>
           <View style={styles.helperRow}>
             <MaterialCommunityIcons name="truck-fast-outline" size={14} color="#6B7280" />
             <Text style={styles.helperText}>
               Navigate to delivery location to complete the order
             </Text>
           </View>
-        )}
-      </View>
+        </View>
+      )}
     </View>
   );
 }

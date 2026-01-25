@@ -122,15 +122,7 @@ dependencies {
         implementation jscFlavor
     }
 
-    // Firebase BoM
-    implementation platform('com.google.firebase:firebase-bom:34.7.0')
-
-    // Firebase Auth for phone authentication
-    implementation 'com.google.firebase:firebase-auth'
-
-    // Firebase Cloud Messaging for push notifications
-    implementation 'com.google.firebase:firebase-messaging'
-
-    // Firebase Analytics (optional but recommended)
-    implementation 'com.google.firebase:firebase-analytics'
+    // Note: Firebase dependencies (auth, messaging, analytics) are automatically
+    // managed by @react-native-firebase packages. Do NOT add direct firebase-bom
+    // or firebase-* dependencies here as they conflict with react-native-firebase.
 }

@@ -7,7 +7,6 @@ import {
   ScrollView,
   RefreshControl,
   ActivityIndicator,
-  Alert,
   Modal,
   Animated,
   StatusBar,
@@ -24,6 +23,7 @@ import DeliveryCard from './components/DeliveryCard';
 import FilterBar from './components/FilterBar';
 import BatchGroup from './components/BatchGroup';
 import AvailableBatchesModal from './components/AvailableBatchesModal';
+import CustomAlert from '../../components/common/CustomAlert';
 import { getMyBatch, getAvailableBatches, updateDeliveryStatus as apiUpdateDeliveryStatus, acceptBatch, getDriverOrders, getDriverBatchHistory } from '../../services/deliveryService';
 import type { Batch, Order, OrderStatus, AvailableBatch, DriverOrder, HistoryBatch, HistorySingleOrder } from '../../types/api';
 
@@ -87,6 +87,15 @@ export default function DeliveriesScreen() {
   const [newBatchMessage, setNewBatchMessage] = useState('');
   const [showCompletionToast, setShowCompletionToast] = useState(false);
   const [completionMessage, setCompletionMessage] = useState('');
+
+  // Custom alert states
+  const [alertConfig, setAlertConfig] = useState<{
+    visible: boolean;
+    title: string;
+    message: string;
+    icon?: string;
+    iconColor?: string;
+  }>({ visible: false, title: '', message: '' });
 
   // Backend data
   const [currentBatch, setCurrentBatch] = useState<Batch | null>(null);
@@ -223,17 +232,28 @@ export default function DeliveriesScreen() {
       console.log('📥 Fetching driver batch history...');
       const response = await getDriverBatchHistory();
 
-      const allBatches = response.data.batches || [];
-      const singleOrders = response.data.singleOrders || [];
+      // Defensive null checks
+      if (!response || !response.data) {
+        console.warn('⚠️ Empty response from getDriverBatchHistory');
+        setHistoryBatches([]);
+        setHistorySingleOrders([]);
+        return;
+      }
+
+      const allBatches = Array.isArray(response.data.batches) ? response.data.batches : [];
+      const singleOrders = Array.isArray(response.data.singleOrders) ? response.data.singleOrders : [];
 
       // Filter out DISPATCHED batches (they're still active, not historical)
       // Only show COMPLETED, PARTIAL_COMPLETE, and CANCELLED batches in history
-      const historicalBatches = allBatches.filter(batch =>
-        batch.status !== 'DISPATCHED' &&
-        batch.status !== 'COLLECTING' &&
-        batch.status !== 'READY_FOR_DISPATCH' &&
-        batch.status !== 'IN_PROGRESS'
-      );
+      const historicalBatches = allBatches.filter(batch => {
+        // Extra safety check
+        if (!batch || !batch.status) return false;
+
+        return batch.status !== 'DISPATCHED' &&
+               batch.status !== 'COLLECTING' &&
+               batch.status !== 'READY_FOR_DISPATCH' &&
+               batch.status !== 'IN_PROGRESS';
+      });
 
       setHistoryBatches(historicalBatches);
       setHistorySingleOrders(singleOrders);
@@ -242,6 +262,7 @@ export default function DeliveriesScreen() {
       console.log('📋 Filtered out active batches:', allBatches.length - historicalBatches.length);
     } catch (error: any) {
       console.error('❌ Error fetching driver batch history:', error);
+      console.error('❌ Error details:', error.message, error.stack);
       setHistoryBatches([]);
       setHistorySingleOrders([]);
     } finally {
@@ -456,13 +477,18 @@ export default function DeliveriesScreen() {
         return;
       }
 
-      // Check if trying to start a new delivery (READY → OUT_FOR_DELIVERY)
-      const isStartingDelivery = (newStatus === 'OUT_FOR_DELIVERY');
+      // Check if trying to start a new delivery (handles multiple status formats)
+      const isStartingDelivery = (
+        newStatus === 'OUT_FOR_DELIVERY' ||
+        newStatus === 'EN_ROUTE' ||
+        newStatus === 'in_progress'
+      );
 
       if (isStartingDelivery) {
         // Check if there are any active deliveries from current batch (excluding the one being started)
         const activeOrdersInCurrentBatch = currentOrders.filter(order => {
           const isActive = order.status === 'OUT_FOR_DELIVERY' ||
+            order.status === 'EN_ROUTE' ||
             order.status === 'PICKED_UP' ||
             order.status === 'ARRIVED';
 
@@ -472,17 +498,21 @@ export default function DeliveriesScreen() {
         // Also check driver orders for active deliveries
         const activeDriverOrders = driverOrders.filter(order => {
           return order.status === 'OUT_FOR_DELIVERY' ||
-            order.status === 'PICKED_UP';
+            order.status === 'EN_ROUTE' ||
+            order.status === 'PICKED_UP' ||
+            order.status === 'ARRIVED';
         });
 
         const totalActiveOrders = activeOrdersInCurrentBatch.length + activeDriverOrders.length;
 
         if (totalActiveOrders > 0) {
-          Alert.alert(
-            'Complete Active Deliveries First',
-            `You have ${totalActiveOrders} active ${totalActiveOrders === 1 ? 'delivery' : 'deliveries'}.\n\nPlease complete all active deliveries before starting a new one.`,
-            [{ text: 'OK', style: 'default' }]
-          );
+          setAlertConfig({
+            visible: true,
+            title: 'Complete Active Deliveries First',
+            message: `You have ${totalActiveOrders} active ${totalActiveOrders === 1 ? 'delivery' : 'deliveries'}.\n\nPlease complete all active deliveries before starting a new one.`,
+            icon: 'alert-circle',
+            iconColor: '#F59E0B',
+          });
           return;
         }
 
@@ -523,12 +553,13 @@ export default function DeliveriesScreen() {
       await fetchCurrentBatch();
     } catch (error: any) {
       console.error('❌ Error updating status:', error);
-      // Optionally show an alert to the user
-      Alert.alert(
-        'Error',
-        error.message || 'Failed to update delivery status. Please try again.',
-        [{ text: 'OK' }]
-      );
+      setAlertConfig({
+        visible: true,
+        title: 'Error',
+        message: error.message || 'Failed to update delivery status. Please try again.',
+        icon: 'alert-circle',
+        iconColor: '#EF4444',
+      });
     }
   };
 
@@ -582,7 +613,13 @@ export default function DeliveriesScreen() {
         if (supported) {
           return Linking.openURL(phoneUrl);
         } else {
-          Alert.alert('Error', 'Phone dialer is not available');
+          setAlertConfig({
+            visible: true,
+            title: 'Error',
+            message: 'Phone dialer is not available',
+            icon: 'phone-off',
+            iconColor: '#EF4444',
+          });
         }
       })
       .catch(err => console.error('Error opening phone dialer:', err));
@@ -590,52 +627,97 @@ export default function DeliveriesScreen() {
 
   // Handle navigate to address
   const handleNavigate = (latitude?: number, longitude?: number, address?: string) => {
-    if (latitude && longitude) {
-      const url = Platform.OS === 'ios'
-        ? `maps:0,0?q=${latitude},${longitude}`
-        : `geo:0,0?q=${latitude},${longitude}`;
-
-      Linking.canOpenURL(url)
-        .then(supported => {
-          if (supported) {
-            return Linking.openURL(url);
-          } else {
-            // Fallback to Google Maps web
-            const webUrl = `https://www.google.com/maps/search/?api=1&query=${latitude},${longitude}`;
-            return Linking.openURL(webUrl);
-          }
-        })
-        .catch(err => console.error('Error opening maps:', err));
-    } else if (address) {
+    // Prefer address-based navigation for better location recognition
+    if (address) {
       const encodedAddress = encodeURIComponent(address);
-      const url = Platform.OS === 'ios'
-        ? `maps:0,0?q=${encodedAddress}`
-        : `geo:0,0?q=${encodedAddress}`;
 
-      Linking.openURL(url).catch(err => console.error('Error opening maps:', err));
+      if (Platform.OS === 'ios') {
+        // iOS - Use Apple Maps with address
+        const appleMapsUrl = `maps://?daddr=${encodedAddress}`;
+        Linking.canOpenURL(appleMapsUrl)
+          .then(supported => {
+            if (supported) {
+              return Linking.openURL(appleMapsUrl);
+            } else {
+              return Linking.openURL(`https://www.google.com/maps/dir/?api=1&destination=${encodedAddress}`);
+            }
+          })
+          .catch(err => console.error('Error opening maps:', err));
+      } else {
+        // Android - Use Google Maps navigation intent
+        const googleMapsUrl = `google.navigation:q=${encodedAddress}`;
+        Linking.canOpenURL(googleMapsUrl)
+          .then(supported => {
+            if (supported) {
+              return Linking.openURL(googleMapsUrl);
+            } else {
+              return Linking.openURL(`https://www.google.com/maps/dir/?api=1&destination=${encodedAddress}`);
+            }
+          })
+          .catch(() => {
+            Linking.openURL(`https://www.google.com/maps/dir/?api=1&destination=${encodedAddress}`);
+          });
+      }
+    } else if (latitude && longitude) {
+      // Fallback to coordinates if no address available
+      const coordQuery = `${latitude},${longitude}`;
+      if (Platform.OS === 'ios') {
+        const appleMapsUrl = `maps://?daddr=${coordQuery}`;
+        Linking.openURL(appleMapsUrl).catch(() => {
+          Linking.openURL(`https://www.google.com/maps/dir/?api=1&destination=${coordQuery}`);
+        });
+      } else {
+        const googleMapsUrl = `google.navigation:q=${coordQuery}`;
+        Linking.canOpenURL(googleMapsUrl)
+          .then(supported => {
+            if (supported) {
+              return Linking.openURL(googleMapsUrl);
+            } else {
+              return Linking.openURL(`https://www.google.com/maps/dir/?api=1&destination=${coordQuery}`);
+            }
+          })
+          .catch(() => {
+            Linking.openURL(`https://www.google.com/maps/dir/?api=1&destination=${coordQuery}`);
+          });
+      }
     } else {
-      Alert.alert('Error', 'No address or coordinates available');
+      setAlertConfig({
+        visible: true,
+        title: 'Error',
+        message: 'No address or coordinates available',
+        icon: 'map-marker-off',
+        iconColor: '#EF4444',
+      });
     }
   };
 
   // Convert API orders to local delivery format
   const convertOrderToDelivery = (order: Order, batchId?: string): LocalDelivery => {
-    // Build address string with available fields
+    // Build address string - use addressLine1, locality, city
     const addressParts = [
-      order.deliveryAddress?.street,
-      order.deliveryAddress?.area,
+      order.deliveryAddress?.addressLine1,
+      order.deliveryAddress?.locality || order.deliveryAddress?.area,
       order.deliveryAddress?.city
     ].filter(Boolean);
 
     const dropoffLocation = addressParts.length > 0 ? addressParts.join(', ') : 'Address not available';
 
+    // Handle customer data - check contactName/contactPhone fields (from schema) and fallbacks
+    const customerName = order.deliveryAddress?.contactName || order.deliveryAddress?.name || 'Customer';
+    const customerPhone = order.deliveryAddress?.contactPhone || order.deliveryAddress?.phone || '';
+
     return {
       id: order._id,
       orderId: order.orderNumber,
-      customerName: order.deliveryAddress?.name || 'Customer',
-      customerPhone: order.deliveryAddress?.phone || '',
+      customerName,
+      customerPhone,
       pickupLocation: currentBatch && typeof currentBatch.kitchenId === 'object'
-        ? `${currentBatch.kitchenId.name}, ${currentBatch.kitchenId.address.area}`
+        ? [
+            currentBatch.kitchenId.name,
+            currentBatch.kitchenId.address?.addressLine1,
+            currentBatch.kitchenId.address?.locality || currentBatch.kitchenId.address?.area,
+            currentBatch.kitchenId.address?.city
+          ].filter(Boolean).join(', ')
         : 'Kitchen',
       dropoffLocation,
       status: order.status,
@@ -654,14 +736,14 @@ export default function DeliveriesScreen() {
 
   // Convert driver orders to local delivery format
   const convertDriverOrderToDelivery = (order: DriverOrder): LocalDelivery => {
-    // Handle missing customer data - use deliveryAddress as fallback
-    const customerName = order.customer?.name || order.deliveryAddress?.name || 'Customer';
-    const customerPhone = order.customer?.phone || order.deliveryAddress?.phone || '';
+    // Handle missing customer data - check contactName/contactPhone fields and fallbacks
+    const customerName = order.deliveryAddress?.contactName || order.customer?.name || order.deliveryAddress?.name || 'Customer';
+    const customerPhone = order.deliveryAddress?.contactPhone || order.customer?.phone || order.deliveryAddress?.phone || '';
 
-    // Build address string with available fields
+    // Build address string - use addressLine1, locality, city
     const addressParts = [
-      order.deliveryAddress?.street || order.deliveryAddress?.addressLine1,
-      order.deliveryAddress?.area || order.deliveryAddress?.locality,
+      order.deliveryAddress?.addressLine1,
+      order.deliveryAddress?.locality || order.deliveryAddress?.area,
       order.deliveryAddress?.city
     ].filter(Boolean);
 
@@ -688,21 +770,30 @@ export default function DeliveriesScreen() {
 
   // Convert history batch order to local delivery format
   const convertHistoryOrderToDelivery = (order: Order, batch: HistoryBatch): LocalDelivery => {
-    // Build address string with available fields
+    // Build address string - use addressLine1, locality, city
     const addressParts = [
-      order.deliveryAddress?.street,
-      order.deliveryAddress?.area,
+      order.deliveryAddress?.addressLine1,
+      order.deliveryAddress?.locality || order.deliveryAddress?.area,
       order.deliveryAddress?.city
     ].filter(Boolean);
 
     const dropoffLocation = addressParts.length > 0 ? addressParts.join(', ') : 'Address not available';
 
+    // Handle customer data - check contactName/contactPhone fields (from schema) and fallbacks
+    const customerName = order.deliveryAddress?.contactName || order.deliveryAddress?.name || 'Customer';
+    const customerPhone = order.deliveryAddress?.contactPhone || order.deliveryAddress?.phone || '';
+
     return {
       id: order._id,
       orderId: order.orderNumber,
-      customerName: order.deliveryAddress?.name || 'Customer',
-      customerPhone: order.deliveryAddress?.phone || '',
-      pickupLocation: `${batch.kitchen.name}, ${batch.kitchen.address.area}`,
+      customerName,
+      customerPhone,
+      pickupLocation: [
+        batch.kitchen.name,
+        batch.kitchen.address?.addressLine1,
+        batch.kitchen.address?.locality || batch.kitchen.address?.area,
+        batch.kitchen.address?.city
+      ].filter(Boolean).join(', '),
       dropoffLocation,
       status: order.status,
       eta: 'Completed',
@@ -892,7 +983,7 @@ export default function DeliveriesScreen() {
               </TouchableOpacity>
             )}
             <View>
-              <Text style={styles.title}>
+              <Text style={styles.title} numberOfLines={1}>
                 {viewingBatchId && currentBatch
                   ? currentBatch.batchNumber
                   : 'Your Deliveries'}
@@ -1151,8 +1242,13 @@ export default function DeliveriesScreen() {
                   <View style={styles.historySection}>
                     <Text style={styles.historySectionTitle}>Batches</Text>
                     {filteredHistoryBatches.map((batch) => {
+                      // Safety check for batch data
+                      if (!batch || !batch._id) return null;
+
                       const isExpanded = expandedHistoryBatches.includes(batch._id);
-                      const batchOrders = batch.orders.map(order => convertHistoryOrderToDelivery(order, batch));
+                      const batchOrders = Array.isArray(batch.orders)
+                        ? batch.orders.map(order => convertHistoryOrderToDelivery(order, batch))
+                        : [];
 
                       return (
                         <View key={batch._id} style={styles.historyBatchCard}>
@@ -1212,22 +1308,26 @@ export default function DeliveriesScreen() {
                             </View>
 
                             <View style={styles.historyBatchInfo}>
-                              <View style={styles.historyBatchInfoRow}>
-                                <MaterialCommunityIcons name="store" size={16} color="#6B7280" />
-                                <Text style={styles.historyBatchInfoText}>
-                                  {batch.kitchen.name}
-                                </Text>
-                              </View>
-                              <View style={styles.historyBatchInfoRow}>
-                                <MaterialCommunityIcons name="map-marker" size={16} color="#6B7280" />
-                                <Text style={styles.historyBatchInfoText}>
-                                  {batch.zone.name}
-                                </Text>
-                              </View>
+                              {batch.kitchen && (
+                                <View style={styles.historyBatchInfoRow}>
+                                  <MaterialCommunityIcons name="store" size={16} color="#6B7280" />
+                                  <Text style={styles.historyBatchInfoText}>
+                                    {batch.kitchen.name || 'Unknown Kitchen'}
+                                  </Text>
+                                </View>
+                              )}
+                              {batch.zone && (
+                                <View style={styles.historyBatchInfoRow}>
+                                  <MaterialCommunityIcons name="map-marker" size={16} color="#6B7280" />
+                                  <Text style={styles.historyBatchInfoText}>
+                                    {batch.zone.name || 'Unknown Zone'}
+                                  </Text>
+                                </View>
+                              )}
                               <View style={styles.historyBatchInfoRow}>
                                 <MaterialCommunityIcons name="package-variant" size={16} color="#6B7280" />
                                 <Text style={styles.historyBatchInfoText}>
-                                  {batch.totalOrders} orders
+                                  {batch.totalOrders || 0} orders
                                 </Text>
                               </View>
                             </View>
@@ -1259,8 +1359,12 @@ export default function DeliveriesScreen() {
                 {historySingleOrders.length > 0 && (
                   <View style={styles.historySection}>
                     <Text style={styles.historySectionTitle}>Individual Orders</Text>
-                    {historySingleOrders.map((order) => (
-                      <View key={order._id} style={styles.historyOrderCard}>
+                    {historySingleOrders.map((order) => {
+                      // Safety check for order data
+                      if (!order || !order._id) return null;
+
+                      return (
+                        <View key={order._id} style={styles.historyOrderCard}>
                         <View style={styles.historyOrderHeader}>
                           <Text style={styles.historyOrderNumber}>{order.orderNumber}</Text>
                           <View
@@ -1296,7 +1400,7 @@ export default function DeliveriesScreen() {
                         <View style={styles.historyOrderInfo}>
                           <MaterialCommunityIcons name="store" size={16} color="#6B7280" />
                           <Text style={styles.historyOrderInfoText}>
-                            {order.kitchenId.name}
+                            {order.kitchenId?.name || 'Unknown Kitchen'}
                           </Text>
                         </View>
                         <Text style={styles.historyOrderDate}>
@@ -1309,7 +1413,8 @@ export default function DeliveriesScreen() {
                           })}
                         </Text>
                       </View>
-                    ))}
+                      );
+                    })}
                   </View>
                 )}
               </View>
@@ -1376,6 +1481,17 @@ export default function DeliveriesScreen() {
           </View>
         </Animated.View>
       )}
+
+      {/* Custom Alert */}
+      <CustomAlert
+        visible={alertConfig.visible}
+        title={alertConfig.title}
+        message={alertConfig.message}
+        icon={alertConfig.icon}
+        iconColor={alertConfig.iconColor}
+        buttons={[{ text: 'OK', style: 'default' }]}
+        onClose={() => setAlertConfig({ visible: false, title: '', message: '' })}
+      />
     </SafeAreaView>
   );
 }
@@ -1417,7 +1533,7 @@ const styles = StyleSheet.create({
     padding: 4,
   },
   title: {
-    fontSize: 28,
+    fontSize: 20,
     fontWeight: '700',
     color: '#111827',
   },

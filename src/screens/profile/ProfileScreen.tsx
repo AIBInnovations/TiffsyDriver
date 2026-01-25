@@ -359,8 +359,9 @@ export default function ProfileScreen() {
           />
         )}
 
-        {/* Profile Header Card */}
+        {/* Combined Profile Card */}
         <View style={styles.headerCard}>
+          {/* Avatar and Basic Info */}
           <View style={styles.headerCardContent}>
             <ProfileAvatar
               initials={getInitials(profile.fullName)}
@@ -378,12 +379,47 @@ export default function ProfileScreen() {
               </View>
             </View>
           </View>
+
+          {/* Driver ID */}
           <View style={styles.headerCardMeta}>
             <View style={styles.metaItem}>
               <MaterialCommunityIcons name="card-account-details-outline" size={14} color="#6B7280" />
               <Text style={styles.metaText}>{profile.driverId}</Text>
             </View>
           </View>
+
+          {/* Divider */}
+          <View style={styles.cardDivider} />
+
+          {/* Profile Details */}
+          <View style={styles.detailsSection}>
+            <ListRow
+              icon="email-outline"
+              iconColor="#3B82F6"
+              iconBgColor="#EFF6FF"
+              title="Email"
+              value={profile.email || "Not set"}
+              showChevron={false}
+            />
+            <ListRow
+              icon="car-outline"
+              iconColor="#10B981"
+              iconBgColor="#F0FDF4"
+              title="Vehicle"
+              value={`${vehicleTypeLabels[profile.vehicleType]} - ${profile.vehicleNumber}`}
+              showChevron={false}
+            />
+            <ListRow
+              icon="translate"
+              iconColor="#F59E0B"
+              iconBgColor="#FFFBEB"
+              title="Language"
+              value={languageLabels[profile.preferredLanguage].split(" ")[0]}
+              showChevron={false}
+            />
+          </View>
+
+          {/* Single Edit Profile Button */}
           <Pressable
             style={styles.editProfileButton}
             onPress={() => setShowEditProfile(true)}
@@ -392,40 +428,6 @@ export default function ProfileScreen() {
             <Text style={styles.editProfileButtonText}>Edit Profile</Text>
           </Pressable>
         </View>
-
-        {/* Profile Details Card */}
-        <SectionCard title="Profile Details" compact={profile.appSettings.compactMode}>
-          <ListRow
-            icon="email-outline"
-            iconColor="#3B82F6"
-            iconBgColor="#EFF6FF"
-            title="Email"
-            value={profile.email || "Not set"}
-            showChevron={false}
-          />
-          <ListRow
-            icon="car-outline"
-            iconColor="#10B981"
-            iconBgColor="#F0FDF4"
-            title="Vehicle"
-            value={`${vehicleTypeLabels[profile.vehicleType]} - ${profile.vehicleNumber}`}
-            showChevron={false}
-          />
-          <ListRow
-            icon="translate"
-            iconColor="#F59E0B"
-            iconBgColor="#FFFBEB"
-            title="Language"
-            value={languageLabels[profile.preferredLanguage].split(" ")[0]}
-            showChevron={false}
-          />
-          <View style={{ height: 16 }} />
-          <View style={styles.editLinkContainer}>
-            <Pressable onPress={() => setShowEditProfile(true)}>
-              <Text style={styles.editLink}>Edit Details</Text>
-            </Pressable>
-          </View>
-        </SectionCard>
 
         {/* Notification Preferences */}
         <SectionCard title="Notifications" compact={profile.appSettings.compactMode}>
@@ -533,9 +535,7 @@ export default function ProfileScreen() {
             if (updates.vehicleType !== undefined) {
               vehicleUpdates.vehicleType = updates.vehicleType;
             }
-            if (updates.vehicleNumber !== undefined) {
-              vehicleUpdates.vehicleNumber = updates.vehicleNumber;
-            }
+            // Note: vehicleNumber is not editable after registration - handled by support only
 
             // Try to call backend APIs in parallel if both have updates
             let backendSuccess = false;
@@ -709,8 +709,15 @@ const styles = StyleSheet.create({
     alignItems: "center",
     paddingVertical: 12,
     borderTopWidth: 1,
-    borderBottomWidth: 1,
     borderColor: "#F3F4F6",
+    marginBottom: 16,
+  },
+  cardDivider: {
+    height: 1,
+    backgroundColor: "#F3F4F6",
+    marginBottom: 16,
+  },
+  detailsSection: {
     marginBottom: 16,
   },
   metaItem: {
@@ -736,24 +743,12 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     borderRadius: 12,
     gap: 6,
+    marginTop: 4,
   },
   editProfileButtonText: {
     fontSize: 15,
     fontWeight: "600",
     color: "#F56B4C",
-  },
-  editLinkContainer: {
-    paddingTop: 8,
-    alignItems: "center",
-  },
-  editLink: {
-    fontSize: 14,
-    fontWeight: "600",
-    color: "#F56B4C",
-    paddingVertical: 8,
-    paddingHorizontal: 16,
-    backgroundColor: "#FEF2F2",
-    borderRadius: 7,
   },
   savingLabel: {
     fontSize: 12,

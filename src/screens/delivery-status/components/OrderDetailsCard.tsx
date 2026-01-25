@@ -1,4 +1,4 @@
-import { View, Text, StyleSheet, TouchableOpacity, Linking } from "react-native";
+import { View, Text, StyleSheet, TouchableOpacity, Linking, Platform } from "react-native";
 import { useState } from "react";
 import MaterialCommunityIcons from "react-native-vector-icons/MaterialCommunityIcons";
 
@@ -37,8 +37,28 @@ export default function OrderDetailsCard({
       if (onLocationPress) {
         onLocationPress(location, type);
       } else {
-        const address = encodeURIComponent(location);
-        Linking.openURL(`https://maps.google.com/?q=${address}`);
+        const encodedAddress = encodeURIComponent(location);
+
+        if (Platform.OS === 'ios') {
+          const appleMapsUrl = `maps://?daddr=${encodedAddress}`;
+          const webUrl = `https://www.google.com/maps/dir/?api=1&destination=${encodedAddress}`;
+
+          Linking.canOpenURL(appleMapsUrl)
+            .then(supported => {
+              if (supported) {
+                return Linking.openURL(appleMapsUrl);
+              } else {
+                return Linking.openURL(webUrl);
+              }
+            })
+            .catch(() => {
+              Linking.openURL(webUrl);
+            });
+        } else {
+          // Android - Use Google Maps search URL for accurate address matching
+          const googleMapsUrl = `https://www.google.com/maps/search/?api=1&query=${encodedAddress}`;
+          Linking.openURL(googleMapsUrl);
+        }
       }
     }
   };

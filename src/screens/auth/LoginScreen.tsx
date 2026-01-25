@@ -7,11 +7,14 @@ import {
   TextInput,
   StyleSheet,
   Image,
-  Alert,
   ActivityIndicator,
+  KeyboardAvoidingView,
+  ScrollView,
+  Platform,
 } from 'react-native';
 import auth from '@react-native-firebase/auth';
 import type { AuthStackScreenProps } from "../../navigation/types";
+import CustomAlert from '../../components/common/CustomAlert';
 
 type Props = AuthStackScreenProps<'Login'>;
 
@@ -19,6 +22,13 @@ const LoginScreen = ({ navigation }: Props) => {
   const [phone, setPhone] = useState('');
   const [remember, setRemember] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [alertConfig, setAlertConfig] = useState<{
+    visible: boolean;
+    title: string;
+    message: string;
+    icon?: string;
+    iconColor?: string;
+  }>({ visible: false, title: '', message: '' });
 
   const handleGetOtp = async () => {
     if (phone.length >= 10) {
@@ -37,10 +47,13 @@ const LoginScreen = ({ navigation }: Props) => {
         });
       } catch (error: any) {
         console.error('❌ Error sending OTP:', error);
-        Alert.alert(
-          'Error',
-          error.message || 'Failed to send OTP. Please try again.'
-        );
+        setAlertConfig({
+          visible: true,
+          title: 'Error',
+          message: error.message || 'Failed to send OTP. Please try again.',
+          icon: 'alert-circle',
+          iconColor: '#EF4444',
+        });
       } finally {
         setLoading(false);
       }
@@ -48,11 +61,21 @@ const LoginScreen = ({ navigation }: Props) => {
   };
 
   return (
-    <View style={styles.container}>
+    <KeyboardAvoidingView
+      style={styles.container}
+      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      keyboardVerticalOffset={0}
+    >
       <StatusBar barStyle="light-content" backgroundColor="#F56B4C" />
-
-      {/* Top header area */}
-      <View style={styles.header}>
+      <ScrollView
+        style={styles.scrollView}
+        contentContainerStyle={styles.scrollContent}
+        keyboardShouldPersistTaps="handled"
+        showsVerticalScrollIndicator={false}
+        bounces={false}
+      >
+        {/* Top header area */}
+        <View style={styles.header}>
         <View style={styles.illustrationContainer}>
           <Image
             source={require('../../../assets/images/pana.png')}
@@ -159,7 +182,19 @@ const LoginScreen = ({ navigation }: Props) => {
           {'\n'}and <Text style={styles.link}>Privacy Policy</Text>
         </Text>
       </View>
-    </View>
+      </ScrollView>
+
+      {/* Custom Alert */}
+      <CustomAlert
+        visible={alertConfig.visible}
+        title={alertConfig.title}
+        message={alertConfig.message}
+        icon={alertConfig.icon}
+        iconColor={alertConfig.iconColor}
+        buttons={[{ text: 'OK', style: 'default' }]}
+        onClose={() => setAlertConfig({ visible: false, title: '', message: '' })}
+      />
+    </KeyboardAvoidingView>
   );
 };
 
@@ -168,8 +203,14 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#F56B4C',
   },
+  scrollView: {
+    flex: 1,
+  },
+  scrollContent: {
+    flexGrow: 1,
+  },
   header: {
-    height: 220,
+    minHeight: 220,
     backgroundColor: '#F56B4C',
     paddingHorizontal: 20,
     paddingTop: 15,
@@ -185,13 +226,13 @@ const styles = StyleSheet.create({
     marginTop: -5,
   },
   card: {
-    flex: 1,
     backgroundColor: 'white',
     borderTopLeftRadius: 30,
     borderTopRightRadius: 30,
     paddingHorizontal: 20,
     paddingTop: 20,
-    paddingBottom: 50,
+    paddingBottom: 30,
+    minHeight: 400,
   },
   label: {
     color: '#111827',
