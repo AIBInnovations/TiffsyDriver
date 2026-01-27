@@ -33,6 +33,11 @@ export const API_CONFIG = {
     DRIVER_PROFILE_IMAGE: '/driver/profile/image',
     DRIVER_DOCUMENTS_REQUEST: '/driver/documents/request',
     DRIVER_STATS: '/driver/stats',
+
+    // Notification endpoints
+    NOTIFICATIONS: '/notifications',
+    MARK_NOTIFICATION_READ: (notificationId: string) => `/notifications/${notificationId}/read`,
+    MARK_ALL_NOTIFICATIONS_READ: '/notifications/mark-all-read',
   },
 };
 

@@ -255,7 +255,7 @@ export interface DeliveryStatusUpdateData {
 // ============================================
 
 // Vehicle Types
-export type VehicleType = 'BIKE' | 'SCOOTER' | 'BICYCLE' | 'OTHER';
+export type VehicleType = 'BIKE' | 'SCOOTER' | 'BICYCLES' | 'OTHER';
 
 // Document Types
 export type DocumentType = 'RC' | 'INSURANCE' | 'PUC' | 'OTHER';
@@ -427,4 +427,50 @@ export interface HistorySingleOrder {
 export interface DriverBatchHistoryData {
   batches: HistoryBatch[];
   singleOrders: HistorySingleOrder[];
+}
+
+// ============================================
+// Notification Types
+// ============================================
+
+// Notification types that match backend
+export type NotificationType =
+  | 'BATCH_READY'
+  | 'BATCH_ASSIGNED'
+  | 'BATCH_UPDATED'
+  | 'BATCH_CANCELLED'
+  | 'ORDER_READY_FOR_PICKUP'
+  | 'ORDER_PICKED_UP'
+  | 'ORDER_OUT_FOR_DELIVERY'
+  | 'ORDER_DELIVERED'
+  | 'ORDER_FAILED';
+
+// Notification interface
+export interface Notification {
+  _id: string;
+  userId: string;
+  type: NotificationType;
+  title: string;
+  body: string;
+  data?: {
+    batchId?: string;
+    batchNumber?: string;
+    orderId?: string;
+    orderNumber?: string;
+    orderCount?: string;
+    kitchenId?: string;
+    [key: string]: any;
+  };
+  entityType?: 'BATCH' | 'ORDER';
+  entityId?: string;
+  isRead: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+// Notifications List Response
+export interface NotificationsData {
+  notifications: Notification[];
+  unreadCount: number;
+  total: number;
 }

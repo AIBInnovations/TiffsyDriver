@@ -169,11 +169,18 @@ export const getStoredFCMToken = async (): Promise<string | null> => {
 // The availability status only affects whether drivers can accept new batches
 export const registerFCMToken = async (): Promise<boolean> => {
   try {
+    console.log('🔔 ========================================');
+    console.log('🔔 STARTING FCM TOKEN REGISTRATION');
+    console.log('🔔 ========================================');
+
     const fcmToken = await getFCMToken();
     if (!fcmToken) {
-      console.log('⚠️ No FCM token available');
+      console.log('❌ No FCM token available');
       return false;
     }
+
+    console.log('✅ FCM Token obtained');
+    console.log('📱 Token (first 50 chars):', fcmToken.substring(0, 50) + '...');
 
     const deviceId = await getDeviceId();
     const deviceType = Platform.OS === 'ios' ? 'IOS' : 'ANDROID';
@@ -205,6 +212,9 @@ export const registerFCMToken = async (): Promise<boolean> => {
       console.log('⚠️ Could not load notification preferences, using defaults');
     }
 
+    console.log('📡 Sending FCM token to backend API...');
+    console.log('📡 Endpoint:', `${API_CONFIG.BASE_URL}${API_CONFIG.ENDPOINTS.FCM_TOKEN}`);
+
     const response = await fetch(
       `${API_CONFIG.BASE_URL}${API_CONFIG.ENDPOINTS.FCM_TOKEN}`,
       {
@@ -222,17 +232,25 @@ export const registerFCMToken = async (): Promise<boolean> => {
       }
     );
 
+    console.log('📡 Response status:', response.status);
+
     const data = await response.json();
-    console.log('📡 FCM Registration Response:', data);
+    console.log('📡 FCM Registration Response:', JSON.stringify(data, null, 2));
 
     if (!response.ok) {
       throw new Error(data.message || 'Failed to register FCM token');
     }
 
-    console.log('✅ FCM token registered successfully with preferences');
+    console.log('✅ ========================================');
+    console.log('✅ FCM TOKEN REGISTERED SUCCESSFULLY');
+    console.log('✅ Backend can now send push notifications');
+    console.log('✅ ========================================');
     return true;
   } catch (error: any) {
-    console.error('❌ Error registering FCM token:', error);
+    console.error('❌ ========================================');
+    console.error('❌ ERROR REGISTERING FCM TOKEN');
+    console.error('❌ Error:', error.message);
+    console.error('❌ ========================================');
     return false;
   }
 };
@@ -328,7 +346,14 @@ const shouldShowNotification = async (notificationType?: string): Promise<boolea
 
 // Handle notification received in foreground
 export const handleForegroundNotification = async (remoteMessage: any) => {
-  console.log('🔔 Foreground notification received:', remoteMessage);
+  console.log('🔔 ========================================');
+  console.log('🔔 FOREGROUND NOTIFICATION RECEIVED');
+  console.log('🔔 ========================================');
+  console.log('🔔 Full message:', JSON.stringify(remoteMessage, null, 2));
+  console.log('🔔 Title:', remoteMessage?.notification?.title);
+  console.log('🔔 Body:', remoteMessage?.notification?.body);
+  console.log('🔔 Data:', remoteMessage?.data);
+  console.log('🔔 ========================================');
 
   try {
     const { notification, data } = remoteMessage;
@@ -341,11 +366,14 @@ export const handleForegroundNotification = async (remoteMessage: any) => {
       return;
     }
 
+    console.log('✅ Notification will be displayed');
+
     // Get appropriate channel based on notification type
     const channelId = getChannelForNotificationType(data?.type);
+    console.log('📱 Using channel:', channelId);
 
     // Display notification using notifee
-    await notifee.displayNotification({
+    const notificationId = await notifee.displayNotification({
       title: notification?.title || 'New Notification',
       body: notification?.body || '',
       data: data || {},
@@ -372,7 +400,10 @@ export const handleForegroundNotification = async (remoteMessage: any) => {
       },
     });
 
-    console.log('✅ Foreground notification displayed via notifee');
+    console.log('✅ ========================================');
+    console.log('✅ NOTIFICATION DISPLAYED SUCCESSFULLY');
+    console.log('✅ Notification ID:', notificationId);
+    console.log('✅ ========================================');
 
     // Handle data payload
     if (data) {
@@ -621,5 +652,80 @@ export const syncNotificationPreferences = async (preferences: {
   } catch (error: any) {
     console.error('❌ Error syncing notification preferences:', error);
     return false;
+  }
+};
+
+/**
+ * Test local notification display
+ * Use this to verify that notifee is working correctly
+ */
+export const testLocalNotification = async (): Promise<void> => {
+  try {
+    console.log('🧪 ========================================');
+    console.log('🧪 TESTING NOTIFICATION SYSTEM');
+    console.log('🧪 ========================================');
+
+    // Step 1: Check FCM token
+    const fcmToken = await getStoredFCMToken();
+    if (fcmToken) {
+      console.log('✅ FCM Token EXISTS in storage');
+      console.log('📱 Token (first 50 chars):', fcmToken.substring(0, 50) + '...');
+      console.log('📱 Token (last 20 chars): ...' + fcmToken.substring(fcmToken.length - 20));
+    } else {
+      console.log('❌ NO FCM TOKEN FOUND');
+      console.log('⚠️ You need to LOGOUT and LOGIN again to register FCM token');
+      console.log('⚠️ Without FCM token, backend CANNOT send push notifications');
+    }
+
+    // Step 2: Check notification permission
+    const hasPermission = await checkNotificationPermission();
+    console.log(hasPermission ? '✅ Notification permission GRANTED' : '❌ Notification permission DENIED');
+
+    // Step 3: Display test notification
+    console.log('📱 Displaying test notification...');
+    const { NOTIFICATION_CHANNELS } = require('./notificationChannels');
+
+    await notifee.displayNotification({
+      title: '🧪 Test Notification',
+      body: 'If you see this, local notifications work! Check logs for FCM token status.',
+      data: {
+        type: 'TEST',
+        timestamp: Date.now().toString(),
+      },
+      android: {
+        channelId: NOTIFICATION_CHANNELS.GENERAL,
+        pressAction: {
+          id: 'default',
+        },
+        sound: 'default',
+        importance: 4,
+        showTimestamp: true,
+        timestamp: Date.now(),
+      },
+      ios: {
+        sound: 'default',
+      },
+    });
+
+    console.log('✅ ========================================');
+    console.log('✅ TEST RESULTS:');
+    console.log('✅ Local notifications: WORKING ✓');
+    console.log(fcmToken ? '✅ FCM Token: REGISTERED ✓' : '❌ FCM Token: NOT FOUND ✗');
+    console.log(hasPermission ? '✅ Permissions: GRANTED ✓' : '❌ Permissions: DENIED ✗');
+    console.log('✅ ========================================');
+
+    if (!fcmToken) {
+      console.log('⚠️  NEXT STEPS:');
+      console.log('⚠️  1. Logout from the app');
+      console.log('⚠️  2. Login again');
+      console.log('⚠️  3. Look for "FCM TOKEN REGISTERED SUCCESSFULLY" in logs');
+      console.log('⚠️ ========================================');
+    }
+  } catch (error: any) {
+    console.error('❌ ========================================');
+    console.error('❌ TEST FAILED');
+    console.error('❌ Error:', error.message);
+    console.error('❌ Stack:', error.stack);
+    console.error('❌ ========================================');
   }
 };

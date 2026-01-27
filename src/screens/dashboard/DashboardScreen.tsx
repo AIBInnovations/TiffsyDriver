@@ -15,21 +15,23 @@ import {
 import { useState, useCallback, useEffect, useRef } from 'react';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
-import type { BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
+import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons';
-import type { MainTabsParamList } from '../../navigation/types';
+import type { DashboardStackParamList } from '../../navigation/types';
 import StatsCard from './components/StatsCard';
 import CustomAlert from '../../components/common/CustomAlert';
 import { useDriverProfileStore } from '../profile/useDriverProfileStore';
 import { getMyBatch, getAvailableBatches, markBatchPickedUp, acceptBatch, getDriverBatchHistory } from '../../services/deliveryService';
 import { getCurrentUser } from '../../services/authService';
 import { getDriverStats } from '../../services/driverProfileService';
+import { getNotifications } from '../../services/notificationService';
+import { testLocalNotification } from '../../services/fcmService';
 import type { Batch, BatchSummary, AvailableBatch, DriverStats, HistoryBatch, HistorySingleOrder } from '../../types/api';
 import AvailableBatchItem from './components/AvailableBatchItem';
 
 
 export default function DashboardScreen() {
-  const navigation = useNavigation<BottomTabNavigationProp<MainTabsParamList>>();
+  const navigation = useNavigation<NativeStackNavigationProp<DashboardStackParamList>>();
   const { profile, setAvailabilityStatus } = useDriverProfileStore();
 
   // State
@@ -61,6 +63,7 @@ export default function DashboardScreen() {
   });
   const [historyBatches, setHistoryBatches] = useState<HistoryBatch[]>([]);
   const [historySingleOrders, setHistorySingleOrders] = useState<HistorySingleOrder[]>([]);
+  const [unreadNotificationCount, setUnreadNotificationCount] = useState(0);
 
   // Custom alert states
   const [showPickupConfirm, setShowPickupConfirm] = useState(false);
@@ -244,6 +247,19 @@ export default function DashboardScreen() {
     }
   }, []);
 
+  // Fetch unread notification count
+  const fetchUnreadNotificationCount = useCallback(async () => {
+    try {
+      console.log('📥 Fetching unread notification count...');
+      const response = await getNotifications(10, 0); // Fetch first 10 to get unread count
+      setUnreadNotificationCount(response.data.unreadCount);
+      console.log('✅ Unread notification count:', response.data.unreadCount);
+    } catch (error: any) {
+      console.error('❌ Error fetching unread notification count:', error);
+      // Don't show error toast for this as it's not critical
+    }
+  }, []);
+
   // Initial data load
   useEffect(() => {
     const loadDashboardData = async () => {
@@ -255,6 +271,7 @@ export default function DashboardScreen() {
           fetchDriverStats(),
           fetchUserProfile(),
           fetchHistory(),
+          fetchUnreadNotificationCount(),
         ]);
       } catch (error) {
         console.error('❌ Error loading dashboard data:', error);
@@ -264,7 +281,7 @@ export default function DashboardScreen() {
     };
 
     loadDashboardData();
-  }, [fetchCurrentBatch, fetchAvailableBatches, fetchDriverStats, fetchUserProfile, fetchHistory]);
+  }, [fetchCurrentBatch, fetchAvailableBatches, fetchDriverStats, fetchUserProfile, fetchHistory, fetchUnreadNotificationCount]);
 
   // Auto-refresh current batch if active (every 30 seconds)
   useEffect(() => {
@@ -284,6 +301,13 @@ export default function DashboardScreen() {
       StatusBar.setBarStyle('light-content');
       StatusBar.setBackgroundColor('#F56B4C');
     }, [])
+  );
+
+  // Refresh unread notification count when screen is focused
+  useFocusEffect(
+    useCallback(() => {
+      fetchUnreadNotificationCount();
+    }, [fetchUnreadNotificationCount])
   );
 
   // Toggle online/offline status
@@ -314,15 +338,16 @@ export default function DashboardScreen() {
         fetchDriverStats(),
         fetchUserProfile(),
         fetchHistory(),
+        fetchUnreadNotificationCount(),
       ]);
       showToast('Dashboard refreshed');
     } catch (error) {
-      console.error('❌ Error refreshing dashboard:', error);
+      console.error('❌ refreshing dashboard:', error);
       showToast('Failed to refresh', 'error');
     } finally {
       setRefreshing(false);
     }
-  }, [fetchCurrentBatch, fetchAvailableBatches, fetchDriverStats, fetchUserProfile, fetchHistory, showToast]);
+  }, [fetchCurrentBatch, fetchAvailableBatches, fetchDriverStats, fetchUserProfile, fetchHistory, fetchUnreadNotificationCount, showToast]);
 
   // Navigate to batch details
   const handleViewBatch = useCallback(() => {
@@ -560,6 +585,41 @@ export default function DashboardScreen() {
                 style={styles.statusPillSwitch}
               />
             </View>
+          </View>
+
+          {/* Notification Icon */}
+          <View style={styles.headerRight}>
+            {/* TEST BUTTON - Remove after testing */}
+            <TouchableOpacity
+              style={[styles.notificationButton, { marginRight: 8 }]}
+              onPress={() => {
+                console.log('🧪 Test button pressed');
+                testLocalNotification();
+              }}
+            >
+              <MaterialCommunityIcons
+                name="test-tube"
+                size={24}
+                color="#FFFFFF"
+              />
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={styles.notificationButton}
+              onPress={() => navigation.navigate('Notifications')}
+            >
+              <MaterialCommunityIcons
+                name="bell-outline"
+                size={28}
+                color="#FFFFFF"
+              />
+              {/* Badge for unread count */}
+              {unreadNotificationCount > 0 && (
+                <View style={styles.notificationBadge}>
+                  <Text style={styles.notificationBadgeText}>{unreadNotificationCount}</Text>
+                </View>
+              )}
+            </TouchableOpacity>
           </View>
 
         </View>
@@ -919,6 +979,35 @@ const styles = StyleSheet.create({
   },
   headerLeft: {
     flex: 1,
+  },
+  headerRight: {
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingTop: 8,
+  },
+  notificationButton: {
+    position: 'relative',
+    padding: 8,
+    borderRadius: 12,
+    backgroundColor: 'rgba(255, 255, 255, 0.15)',
+  },
+  notificationBadge: {
+    position: 'absolute',
+    top: 4,
+    right: 4,
+    backgroundColor: '#EF4444',
+    borderRadius: 10,
+    minWidth: 20,
+    height: 20,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 2,
+    borderColor: '#F56B4C',
+  },
+  notificationBadgeText: {
+    color: '#FFFFFF',
+    fontSize: 11,
+    fontWeight: 'bold',
   },
   greeting: {
     fontSize: 13,

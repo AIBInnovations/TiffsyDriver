@@ -42,12 +42,18 @@ export type DeliveryStatusType =
   | "delivered"
   | "failed";
 
+// Dashboard Stack (nested in tab)
+export type DashboardStackParamList = {
+  DashboardMain: undefined;
+  Notifications: undefined;
+};
+
 // Main Tabs
 export type MainTabsParamList = {
-  Dashboard: undefined;
+  Dashboard: NavigatorScreenParams<DashboardStackParamList> | undefined;
   Deliveries: NavigatorScreenParams<DeliveriesStackParamList> | undefined;
   DeliveryStatus: DeliveryStatusParams | undefined;
-  Profile: undefined;
+  Profile: NavigatorScreenParams<ProfileStackParamList> | undefined;
 };
 
 // Deliveries Stack (nested in tab)

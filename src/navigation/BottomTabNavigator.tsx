@@ -1,6 +1,6 @@
 import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
 import { MainTabsParamList } from "./types";
-import DashboardScreen from "../screens/dashboard/DashboardScreen";
+import DashboardStackNavigator from "./DashboardStackNavigator";
 import DeliveryStackNavigator from "./DeliveryStackNavigator";
 import DeliveryStatusScreen from "../screens/delivery-status/DeliveryStatusScreen";
 import ProfileStackNavigator from "./ProfileStackNavigator";
@@ -32,7 +32,7 @@ export default function BottomTabNavigator() {
     >
       <Tab.Screen
         name="Dashboard"
-        component={DashboardScreen}
+        component={DashboardStackNavigator}
         options={{
           tabBarLabel: "Home",
           tabBarIcon: ({ color, focused }) => (
