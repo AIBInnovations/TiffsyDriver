@@ -23,12 +23,6 @@ export default function NotificationPreferences() {
       enabled: true,
     },
     {
-      id: "earnings",
-      label: "Earnings",
-      description: "Get notified about payments and earnings",
-      enabled: true,
-    },
-    {
       id: "promotions",
       label: "Promotions",
       description: "Receive promotional offers and bonuses",

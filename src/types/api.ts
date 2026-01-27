@@ -173,7 +173,6 @@ export interface AvailableBatch {
   zone: Zone;
   orderCount: number;
   mealWindow: MealWindow;
-  estimatedEarnings: number;
 }
 
 // Delivery Assignment interface

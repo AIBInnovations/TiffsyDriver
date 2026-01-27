@@ -218,14 +218,6 @@ export default function AvailableBatchesModal({
                           {batch.orderCount === 1 ? 'Order' : 'Orders'}
                         </Text>
                       </View>
-                      <View style={styles.statDivider} />
-                      <View style={styles.statItem}>
-                        <MaterialCommunityIcons name="cash" size={20} color="#10B981" />
-                        <Text style={[styles.statValue, { color: '#10B981' }]}>
-                          ₹{batch.estimatedEarnings}
-                        </Text>
-                        <Text style={styles.statLabel}>Est. Earnings</Text>
-                      </View>
                     </View>
 
                     {/* Action Buttons */}
@@ -283,7 +275,7 @@ export default function AvailableBatchesModal({
       <CustomAlert
         visible={!!confirmBatch}
         title="Accept Batch"
-        message={confirmBatch ? `${confirmBatch.batchNumber}\n\nOrders: ${confirmBatch.orderCount}\nEstimated Earnings: ₹${confirmBatch.estimatedEarnings}\nMeal Window: ${confirmBatch.mealWindow}\nZone: ${confirmBatch.zone.name}\n\nAccept this batch and head to ${confirmBatch.kitchen.name}?` : ''}
+        message={confirmBatch ? `${confirmBatch.batchNumber}\n\nOrders: ${confirmBatch.orderCount}\nMeal Window: ${confirmBatch.mealWindow}\nZone: ${confirmBatch.zone.name}\n\nAccept this batch and head to ${confirmBatch.kitchen.name}?` : ''}
         icon="package-variant-closed"
         iconColor="#F56B4C"
         buttons={[

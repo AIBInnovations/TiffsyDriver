@@ -19,7 +19,6 @@ import {
   useDriverProfileStore,
   getInitials,
   vehicleTypeLabels,
-  languageLabels,
   VehicleType,
 } from "./useDriverProfileStore";
 import {
@@ -27,7 +26,12 @@ import {
   updateDriverProfile as updateDriverProfileAPI,
   updateDriverVehicle,
 } from "../../services/driverProfileService";
-import { removeFCMToken } from "../../services/fcmService";
+import {
+  removeFCMToken,
+  syncNotificationPreferences,
+  checkNotificationPermission,
+  requestNotificationPermission
+} from "../../services/fcmService";
 import {
   ProfileAvatar,
   SectionCard,
@@ -77,6 +81,10 @@ export default function ProfileScreen() {
   // Debounced save indicator
   const [isSavingPrefs, setIsSavingPrefs] = useState(false);
   const saveTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Notification permission status
+  const [hasNotificationPermission, setHasNotificationPermission] = useState<boolean | null>(null);
+  const [isRequestingPermission, setIsRequestingPermission] = useState(false);
 
   // Refresh control
   const [isRefreshing, setIsRefreshing] = useState(false);
@@ -207,15 +215,30 @@ export default function ProfileScreen() {
     async (updateFn: () => Promise<void>) => {
       setIsSavingPrefs(true);
       await updateFn();
+
+      // Sync notification preferences to backend
+      try {
+        // Get updated preferences from profile after the update
+        const profileData = await updateFn();
+
+        // Sync to backend in background (don't block UI)
+        syncNotificationPreferences(profile.notificationPrefs).catch((error) => {
+          console.error('Failed to sync notification preferences to backend:', error);
+          // Non-critical error, don't show to user
+        });
+      } catch (error) {
+        console.error('Error syncing preferences:', error);
+      }
+
       if (saveTimeoutRef.current) {
         clearTimeout(saveTimeoutRef.current);
       }
       saveTimeoutRef.current = setTimeout(() => {
         setIsSavingPrefs(false);
-        showToast("Saved locally", "success");
+        showToast("Saved", "success");
       }, 600);
     },
-    [showToast]
+    [showToast, profile.notificationPrefs]
   );
 
   // Cleanup timeout on unmount
@@ -248,6 +271,48 @@ export default function ProfileScreen() {
       StatusBar.setBackgroundColor('#FFFFFF');
     }, [])
   );
+
+  // Check notification permission when screen is focused
+  useFocusEffect(
+    useCallback(() => {
+      const checkPermission = async () => {
+        try {
+          const hasPermission = await checkNotificationPermission();
+          setHasNotificationPermission(hasPermission);
+          console.log('🔔 Notification permission status:', hasPermission);
+        } catch (error) {
+          console.error('❌ Error checking notification permission:', error);
+          setHasNotificationPermission(null);
+        }
+      };
+
+      checkPermission();
+    }, [])
+  );
+
+  // Handle notification permission request
+  const handleRequestNotificationPermission = useCallback(async () => {
+    setIsRequestingPermission(true);
+    try {
+      console.log('🔔 Requesting notification permission from Profile screen...');
+      const granted = await requestNotificationPermission();
+
+      if (granted) {
+        setHasNotificationPermission(true);
+        showToast('Notification permission granted', 'success');
+        console.log('✅ Notification permission granted');
+      } else {
+        setHasNotificationPermission(false);
+        showToast('Permission denied. Please enable notifications in your device settings.', 'error');
+        console.log('❌ Notification permission denied');
+      }
+    } catch (error) {
+      console.error('❌ Error requesting notification permission:', error);
+      showToast('Failed to request permission', 'error');
+    } finally {
+      setIsRequestingPermission(false);
+    }
+  }, [showToast]);
 
   const handleLogout = useCallback(async () => {
     // Show loading state in modal
@@ -409,14 +474,6 @@ export default function ProfileScreen() {
               value={`${vehicleTypeLabels[profile.vehicleType]} - ${profile.vehicleNumber}`}
               showChevron={false}
             />
-            <ListRow
-              icon="translate"
-              iconColor="#F59E0B"
-              iconBgColor="#FFFBEB"
-              title="Language"
-              value={languageLabels[profile.preferredLanguage].split(" ")[0]}
-              showChevron={false}
-            />
           </View>
 
           {/* Single Edit Profile Button */}
@@ -431,6 +488,37 @@ export default function ProfileScreen() {
 
         {/* Notification Preferences */}
         <SectionCard title="Notifications" compact={profile.appSettings.compactMode}>
+          {/* Permission Warning Banner */}
+          {hasNotificationPermission === false && (
+            <View style={styles.permissionWarningBanner}>
+              <View style={styles.permissionWarningContent}>
+                <MaterialCommunityIcons
+                  name="alert-circle-outline"
+                  size={20}
+                  color="#F59E0B"
+                  style={styles.permissionWarningIcon}
+                />
+                <View style={styles.permissionWarningText}>
+                  <Text style={styles.permissionWarningTitle}>
+                    Notification Permission Required
+                  </Text>
+                  <Text style={styles.permissionWarningSubtitle}>
+                    Enable notifications to receive important updates about deliveries and batches
+                  </Text>
+                </View>
+              </View>
+              <Pressable
+                style={styles.permissionWarningButton}
+                onPress={handleRequestNotificationPermission}
+                disabled={isRequestingPermission}
+              >
+                <Text style={styles.permissionWarningButtonText}>
+                  {isRequestingPermission ? 'Requesting...' : 'Enable Notifications'}
+                </Text>
+              </Pressable>
+            </View>
+          )}
+
           <SwitchRow
             icon="bell-ring-outline"
             iconColor="#3B82F6"
@@ -452,18 +540,6 @@ export default function ProfileScreen() {
             value={profile.notificationPrefs.batchUpdates}
             onValueChange={(value) =>
               handlePrefChange(() => updateNotificationPrefs({ batchUpdates: value }))
-            }
-            disabled={isSaving}
-          />
-          <SwitchRow
-            icon="tag-outline"
-            iconColor="#F59E0B"
-            iconBgColor="#FFFBEB"
-            title="Promotions"
-            subtitle="Offers and promotional messages"
-            value={profile.notificationPrefs.promotions}
-            onValueChange={(value) =>
-              handlePrefChange(() => updateNotificationPrefs({ promotions: value }))
             }
             disabled={isSaving}
           />
@@ -771,5 +847,48 @@ const styles = StyleSheet.create({
     fontSize: 15,
     fontWeight: "600",
     color: "#EF4444",
+  },
+  permissionWarningBanner: {
+    backgroundColor: "#FEF3C7",
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 16,
+    borderWidth: 1,
+    borderColor: "#FDE68A",
+  },
+  permissionWarningContent: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    marginBottom: 12,
+  },
+  permissionWarningIcon: {
+    marginTop: 2,
+  },
+  permissionWarningText: {
+    flex: 1,
+    marginLeft: 12,
+  },
+  permissionWarningTitle: {
+    fontSize: 14,
+    fontWeight: "600",
+    color: "#92400E",
+    marginBottom: 4,
+  },
+  permissionWarningSubtitle: {
+    fontSize: 12,
+    color: "#78350F",
+    lineHeight: 16,
+  },
+  permissionWarningButton: {
+    backgroundColor: "#F59E0B",
+    borderRadius: 8,
+    paddingVertical: 10,
+    paddingHorizontal: 16,
+    alignItems: "center",
+  },
+  permissionWarningButtonText: {
+    fontSize: 14,
+    fontWeight: "600",
+    color: "#FFFFFF",
   },
 });

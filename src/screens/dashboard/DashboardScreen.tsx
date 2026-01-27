@@ -736,14 +736,6 @@ export default function DashboardScreen() {
                   </View>
 
                   <View style={styles.batchInfoRow}>
-                    <MaterialCommunityIcons name="cash" size={20} color="#6B7280" />
-                    <Text style={styles.batchInfoLabel}>Earnings:</Text>
-                    <Text style={[styles.batchInfoValue, { color: '#10B981', fontWeight: '700' }]}>
-                      ₹{availableBatches[0].estimatedEarnings}
-                    </Text>
-                  </View>
-
-                  <View style={styles.batchInfoRow}>
                     <MaterialCommunityIcons name="silverware-fork-knife" size={20} color="#6B7280" />
                     <Text style={styles.batchInfoLabel}>Meal:</Text>
                     <Text style={styles.batchInfoValue}>{availableBatches[0].mealWindow}</Text>

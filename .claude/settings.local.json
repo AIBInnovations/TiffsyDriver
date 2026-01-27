@@ -5,7 +5,8 @@
       "Bash(npm ls:*)",
       "Bash(./gradlew clean:*)",
       "Bash(cd d:Tiffsy DriverTiffsyDriver)",
-      "Bash(git checkout:*)"
+      "Bash(git checkout:*)",
+      "Bash(npm install:*)"
     ]
   }
 }

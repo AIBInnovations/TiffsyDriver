@@ -302,7 +302,6 @@ export default function DeliveriesScreen() {
           kitchen: batch.kitchen?.name,
           zone: batch.zone?.name,
           orderCount: batch.orderCount,
-          earnings: batch.estimatedEarnings,
         });
       });
     } catch (error: any) {
@@ -770,43 +769,67 @@ export default function DeliveriesScreen() {
 
   // Convert history batch order to local delivery format
   const convertHistoryOrderToDelivery = (order: Order, batch: HistoryBatch): LocalDelivery => {
-    // Build address string - use addressLine1, locality, city
-    const addressParts = [
-      order.deliveryAddress?.addressLine1,
-      order.deliveryAddress?.locality || order.deliveryAddress?.area,
-      order.deliveryAddress?.city
-    ].filter(Boolean);
+    try {
+      // Build address string - use addressLine1, locality, city
+      const addressParts = [
+        order?.deliveryAddress?.addressLine1,
+        order?.deliveryAddress?.locality || order?.deliveryAddress?.area,
+        order?.deliveryAddress?.city
+      ].filter(Boolean);
 
-    const dropoffLocation = addressParts.length > 0 ? addressParts.join(', ') : 'Address not available';
+      const dropoffLocation = addressParts.length > 0 ? addressParts.join(', ') : 'Address not available';
 
-    // Handle customer data - check contactName/contactPhone fields (from schema) and fallbacks
-    const customerName = order.deliveryAddress?.contactName || order.deliveryAddress?.name || 'Customer';
-    const customerPhone = order.deliveryAddress?.contactPhone || order.deliveryAddress?.phone || '';
+      // Handle customer data - check contactName/contactPhone fields (from schema) and fallbacks
+      const customerName = order?.deliveryAddress?.contactName || order?.deliveryAddress?.name || 'Customer';
+      const customerPhone = order?.deliveryAddress?.contactPhone || order?.deliveryAddress?.phone || '';
 
-    return {
-      id: order._id,
-      orderId: order.orderNumber,
-      customerName,
-      customerPhone,
-      pickupLocation: [
-        batch.kitchen.name,
-        batch.kitchen.address?.addressLine1,
-        batch.kitchen.address?.locality || batch.kitchen.address?.area,
-        batch.kitchen.address?.city
-      ].filter(Boolean).join(', '),
-      dropoffLocation,
-      status: order.status,
-      eta: 'Completed',
-      deliveryWindow: 'LUNCH',
-      batchId: batch._id,
-      distance: '-',
-      sequenceNumber: order.sequenceNumber,
-      deliveryAddress: order.deliveryAddress ? {
-        latitude: order.deliveryAddress.latitude,
-        longitude: order.deliveryAddress.longitude,
-        coordinates: order.deliveryAddress.coordinates,
-      } : undefined,
-    };
+      // Safely build pickup location with null checks
+      const pickupParts = [];
+      if (batch?.kitchen) {
+        if (batch.kitchen.name) pickupParts.push(batch.kitchen.name);
+        if (batch.kitchen.address?.addressLine1) pickupParts.push(batch.kitchen.address.addressLine1);
+        if (batch.kitchen.address?.locality || batch.kitchen.address?.area) {
+          pickupParts.push(batch.kitchen.address.locality || batch.kitchen.address.area);
+        }
+        if (batch.kitchen.address?.city) pickupParts.push(batch.kitchen.address.city);
+      }
+      const pickupLocation = pickupParts.length > 0 ? pickupParts.join(', ') : 'Kitchen';
+
+      return {
+        id: order?._id || 'unknown',
+        orderId: order?.orderNumber || 'N/A',
+        customerName,
+        customerPhone,
+        pickupLocation,
+        dropoffLocation,
+        status: order?.status || 'UNKNOWN',
+        eta: 'Completed',
+        deliveryWindow: 'LUNCH',
+        batchId: batch?._id || 'unknown',
+        distance: '-',
+        sequenceNumber: order?.sequenceNumber,
+        deliveryAddress: order?.deliveryAddress ? {
+          latitude: order.deliveryAddress.latitude,
+          longitude: order.deliveryAddress.longitude,
+          coordinates: order.deliveryAddress.coordinates,
+        } : undefined,
+      };
+    } catch (error) {
+      console.error('❌ Error converting history order to delivery:', error);
+      // Return a minimal safe object
+      return {
+        id: 'error',
+        orderId: 'Error',
+        customerName: 'Error loading order',
+        customerPhone: '',
+        pickupLocation: 'Unknown',
+        dropoffLocation: 'Unknown',
+        status: 'FAILED',
+        eta: '-',
+        deliveryWindow: '-',
+        distance: '-',
+      };
+    }
   };
 
   // Get deliveries from current batch
@@ -1242,16 +1265,26 @@ export default function DeliveriesScreen() {
                   <View style={styles.historySection}>
                     <Text style={styles.historySectionTitle}>Batches</Text>
                     {filteredHistoryBatches.map((batch) => {
-                      // Safety check for batch data
-                      if (!batch || !batch._id) return null;
+                      try {
+                        // Safety check for batch data
+                        if (!batch || !batch._id) return null;
 
-                      const isExpanded = expandedHistoryBatches.includes(batch._id);
-                      const batchOrders = Array.isArray(batch.orders)
-                        ? batch.orders.map(order => convertHistoryOrderToDelivery(order, batch))
-                        : [];
+                        const isExpanded = expandedHistoryBatches.includes(batch._id);
+                        const batchOrders = Array.isArray(batch.orders)
+                          ? batch.orders
+                              .map(order => {
+                                try {
+                                  return convertHistoryOrderToDelivery(order, batch);
+                                } catch (err) {
+                                  console.error('❌ Error converting order:', err);
+                                  return null;
+                                }
+                              })
+                              .filter(Boolean) as LocalDelivery[]
+                          : [];
 
-                      return (
-                        <View key={batch._id} style={styles.historyBatchCard}>
+                        return (
+                          <View key={batch._id} style={styles.historyBatchCard}>
                           <TouchableOpacity
                             onPress={() => toggleHistoryBatchExpand(batch._id)}
                             activeOpacity={0.7}
@@ -1351,6 +1384,10 @@ export default function DeliveriesScreen() {
                           )}
                         </View>
                       );
+                      } catch (batchError) {
+                        console.error('❌ Error rendering batch:', batch._id, batchError);
+                        return null;
+                      }
                     })}
                   </View>
                 )}

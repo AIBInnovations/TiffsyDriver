@@ -141,87 +141,6 @@ export default function DeliveryCard({ delivery, onStatusChange, onCallCustomer,
     }
   };
 
-  const getActionButton = () => {
-    switch (delivery.status) {
-      // Old context statuses
-      case "pending":
-        return (
-          <TouchableOpacity
-            style={[styles.actionButton, styles.startButton]}
-            onPress={() => onStatusChange(delivery.id, "in_progress")}
-          >
-            <MaterialCommunityIcons name="play" size={18} color="#FFFFFF" />
-            <Text style={styles.actionButtonText}>Start Delivery</Text>
-          </TouchableOpacity>
-        );
-      case "in_progress":
-        return (
-          <TouchableOpacity
-            style={[styles.actionButton, styles.pickupButton]}
-            onPress={() => onStatusChange(delivery.id, "picked_up")}
-          >
-            <MaterialCommunityIcons name="package-variant" size={18} color="#FFFFFF" />
-            <Text style={styles.actionButtonText}>Mark as Picked Up</Text>
-          </TouchableOpacity>
-        );
-      case "picked_up":
-        return (
-          <TouchableOpacity
-            style={[styles.actionButton, styles.deliverButton]}
-            onPress={() => onStatusChange(delivery.id, "completed")}
-          >
-            <MaterialCommunityIcons name="check" size={18} color="#FFFFFF" />
-            <Text style={styles.actionButtonText}>Mark as Delivered</Text>
-          </TouchableOpacity>
-        );
-
-      // API statuses (new backend format: READY → EN_ROUTE → ARRIVED → DELIVERED)
-      case "READY":
-        return (
-          <TouchableOpacity
-            style={[styles.actionButton, styles.startButton]}
-            onPress={() => onStatusChange(delivery.id, "EN_ROUTE")}
-          >
-            <MaterialCommunityIcons name="play" size={18} color="#FFFFFF" />
-            <Text style={styles.actionButtonText}>Start Delivery</Text>
-          </TouchableOpacity>
-        );
-      case "EN_ROUTE":
-      case "OUT_FOR_DELIVERY":  // Legacy support
-        return (
-          <TouchableOpacity
-            style={[styles.actionButton, styles.deliverButton]}
-            onPress={() => onStatusChange(delivery.id, "DELIVERED")}
-          >
-            <MaterialCommunityIcons name="check" size={18} color="#FFFFFF" />
-            <Text style={styles.actionButtonText}>Mark as Delivered</Text>
-          </TouchableOpacity>
-        );
-      case "ARRIVED":
-      case "PICKED_UP":  // Legacy support
-        return (
-          <TouchableOpacity
-            style={[styles.actionButton, styles.deliverButton]}
-            onPress={() => onStatusChange(delivery.id, "DELIVERED")}
-          >
-            <MaterialCommunityIcons name="check" size={18} color="#FFFFFF" />
-            <Text style={styles.actionButtonText}>Mark as Delivered</Text>
-          </TouchableOpacity>
-        );
-
-      default:
-        return null;
-    }
-  };
-
-  const showFailButton =
-    delivery.status === "in_progress" ||
-    delivery.status === "picked_up" ||
-    delivery.status === "EN_ROUTE" ||
-    delivery.status === "ARRIVED" ||
-    delivery.status === "OUT_FOR_DELIVERY" ||  // Legacy
-    delivery.status === "PICKED_UP";  // Legacy
-
   return (
     <View style={styles.card}>
       {/* Header with Order ID and Status */}
@@ -322,31 +241,6 @@ export default function DeliveryCard({ delivery, onStatusChange, onCallCustomer,
       {showPhone && (
         <Text style={styles.phoneNumber}>{delivery.customerPhone}</Text>
       )}
-
-      {/* Action Buttons */}
-      <View style={styles.actionsContainer}>
-        {getActionButton()}
-        {showFailButton && (
-          <TouchableOpacity
-            style={[styles.actionButton, styles.failButton]}
-            onPress={() => {
-              // Use API status if dealing with API order, otherwise use context status
-              const isAPIStatus = (
-                delivery.status === "READY" ||
-                delivery.status === "EN_ROUTE" ||
-                delivery.status === "ARRIVED" ||
-                delivery.status === "OUT_FOR_DELIVERY" ||
-                delivery.status === "PICKED_UP"
-              );
-              const failStatus = isAPIStatus ? "FAILED" : "failed";
-              onStatusChange(delivery.id, failStatus);
-            }}
-          >
-            <MaterialCommunityIcons name="close" size={18} color="#FFFFFF" />
-            <Text style={styles.actionButtonText}>Fail</Text>
-          </TouchableOpacity>
-        )}
-      </View>
 
       {/* Navigation Action Sheet */}
       <ActionSheet
@@ -593,39 +487,5 @@ const styles = StyleSheet.create({
     color: "#3B82F6",
     marginBottom: 12,
     marginLeft: 28,
-  },
-  actionsContainer: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
-    marginTop: 8,
-  },
-  actionButton: {
-    flex: 1,
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    paddingVertical: 12,
-    borderRadius: 12,
-    gap: 6,
-  },
-  startButton: {
-    backgroundColor: "#3B82F6",
-  },
-  pickupButton: {
-    backgroundColor: "#F59E0B",
-  },
-  deliverButton: {
-    backgroundColor: "#10B981",
-  },
-  failButton: {
-    backgroundColor: "#EF4444",
-    flex: 0,
-    paddingHorizontal: 16,
-  },
-  actionButtonText: {
-    color: "#FFFFFF",
-    fontSize: 14,
-    fontWeight: "600",
   },
 });

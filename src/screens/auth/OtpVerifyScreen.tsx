@@ -11,6 +11,8 @@ import {
   ScrollView,
   Platform,
   ActivityIndicator,
+  StyleSheet,
+  Pressable,
 } from 'react-native';
 import auth from '@react-native-firebase/auth';
 import { AuthStackScreenProps } from "../../navigation/types";
@@ -19,6 +21,7 @@ import { tokenStorage } from '../../utils/tokenStorage';
 import { useDriverProfileStore } from '../profile/useDriverProfileStore';
 import { registerFCMToken } from '../../services/fcmService';
 import CustomAlert from '../../components/common/CustomAlert';
+import { LegalModal } from '../profile/components/ProfileModals';
 
 type Props = AuthStackScreenProps<'OtpVerify'>;
 
@@ -36,6 +39,8 @@ const OTPVerificationScreen = ({ navigation, route }: Props) => {
     iconColor?: string;
     onConfirm?: () => void;
   }>({ visible: false, title: '', message: '' });
+  const [showTermsModal, setShowTermsModal] = useState(false);
+  const [showPrivacyModal, setShowPrivacyModal] = useState(false);
 
   // Get profile store to set availability status
   const { setAvailabilityStatus } = useDriverProfileStore();
@@ -117,8 +122,21 @@ const OTPVerificationScreen = ({ navigation, route }: Props) => {
         // Step 5: Register FCM token for push notifications
         console.log('🔔 Registering FCM token for push notifications...');
         try {
-          await registerFCMToken();
-          console.log('✅ FCM token registered successfully');
+          const fcmRegistered = await registerFCMToken();
+
+          if (fcmRegistered) {
+            console.log('✅ FCM token registered successfully');
+          } else {
+            console.log('⚠️ FCM token registration failed - likely permission denied');
+            // Show informational alert about notifications
+            setAlertConfig({
+              visible: true,
+              title: 'Notification Permission',
+              message: 'Notification permission was not granted. You can enable it later in your Profile settings to receive important updates about deliveries and batches.',
+              icon: 'bell-off-outline',
+              iconColor: '#F59E0B',
+            });
+          }
         } catch (fcmError) {
           console.error('⚠️ Failed to register FCM token (non-critical):', fcmError);
           // Don't block login if FCM registration fails
@@ -278,110 +296,57 @@ const OTPVerificationScreen = ({ navigation, route }: Props) => {
 
   return (
     <KeyboardAvoidingView
-      style={{ flex: 1, backgroundColor: '#F56B4C' }}
-      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+      style={otpStyles.container}
+      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      keyboardVerticalOffset={0}
     >
       <StatusBar barStyle="light-content" backgroundColor="#F56B4C" />
       <ScrollView
-        style={{ flex: 1 }}
-        contentContainerStyle={{ flexGrow: 1 }}
+        style={otpStyles.scrollView}
+        contentContainerStyle={otpStyles.scrollContent}
         keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}
       >
           {/* Top image / header area */}
-          <View
-            style={{
-              height: 220,
-              backgroundColor: '#F56B4C',
-              paddingHorizontal: 20,
-              paddingTop: 15,
-            }}
-          >
+          <View style={otpStyles.header}>
             {/* Back arrow in circle */}
             <TouchableOpacity
               onPress={() => navigation.goBack()}
-              style={{
-                width: 36,
-                height: 36,
-                borderRadius: 18,
-                alignItems: 'center',
-                justifyContent: 'center',
-              }}
+              style={otpStyles.backButton}
             >
               <Image
                 source={require('../../../assets/icons/backarrow.png')}
-                style={{ width: 40, height: 40 }}
+                style={otpStyles.backIcon}
                 resizeMode="contain"
               />
             </TouchableOpacity>
 
             {/* Illustration placeholder */}
-            <View
-              style={{
-                flex: 1,
-                alignItems: 'center',
-                justifyContent: 'flex-start',
-              }}
-            >
+            <View style={otpStyles.illustrationContainer}>
               {/* Delivery illustration */}
               <Image
                 source={require('../../../assets/images/pana.png')}
-                style={{
-                  width: 230,
-                  height: 190,
-                  marginTop: -35,
-                }}
+                style={otpStyles.illustration}
                 resizeMode="contain"
               />
             </View>
           </View>
 
           {/* Bottom white card */}
-          <View
-            style={{
-              flex: 1,
-              backgroundColor: 'white',
-              borderTopLeftRadius: 30,
-              borderTopRightRadius: 30,
-              paddingHorizontal: 20,
-              paddingTop: 20,
-              paddingBottom: 15,
-            }}
-          >
+          <View style={otpStyles.card}>
             {/* Verify OTP title */}
-            <Text
-              style={{
-                fontSize: 24,
-                fontWeight: '700',
-                color: '#111827',
-                marginBottom: 8,
-              }}
-            >
+            <Text style={otpStyles.title}>
               Verify OTP
             </Text>
 
             {/* Description */}
-            <Text
-              style={{
-                fontSize: 14,
-                color: '#6B7280',
-                marginBottom: 20,
-                lineHeight: 20,
-              }}
-            >
+            <Text style={otpStyles.description}>
               Enter the 6-digit code sent to{'\n'}
               {phoneNumber}
             </Text>
 
             {/* OTP Input Fields */}
-            <View
-              style={{
-                flexDirection: 'row',
-                justifyContent: 'space-between',
-                alignItems: 'center',
-                marginBottom: 20,
-              }}
-            >
+            <View style={otpStyles.otpContainer}>
               {otp.map((digit, index) => (
                 <Fragment key={index}>
                   <TextInput
@@ -393,44 +358,29 @@ const OTPVerificationScreen = ({ navigation, route }: Props) => {
                     value={digit}
                     onChangeText={(value) => handleOtpChange(value, index)}
                     onKeyPress={({ nativeEvent }) => handleKeyPress(nativeEvent.key, index)}
-                    style={{
-                      width: 45,
-                      height: 45,
-                      borderWidth: 1,
-                      borderColor: digit ? 'rgba(55, 200, 127, 1)' : 'rgba(239, 239, 239, 1)',
-                      borderRadius: 10,
-                      textAlign: 'center',
-                      fontSize: 20,
-                      fontWeight: '600',
-                      color: '#111827',
-                      backgroundColor: 'rgba(250, 250, 252, 1)',
-                    }}
+                    style={[
+                      otpStyles.otpInput,
+                      digit && otpStyles.otpInputFilled,
+                    ]}
                     keyboardType="number-pad"
                     maxLength={1}
                     selectTextOnFocus
                   />
                   {index === 2 && (
-                    <Text style={{ color: '#D1D5DB', fontSize: 20, marginHorizontal: 4 }}>-</Text>
+                    <Text style={otpStyles.otpDivider}>-</Text>
                   )}
                 </Fragment>
               ))}
             </View>
 
             {/* Resend code text */}
-            <Text
-              style={{
-                textAlign: 'center',
-                fontSize: 14,
-                color: '#6B7280',
-                marginBottom: 20,
-              }}
-            >
+            <Text style={otpStyles.resendText}>
               {canResend ? (
                 <Text>
                   Didn't receive code?{' '}
                   <Text
                     onPress={handleResendOTP}
-                    style={{ color: '#F56B4C', fontWeight: '600' }}
+                    style={otpStyles.resendLink}
                   >
                     Resend
                   </Text>
@@ -438,7 +388,7 @@ const OTPVerificationScreen = ({ navigation, route }: Props) => {
               ) : (
                 <Text>
                   Re-send code in{' '}
-                  <Text style={{ color: '#F56B4C', fontWeight: '600' }}>
+                  <Text style={otpStyles.timerText}>
                     {timer}s
                   </Text>
                 </Text>
@@ -450,47 +400,28 @@ const OTPVerificationScreen = ({ navigation, route }: Props) => {
               activeOpacity={0.8}
               onPress={handleGetStarted}
               disabled={verifying || otp.some(digit => digit === '')}
-              style={{
-                backgroundColor: verifying || otp.some(digit => digit === '') ? '#CCCCCC' : '#F56B4C',
-                borderRadius: 100,
-                paddingVertical: 15,
-                alignItems: 'center',
-                justifyContent: 'center',
-                marginBottom: 20,
-                shadowColor: '#000',
-                shadowOffset: { width: 0, height: 2 },
-                shadowOpacity: 0.1,
-                shadowRadius: 4,
-                elevation: 3,
-              }}
+              style={[
+                otpStyles.submitButton,
+                (verifying || otp.some(digit => digit === '')) && otpStyles.submitButtonDisabled,
+              ]}
             >
               {verifying ? (
                 <ActivityIndicator color="white" />
               ) : (
-                <Text
-                  style={{ color: 'white', fontSize: 16, fontWeight: '600' }}
-                >
+                <Text style={otpStyles.submitButtonText}>
                   Get Started
                 </Text>
               )}
             </TouchableOpacity>
 
             {/* Footer text */}
-            <Text
-              style={{
-                fontSize: 12,
-                color: '#9CA3AF',
-                textAlign: 'center',
-                lineHeight: 18,
-                marginBottom: 10,
-              }}
-            >
+            <Text style={otpStyles.footerText}>
               By signing in, you agree to{' '}
-              <Text style={{ textDecorationLine: 'underline', color: '#6B7280' }}>
+              <Text style={otpStyles.link} onPress={() => setShowTermsModal(true)}>
                 Terms of Service
               </Text>
               {'\n'}and{' '}
-              <Text style={{ textDecorationLine: 'underline', color: '#6B7280' }}>
+              <Text style={otpStyles.link} onPress={() => setShowPrivacyModal(true)}>
                 Privacy Policy
               </Text>
             </Text>
@@ -511,8 +442,153 @@ const OTPVerificationScreen = ({ navigation, route }: Props) => {
         }]}
         onClose={() => setAlertConfig({ visible: false, title: '', message: '' })}
       />
+
+      {/* Legal Modals */}
+      <LegalModal
+        visible={showTermsModal}
+        onClose={() => setShowTermsModal(false)}
+        type="terms"
+      />
+      <LegalModal
+        visible={showPrivacyModal}
+        onClose={() => setShowPrivacyModal(false)}
+        type="privacy"
+      />
     </KeyboardAvoidingView>
   );
 };
+
+const otpStyles = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: '#F56B4C',
+  },
+  scrollView: {
+    flex: 1,
+  },
+  scrollContent: {
+    flexGrow: 1,
+  },
+  header: {
+    height: 280,
+    backgroundColor: '#F56B4C',
+    paddingHorizontal: 20,
+    paddingTop: 20,
+    justifyContent: 'space-between',
+  },
+  backButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  backIcon: {
+    width: 40,
+    height: 40,
+  },
+  illustrationContainer: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingBottom: 20,
+  },
+  illustration: {
+    width: 240,
+    height: 200,
+  },
+  card: {
+    flex: 1,
+    backgroundColor: 'white',
+    borderTopLeftRadius: 30,
+    borderTopRightRadius: 30,
+    paddingHorizontal: 24,
+    paddingTop: 32,
+    paddingBottom: 24,
+  },
+  title: {
+    fontSize: 24,
+    fontWeight: '700',
+    color: '#111827',
+    marginBottom: 12,
+  },
+  description: {
+    fontSize: 14,
+    color: '#6B7280',
+    marginBottom: 24,
+    lineHeight: 20,
+  },
+  otpContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 24,
+  },
+  otpInput: {
+    width: 48,
+    height: 48,
+    borderWidth: 2,
+    borderColor: 'rgba(239, 239, 239, 1)',
+    borderRadius: 12,
+    textAlign: 'center',
+    fontSize: 20,
+    fontWeight: '600',
+    color: '#111827',
+    backgroundColor: 'rgba(250, 250, 252, 1)',
+  },
+  otpInputFilled: {
+    borderColor: 'rgba(55, 200, 127, 1)',
+  },
+  otpDivider: {
+    color: '#D1D5DB',
+    fontSize: 20,
+    marginHorizontal: 4,
+  },
+  resendText: {
+    textAlign: 'center',
+    fontSize: 14,
+    color: '#6B7280',
+    marginBottom: 24,
+  },
+  resendLink: {
+    color: '#F56B4C',
+    fontWeight: '600',
+  },
+  timerText: {
+    color: '#F56B4C',
+    fontWeight: '600',
+  },
+  submitButton: {
+    backgroundColor: '#F56B4C',
+    borderRadius: 100,
+    paddingVertical: 15,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 20,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  submitButtonDisabled: {
+    backgroundColor: '#CCCCCC',
+    opacity: 0.6,
+  },
+  submitButtonText: {
+    color: 'white',
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  footerText: {
+    fontSize: 12,
+    color: '#9CA3AF',
+    textAlign: 'center',
+    lineHeight: 18,
+  },
+  link: {
+    textDecorationLine: 'underline',
+    color: '#6B7280',
+  },
+});
 
 export default OTPVerificationScreen;

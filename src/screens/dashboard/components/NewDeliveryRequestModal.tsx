@@ -9,7 +9,6 @@ export interface NewDeliveryRequest {
   pickupLocation: string;
   dropoffLocation: string;
   estimatedDistance: string;
-  estimatedEarnings: string;
   deliveryWindow: string;
 }
 
@@ -127,12 +126,6 @@ export default function NewDeliveryRequestModal({
                 <MaterialCommunityIcons name="map-marker-distance" size={20} color="#3B82F6" />
                 <Text style={styles.detailValue}>{delivery.estimatedDistance}</Text>
                 <Text style={styles.detailLabel}>Distance</Text>
-              </View>
-              <View style={styles.detailDivider} />
-              <View style={styles.detailItem}>
-                <MaterialCommunityIcons name="cash" size={20} color="#10B981" />
-                <Text style={[styles.detailValue, { color: "#10B981" }]}>{delivery.estimatedEarnings}</Text>
-                <Text style={styles.detailLabel}>Earnings</Text>
               </View>
               <View style={styles.detailDivider} />
               <View style={styles.detailItem}>

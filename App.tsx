@@ -4,25 +4,46 @@ import { NavigationContainer } from "@react-navigation/native";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import RootNavigator from "./src/navigation/RootNavigator";
 import { initializeFCMListeners, setupTokenRefreshListener } from "./src/services/fcmService";
+import { createNotificationChannels } from "./src/services/notificationChannels";
 
 export default function App() {
   const navigationRef = useRef<any>(null);
 
   useEffect(() => {
-    // Initialize FCM notification listeners
-    console.log("🚀 Initializing FCM listeners in App.tsx...");
+    // Initialize notification system
+    const initializeNotifications = async () => {
+      console.log("🚀 Initializing notification system...");
 
-    // Set up foreground, background, and notification opened listeners
-    const unsubscribeForeground = initializeFCMListeners(navigationRef.current);
+      // Create notification channels for Android
+      await createNotificationChannels();
 
-    // Set up FCM token refresh listener
-    const unsubscribeTokenRefresh = setupTokenRefreshListener();
+      // Set up foreground, background, and notification opened listeners
+      const unsubscribeFCM = initializeFCMListeners(navigationRef.current);
+
+      // Set up FCM token refresh listener
+      const unsubscribeTokenRefresh = setupTokenRefreshListener();
+
+      console.log("✅ Notification system initialized");
+
+      // Return cleanup function
+      return () => {
+        unsubscribeFCM();
+        unsubscribeTokenRefresh();
+        console.log("🧹 Notification listeners cleaned up");
+      };
+    };
+
+    // Initialize and store cleanup function
+    let cleanup: (() => void) | undefined;
+    initializeNotifications().then((cleanupFn) => {
+      cleanup = cleanupFn;
+    });
 
     // Cleanup on unmount
     return () => {
-      unsubscribeForeground();
-      unsubscribeTokenRefresh();
-      console.log("🧹 FCM listeners cleaned up");
+      if (cleanup) {
+        cleanup();
+      }
     };
   }, []);
 

@@ -85,7 +85,6 @@ export const seedFAQs: FAQ[] = [
       "Scroll to 'Removed Orders' section",
       "Each removed order shows the reason",
       "If unexpected, contact dispatch via the app",
-      "Your earnings for that order are adjusted automatically",
     ],
     category: "Batch Issue",
   },
@@ -120,21 +119,6 @@ export const seedFAQs: FAQ[] = [
   },
   {
     id: "faq-9",
-    title: "How are my earnings calculated?",
-    shortAnswer:
-      "Earnings include base pay per delivery, distance bonus, time bonuses, and tips. View breakdown in the Earnings section.",
-    details: [
-      "Base pay: Fixed amount per successful delivery",
-      "Distance bonus: Extra for longer distances",
-      "Time bonus: For completing before deadline",
-      "Peak hour bonus: Higher rates during rush hours",
-      "Tips: 100% of customer tips go to you",
-      "View detailed breakdown in Profile → Earnings",
-    ],
-    category: "Payment/Settlement",
-  },
-  {
-    id: "faq-10",
     title: "When do I receive my payment?",
     shortAnswer:
       "Payments are processed weekly on Mondays. Daily payouts are available for eligible drivers with a small fee.",
