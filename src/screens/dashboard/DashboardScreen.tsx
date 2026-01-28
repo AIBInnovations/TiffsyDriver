@@ -25,7 +25,6 @@ import { getMyBatch, getAvailableBatches, markBatchPickedUp, acceptBatch, getDri
 import { getCurrentUser } from '../../services/authService';
 import { getDriverStats } from '../../services/driverProfileService';
 import { getNotifications } from '../../services/notificationService';
-import { testLocalNotification } from '../../services/fcmService';
 import type { Batch, BatchSummary, AvailableBatch, DriverStats, HistoryBatch, HistorySingleOrder } from '../../types/api';
 import AvailableBatchItem from './components/AvailableBatchItem';
 
@@ -41,6 +40,12 @@ export default function DashboardScreen() {
   const [toastMessage, setToastMessage] = useState('');
   const [toastType, setToastType] = useState<'success' | 'error'>('success');
   const toastOpacity = useRef(new Animated.Value(0)).current;
+
+  // Header animation
+  const headerTranslateY = useRef(new Animated.Value(0)).current;
+  const lastScrollY = useRef(0);
+  const headerVisible = useRef(true);
+  const HEADER_HEIGHT = 140;
 
   // Backend Data
   const [currentBatch, setCurrentBatch] = useState<Batch | null>(null);
@@ -349,6 +354,43 @@ export default function DashboardScreen() {
     }
   }, [fetchCurrentBatch, fetchAvailableBatches, fetchDriverStats, fetchUserProfile, fetchHistory, fetchUnreadNotificationCount, showToast]);
 
+  // Handle scroll for header animation
+  const handleScroll = useCallback((event: any) => {
+    const currentScrollY = event.nativeEvent.contentOffset.y;
+    const scrollDiff = currentScrollY - lastScrollY.current;
+
+    // Only trigger animation after scrolling past a threshold
+    if (currentScrollY > 50) {
+      if (scrollDiff > 5 && headerVisible.current) {
+        // Scrolling down - hide header
+        headerVisible.current = false;
+        Animated.timing(headerTranslateY, {
+          toValue: -HEADER_HEIGHT,
+          duration: 200,
+          useNativeDriver: true,
+        }).start();
+      } else if (scrollDiff < -5 && !headerVisible.current) {
+        // Scrolling up - show header
+        headerVisible.current = true;
+        Animated.timing(headerTranslateY, {
+          toValue: 0,
+          duration: 200,
+          useNativeDriver: true,
+        }).start();
+      }
+    } else if (currentScrollY <= 50 && !headerVisible.current) {
+      // Near top - always show header
+      headerVisible.current = true;
+      Animated.timing(headerTranslateY, {
+        toValue: 0,
+        duration: 200,
+        useNativeDriver: true,
+      }).start();
+    }
+
+    lastScrollY.current = currentScrollY;
+  }, [headerTranslateY]);
+
   // Navigate to batch details
   const handleViewBatch = useCallback(() => {
     if (!currentBatch) return;
@@ -560,8 +602,8 @@ export default function DashboardScreen() {
 
       {/* Main Content Wrapper with Background */}
       <View style={styles.mainWrapper}>
-        {/* Header Section - Fixed */}
-        <View style={styles.header}>
+        {/* Header Section - Animated */}
+        <Animated.View style={[styles.header, { transform: [{ translateY: headerTranslateY }] }]}>
           <View style={styles.headerLeft}>
             <Text style={styles.greeting}>
               {new Date().getHours() < 12 ? 'Good Morning' :
@@ -580,8 +622,8 @@ export default function DashboardScreen() {
               <Switch
                 value={isOnline}
                 onValueChange={handleToggleOnline}
-                trackColor={{ false: '#E5E7EB', true: '#86EFAC' }}
-                thumbColor={isOnline ? '#10B981' : '#9CA3AF'}
+                trackColor={{ false: '#FCA5A5', true: '#86EFAC' }}
+                thumbColor={isOnline ? '#10B981' : '#EF4444'}
                 style={styles.statusPillSwitch}
               />
             </View>
@@ -589,21 +631,6 @@ export default function DashboardScreen() {
 
           {/* Notification Icon */}
           <View style={styles.headerRight}>
-            {/* TEST BUTTON - Remove after testing */}
-            <TouchableOpacity
-              style={[styles.notificationButton, { marginRight: 8 }]}
-              onPress={() => {
-                console.log('🧪 Test button pressed');
-                testLocalNotification();
-              }}
-            >
-              <MaterialCommunityIcons
-                name="test-tube"
-                size={24}
-                color="#FFFFFF"
-              />
-            </TouchableOpacity>
-
             <TouchableOpacity
               style={styles.notificationButton}
               onPress={() => navigation.navigate('Notifications')}
@@ -622,10 +649,12 @@ export default function DashboardScreen() {
             </TouchableOpacity>
           </View>
 
-        </View>
+        </Animated.View>
         <ScrollView
           style={styles.scrollView}
           contentContainerStyle={styles.scrollContent}
+          onScroll={handleScroll}
+          scrollEventThrottle={16}
           refreshControl={
             <RefreshControl
               refreshing={refreshing}
@@ -960,14 +989,20 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   scrollContent: {
+    paddingTop: 140,
     paddingBottom: 20,
   },
   header: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'flex-start',
     paddingHorizontal: 20,
-    paddingVertical: 12,
+    paddingTop: 20,
+    paddingBottom: 24,
     backgroundColor: '#F56B4C',
     borderBottomLeftRadius: 24,
     borderBottomRightRadius: 24,
@@ -975,21 +1010,20 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
     shadowRadius: 8,
-    elevation: 3,
+    elevation: 5,
+    zIndex: 100,
   },
   headerLeft: {
     flex: 1,
   },
   headerRight: {
-    justifyContent: 'center',
+    justifyContent: 'flex-start',
     alignItems: 'center',
-    paddingTop: 8,
+    paddingTop: 24,
   },
   notificationButton: {
     position: 'relative',
-    padding: 8,
-    borderRadius: 12,
-    backgroundColor: 'rgba(255, 255, 255, 0.15)',
+    padding: 4,
   },
   notificationBadge: {
     position: 'absolute',
@@ -1028,21 +1062,18 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     paddingLeft: 12,
     paddingRight: 4,
-    paddingVertical: 4,
+    paddingVertical: 6,
     borderRadius: 20,
     gap: 8,
+    backgroundColor: 'rgba(255, 255, 255, 0.15)',
   },
   statusPillContent: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
   },
-  statusPillOnline: {
-    backgroundColor: '#D1FAE5',
-  },
-  statusPillOffline: {
-    backgroundColor: '#FEE2E2',
-  },
+  statusPillOnline: {},
+  statusPillOffline: {},
   statusPillDot: {
     width: 8,
     height: 8,
@@ -1057,13 +1088,10 @@ const styles = StyleSheet.create({
   statusPillText: {
     fontSize: 14,
     fontWeight: '600',
+    color: '#FFFFFF',
   },
-  statusPillTextOnline: {
-    color: '#065F46',
-  },
-  statusPillTextOffline: {
-    color: '#991B1B',
-  },
+  statusPillTextOnline: {},
+  statusPillTextOffline: {},
   statusPillSwitch: {
     transform: [{ scale: 0.7 }],
   },

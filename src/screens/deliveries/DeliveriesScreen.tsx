@@ -12,14 +12,21 @@ import {
   StatusBar,
   Linking,
   Platform,
+  Dimensions,
 } from 'react-native';
+
+const SCREEN_WIDTH = Dimensions.get('window').width;
+// Tab container has padding 16 on each side from header, plus padding 4 inside
+const TAB_CONTAINER_PADDING = 32 + 8; // header paddingHorizontal (16*2) + tabsContainer padding (4*2)
+const TAB_WIDTH = (SCREEN_WIDTH - TAB_CONTAINER_PADDING) / 2;
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useState, useCallback, useMemo, useEffect } from 'react';
+import { useState, useCallback, useMemo, useEffect, useRef } from 'react';
 import { useRoute, RouteProp, useFocusEffect, useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons';
 import type { DeliveriesStackParamList } from '../../navigation/types';
 import DeliveryCard from './components/DeliveryCard';
+import SwipeableDeliveryCard from './components/SwipeableDeliveryCard';
 import FilterBar from './components/FilterBar';
 import BatchGroup from './components/BatchGroup';
 import AvailableBatchesModal from './components/AvailableBatchesModal';
@@ -72,6 +79,62 @@ export default function DeliveriesScreen() {
 
   // State
   const [activeTab, setActiveTab] = useState<'current' | 'history'>('current');
+
+  // Tab animation
+  const tabIndicatorPosition = useRef(new Animated.Value(0)).current;
+  const contentOpacity = useRef(new Animated.Value(1)).current;
+  const contentTranslateX = useRef(new Animated.Value(0)).current;
+
+  // Handle tab change with animation
+  const handleTabChange = (tab: 'current' | 'history') => {
+    if (tab === activeTab) return;
+
+    const toValue = tab === 'history' ? 1 : 0;
+    const direction = tab === 'history' ? -30 : 30;
+
+    // Fade out current content
+    Animated.parallel([
+      Animated.timing(contentOpacity, {
+        toValue: 0,
+        duration: 100,
+        useNativeDriver: true,
+      }),
+      Animated.timing(contentTranslateX, {
+        toValue: direction,
+        duration: 100,
+        useNativeDriver: true,
+      }),
+    ]).start(() => {
+      // Change tab
+      setActiveTab(tab);
+
+      // Reset position for new content
+      contentTranslateX.setValue(-direction);
+
+      // Fade in new content
+      Animated.parallel([
+        Animated.timing(contentOpacity, {
+          toValue: 1,
+          duration: 150,
+          useNativeDriver: true,
+        }),
+        Animated.spring(contentTranslateX, {
+          toValue: 0,
+          tension: 50,
+          friction: 8,
+          useNativeDriver: true,
+        }),
+      ]).start();
+    });
+
+    // Animate tab indicator
+    Animated.spring(tabIndicatorPosition, {
+      toValue,
+      tension: 50,
+      friction: 8,
+      useNativeDriver: false,
+    }).start();
+  };
   const [searchQuery, setSearchQuery] = useState('');
   const [filterStatus, setFilterStatus] = useState<FilterStatus>('all');
   const [sortBy, setSortBy] = useState<SortOption>('sequence');
@@ -568,6 +631,78 @@ export default function DeliveriesScreen() {
     );
   };
 
+  // Handle card press - navigate to delivery status screen
+  const handleCardPress = (delivery: any) => {
+    // Find the order from current batch or driver orders
+    const batchOrder = currentOrders.find(o => o._id === delivery._id || o._id === delivery.id);
+    const driverOrder = driverOrders.find(o => o._id === delivery._id || o._id === delivery.id);
+    const order = batchOrder || driverOrder;
+
+    if (!order) return;
+
+    // Build dropoff location string
+    const address = order.deliveryAddress;
+    const dropoffLocation = address
+      ? [address.flatNumber, address.street, address.addressLine1, address.landmark, address.area, address.locality, address.city, address.state, address.pincode]
+        .filter(Boolean)
+        .join(', ')
+      : '';
+
+    // Map status to internal status format
+    let currentStatus: 'pending' | 'in_progress' | 'picked_up' | 'delivered' | 'failed' = 'pending';
+    if (order.status === 'OUT_FOR_DELIVERY' || order.status === 'EN_ROUTE') {
+      currentStatus = 'in_progress';
+    } else if (order.status === 'PICKED_UP' || order.status === 'ARRIVED') {
+      currentStatus = 'picked_up';
+    } else if (order.status === 'DELIVERED') {
+      currentStatus = 'delivered';
+    } else if (order.status === 'FAILED') {
+      currentStatus = 'failed';
+    }
+
+    // Navigate to DeliveryStatus screen
+    navigation.navigate('DeliveryStatus', {
+      deliveryId: order._id || '',
+      orderId: order.orderNumber || '',
+      customerName: (driverOrder as any)?.customer?.name || address?.name || 'Customer',
+      customerPhone: (driverOrder as any)?.customer?.phone || address?.phone || '',
+      dropoffLocation,
+      specialInstructions: (driverOrder as any)?.specialInstructions,
+      currentStatus,
+      batchId: currentBatch?._id,
+    });
+  };
+
+  // Handle swipe to mark complete - navigate to delivery status for OTP verification
+  const handleMarkComplete = (deliveryId: string) => {
+    // Find the order
+    const batchOrder = currentOrders.find(o => o._id === deliveryId);
+    const driverOrder = driverOrders.find(o => o._id === deliveryId);
+    const order = batchOrder || driverOrder;
+
+    if (!order) return;
+
+    // Build dropoff location string
+    const address = order.deliveryAddress;
+    const dropoffLocation = address
+      ? [address.flatNumber, address.street, address.addressLine1, address.landmark, address.area, address.locality, address.city, address.state, address.pincode]
+        .filter(Boolean)
+        .join(', ')
+      : '';
+
+    // Navigate to DeliveryStatus screen with in_progress status to show complete actions
+    navigation.navigate('DeliveryStatus', {
+      deliveryId: order._id || '',
+      orderId: order.orderNumber || '',
+      customerName: (driverOrder as any)?.customer?.name || address?.name || 'Customer',
+      customerPhone: (driverOrder as any)?.customer?.phone || address?.phone || '',
+      dropoffLocation,
+      specialInstructions: (driverOrder as any)?.specialInstructions,
+      currentStatus: 'in_progress',
+      batchId: currentBatch?._id,
+    });
+  };
+
   const toggleHistoryBatchExpand = (batchId: string) => {
     setExpandedHistoryBatches(prev =>
       prev.includes(batchId) ? prev.filter(id => id !== batchId) : [...prev, batchId]
@@ -1043,9 +1178,26 @@ export default function DeliveriesScreen() {
 
         {/* Tabs */}
         <View style={styles.tabsContainer}>
+          {/* Animated background indicator */}
+          <Animated.View
+            style={[
+              styles.tabIndicator,
+              {
+                width: TAB_WIDTH,
+                transform: [
+                  {
+                    translateX: tabIndicatorPosition.interpolate({
+                      inputRange: [0, 1],
+                      outputRange: [0, TAB_WIDTH],
+                    }),
+                  },
+                ],
+              },
+            ]}
+          />
           <TouchableOpacity
-            style={[styles.tab, activeTab === 'current' && styles.activeTab]}
-            onPress={() => setActiveTab('current')}
+            style={styles.tab}
+            onPress={() => handleTabChange('current')}
             activeOpacity={0.7}
           >
             <Text style={[styles.tabText, activeTab === 'current' && styles.activeTabText]}>
@@ -1053,8 +1205,8 @@ export default function DeliveriesScreen() {
             </Text>
           </TouchableOpacity>
           <TouchableOpacity
-            style={[styles.tab, activeTab === 'history' && styles.activeTab]}
-            onPress={() => setActiveTab('history')}
+            style={styles.tab}
+            onPress={() => handleTabChange('history')}
             activeOpacity={0.7}
           >
             <Text style={[styles.tabText, activeTab === 'history' && styles.activeTabText]}>
@@ -1137,6 +1289,12 @@ export default function DeliveriesScreen() {
         }
         showsVerticalScrollIndicator={false}
       >
+        <Animated.View
+          style={{
+            opacity: contentOpacity,
+            transform: [{ translateX: contentTranslateX }],
+          }}
+        >
         {activeTab === 'current' ? (
           <>
             {!currentBatch ? (
@@ -1194,24 +1352,28 @@ export default function DeliveriesScreen() {
                 {filterStatus === 'DELIVERED' ? (
                   <View style={styles.deliveredOrdersList}>
                     {filteredAndSortedDeliveries.map(delivery => (
-                      <DeliveryCard
+                      <SwipeableDeliveryCard
                         key={delivery.id}
                         delivery={delivery as any}
                         onStatusChange={handleStatusChange as any}
                         onCallCustomer={handleCallCustomer}
                         onNavigate={handleNavigate}
+                        onCardPress={handleCardPress}
+                        canSwipeToComplete={false}
                       />
                     ))}
                   </View>
                 ) : filterStatus === 'FAILED' ? (
                   <View style={styles.deliveredOrdersList}>
                     {filteredAndSortedDeliveries.map(delivery => (
-                      <DeliveryCard
+                      <SwipeableDeliveryCard
                         key={delivery.id}
                         delivery={delivery as any}
                         onStatusChange={handleStatusChange as any}
                         onCallCustomer={handleCallCustomer}
                         onNavigate={handleNavigate}
+                        onCardPress={handleCardPress}
+                        canSwipeToComplete={false}
                       />
                     ))}
                   </View>
@@ -1227,12 +1389,16 @@ export default function DeliveriesScreen() {
                         onToggle={() => toggleBatchExpand(batch._id)}
                       >
                         {batchDeliveries.map(delivery => (
-                          <DeliveryCard
+                          <SwipeableDeliveryCard
                             key={delivery.id}
                             delivery={delivery as any}
                             onStatusChange={handleStatusChange as any}
                             onCallCustomer={handleCallCustomer}
                             onNavigate={handleNavigate}
+                            onCardPress={handleCardPress}
+                            onMarkComplete={handleMarkComplete}
+                            canSwipeToComplete={true}
+                            onDeliveryCompleted={fetchCurrentBatch}
                           />
                         ))}
                       </BatchGroup>
@@ -1372,12 +1538,14 @@ export default function DeliveriesScreen() {
                               <View style={styles.historyBatchOrdersDivider} />
                               <Text style={styles.historyBatchOrdersTitle}>Orders in this batch:</Text>
                               {batchOrders.map(delivery => (
-                                <DeliveryCard
+                                <SwipeableDeliveryCard
                                   key={delivery.id}
                                   delivery={delivery as any}
                                   onStatusChange={handleStatusChange as any}
                                   onCallCustomer={handleCallCustomer}
                                   onNavigate={handleNavigate}
+                                  onCardPress={handleCardPress}
+                                  canSwipeToComplete={false}
                                 />
                               ))}
                             </View>
@@ -1458,6 +1626,7 @@ export default function DeliveriesScreen() {
             )}
           </>
         )}
+        </Animated.View>
       </ScrollView>
 
       {/* Available Batches Modal */}
@@ -1737,6 +1906,20 @@ const styles = StyleSheet.create({
     backgroundColor: '#F3F4F6',
     borderRadius: 10,
     padding: 4,
+    position: 'relative',
+  },
+  tabIndicator: {
+    position: 'absolute',
+    top: 4,
+    bottom: 4,
+    left: 4,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 8,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.08,
+    shadowRadius: 2,
+    elevation: 2,
   },
   tab: {
     flex: 1,
@@ -1745,14 +1928,10 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     alignItems: 'center',
     justifyContent: 'center',
+    zIndex: 1,
   },
   activeTab: {
-    backgroundColor: '#FFFFFF',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.05,
-    shadowRadius: 2,
-    elevation: 1,
+    // Keep for any additional active styles if needed
   },
   tabText: {
     fontSize: 15,

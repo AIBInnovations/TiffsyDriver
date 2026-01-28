@@ -268,7 +268,6 @@ const styles = StyleSheet.create({
   header: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
     paddingHorizontal: 16,
     paddingVertical: 12,
     backgroundColor: '#FFFFFF',
@@ -276,15 +275,14 @@ const styles = StyleSheet.create({
     borderBottomColor: '#E5E7EB',
   },
   backButton: {
-    padding: 8,
-    marginLeft: -8,
+    padding: 4,
+    marginRight: 12,
   },
   headerCenter: {
     flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
-    marginHorizontal: 16,
+    justifyContent: 'flex-start',
   },
   headerTitle: {
     fontSize: 20,

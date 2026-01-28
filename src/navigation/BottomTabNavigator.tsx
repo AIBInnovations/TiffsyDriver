@@ -1,4 +1,5 @@
 import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { MainTabsParamList } from "./types";
 import DashboardStackNavigator from "./DashboardStackNavigator";
 import DeliveryStackNavigator from "./DeliveryStackNavigator";
@@ -9,6 +10,8 @@ import MaterialCommunityIcons from "react-native-vector-icons/MaterialCommunityI
 const Tab = createBottomTabNavigator<MainTabsParamList>();
 
 export default function BottomTabNavigator() {
+  const insets = useSafeAreaInsets();
+
   return (
     <Tab.Navigator
       id="BottomTabs"
@@ -18,9 +21,9 @@ export default function BottomTabNavigator() {
           backgroundColor: "#ffffff",
           borderTopWidth: 1,
           borderTopColor: "#e5e7eb",
-          paddingBottom: 10,
+          paddingBottom: insets.bottom + 10,
           paddingTop: 10,
-          height: 70,
+          height: 60 + insets.bottom,
         },
         tabBarActiveTintColor: "#3b82f6",
         tabBarInactiveTintColor: "#6b7280",

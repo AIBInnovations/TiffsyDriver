@@ -1,10 +1,35 @@
-import messaging from '@react-native-firebase/messaging';
 import { Platform, PermissionsAndroid } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import notifee, { EventType } from '@notifee/react-native';
 import { API_CONFIG } from '../config/api';
 import { getFirebaseToken } from './authService';
 import { getChannelForNotificationType } from './notificationChannels';
+
+// Firebase messaging - wrapped to handle missing configuration
+let messaging: any = null;
+let isFirebaseAvailable = false;
+
+try {
+  messaging = require('@react-native-firebase/messaging').default;
+  isFirebaseAvailable = true;
+} catch (error) {
+  console.warn('⚠️ Firebase messaging not available');
+}
+
+// Helper to safely get messaging instance
+const getMessaging = () => {
+  if (!isFirebaseAvailable || !messaging) {
+    console.warn('⚠️ Firebase not configured - FCM features disabled');
+    return null;
+  }
+  try {
+    return messaging();
+  } catch (error) {
+    console.warn('⚠️ Firebase not initialized:', error);
+    isFirebaseAvailable = false;
+    return null;
+  }
+};
 
 // Storage key for profile (same as useDriverProfileStore)
 const PROFILE_STORAGE_KEY = '@driver_profile';
@@ -56,7 +81,9 @@ export const checkNotificationPermission = async (): Promise<boolean> => {
       }
     } else {
       // iOS: Check permission status
-      const authStatus = await messaging().hasPermission();
+      const msg = getMessaging();
+      if (!msg) return false;
+      const authStatus = await msg.hasPermission();
       const enabled =
         authStatus === messaging.AuthorizationStatus.AUTHORIZED ||
         authStatus === messaging.AuthorizationStatus.PROVISIONAL;
@@ -112,7 +139,13 @@ export const requestNotificationPermission = async (): Promise<boolean> => {
       // iOS: Request permission using Firebase Messaging
       console.log('📱 iOS: Requesting notification permission');
 
-      const authStatus = await messaging().requestPermission();
+      const msg = getMessaging();
+      if (!msg) {
+        console.log('⚠️ Firebase not available - cannot request iOS permission');
+        return false;
+      }
+
+      const authStatus = await msg.requestPermission();
       const enabled =
         authStatus === messaging.AuthorizationStatus.AUTHORIZED ||
         authStatus === messaging.AuthorizationStatus.PROVISIONAL;
@@ -136,12 +169,18 @@ export const requestNotificationPermission = async (): Promise<boolean> => {
 // Get FCM token
 export const getFCMToken = async (): Promise<string | null> => {
   try {
+    const msg = getMessaging();
+    if (!msg) {
+      console.log('⚠️ Firebase not available - cannot get FCM token');
+      return null;
+    }
+
     const hasPermission = await requestNotificationPermission();
     if (!hasPermission) {
       return null;
     }
 
-    const fcmToken = await messaging().getToken();
+    const fcmToken = await msg.getToken();
     console.log('🔔 FCM Token:', fcmToken);
 
     // Store token locally
@@ -530,30 +569,37 @@ const handleNotificationData = (data: any, navigation?: any) => {
 export const initializeFCMListeners = (navigation?: any) => {
   console.log('🔔 Initializing FCM listeners...');
 
-  // Foreground message listener
-  const unsubscribeForeground = messaging().onMessage(async (remoteMessage) => {
-    handleForegroundNotification(remoteMessage);
-  });
+  const msg = getMessaging();
+  let unsubscribeForeground = () => {};
 
-  // Background message handler (already set up in index.js)
-  messaging().setBackgroundMessageHandler(async (remoteMessage) => {
-    console.log('🔔 Background notification received:', remoteMessage);
-  });
-
-  // Notification opened app from background
-  messaging().onNotificationOpenedApp((remoteMessage) => {
-    handleNotificationOpenedApp(remoteMessage, navigation);
-  });
-
-  // Check if app was opened from a notification (quit state)
-  messaging()
-    .getInitialNotification()
-    .then((remoteMessage) => {
-      if (remoteMessage) {
-        console.log('🔔 App opened from notification (quit state):', remoteMessage);
-        handleNotificationOpenedApp(remoteMessage, navigation);
-      }
+  if (msg) {
+    // Foreground message listener
+    unsubscribeForeground = msg.onMessage(async (remoteMessage: any) => {
+      handleForegroundNotification(remoteMessage);
     });
+
+    // Background message handler (already set up in index.js)
+    msg.setBackgroundMessageHandler(async (remoteMessage: any) => {
+      console.log('🔔 Background notification received:', remoteMessage);
+    });
+
+    // Notification opened app from background
+    msg.onNotificationOpenedApp((remoteMessage: any) => {
+      handleNotificationOpenedApp(remoteMessage, navigation);
+    });
+
+    // Check if app was opened from a notification (quit state)
+    msg
+      .getInitialNotification()
+      .then((remoteMessage: any) => {
+        if (remoteMessage) {
+          console.log('🔔 App opened from notification (quit state):', remoteMessage);
+          handleNotificationOpenedApp(remoteMessage, navigation);
+        }
+      });
+  } else {
+    console.log('⚠️ Firebase not available - FCM listeners not initialized');
+  }
 
   // Notifee foreground event listener (handles notification taps when app is open)
   const unsubscribeNotifee = notifee.onForegroundEvent(({ type, detail }) => {
@@ -590,7 +636,13 @@ export const initializeFCMListeners = (navigation?: any) => {
 export const setupTokenRefreshListener = () => {
   console.log('🔄 Setting up FCM token refresh listener...');
 
-  const unsubscribe = messaging().onTokenRefresh(async (newToken) => {
+  const msg = getMessaging();
+  if (!msg) {
+    console.log('⚠️ Firebase not available - token refresh listener not set up');
+    return () => {};
+  }
+
+  const unsubscribe = msg.onTokenRefresh(async (newToken: string) => {
     console.log('🔄 FCM Token refreshed:', newToken);
     await AsyncStorage.setItem(FCM_TOKEN_KEY, newToken);
 

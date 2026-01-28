@@ -1,4 +1,3 @@
-import auth from '@react-native-firebase/auth';
 import { API_CONFIG } from '../config/api';
 import { tokenStorage } from '../utils/tokenStorage';
 import type {
@@ -11,9 +10,40 @@ import type {
   DriverRegistrationData,
 } from '../types/api';
 
+// Firebase auth - wrapped to handle missing configuration
+let auth: any = null;
+let isFirebaseAuthAvailable = false;
+
+try {
+  auth = require('@react-native-firebase/auth').default;
+  isFirebaseAuthAvailable = true;
+} catch (error) {
+  console.warn('⚠️ Firebase auth not available');
+}
+
+// Helper to safely get auth instance
+const getAuth = () => {
+  if (!isFirebaseAuthAvailable || !auth) {
+    console.warn('⚠️ Firebase Auth not configured');
+    return null;
+  }
+  try {
+    return auth();
+  } catch (error) {
+    console.warn('⚠️ Firebase Auth not initialized:', error);
+    isFirebaseAuthAvailable = false;
+    return null;
+  }
+};
+
 // Get Firebase ID token and log it
 export const getFirebaseToken = async (): Promise<string> => {
-  const currentUser = auth().currentUser;
+  const authInstance = getAuth();
+  if (!authInstance) {
+    throw new Error('Firebase Auth not configured - add GoogleService-Info.plist');
+  }
+
+  const currentUser = authInstance.currentUser;
   if (!currentUser) {
     throw new Error('No authenticated user found');
   }
@@ -214,7 +244,10 @@ export const logout = async (): Promise<void> => {
     console.log('🚪 Logging out user...');
 
     // Sign out from Firebase
-    await auth().signOut();
+    const authInstance = getAuth();
+    if (authInstance) {
+      await authInstance.signOut();
+    }
 
     // Clear stored data
     await tokenStorage.clearAll();
@@ -229,7 +262,11 @@ export const logout = async (): Promise<void> => {
 // Check if user is authenticated
 export const isAuthenticated = async (): Promise<boolean> => {
   try {
-    const currentUser = auth().currentUser;
+    const authInstance = getAuth();
+    if (!authInstance) {
+      return false;
+    }
+    const currentUser = authInstance.currentUser;
     const storedToken = await tokenStorage.getToken();
 
     return !!(currentUser && storedToken);
