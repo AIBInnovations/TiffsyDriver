@@ -5,6 +5,7 @@ import { DeliveryStatusType } from "../../../navigation/types";
 interface ActionButtonsProps {
   currentStatus: DeliveryStatusType;
   onStartDelivery: () => void;
+  onMarkArrived: () => void;
   onMarkDelivered: () => void;
   onMarkFailed: () => void;
   isLoading?: boolean;
@@ -22,6 +23,7 @@ interface ActionButton {
 export default function ActionButtons({
   currentStatus,
   onStartDelivery,
+  onMarkArrived,
   onMarkDelivered,
   onMarkFailed,
   isLoading = false,
@@ -34,14 +36,14 @@ export default function ActionButtons({
         return null;
       case "in_progress":
         return {
-          label: "Mark as Delivered",
-          icon: "check-circle",
-          color: "#10B981",
-          shadowColor: "#10B981",
-          onPress: onMarkDelivered,
+          label: "I've Arrived",
+          icon: "map-marker-check",
+          color: "#3B82F6",
+          shadowColor: "#3B82F6",
+          onPress: onMarkArrived,
         };
       case "picked_up":
-        // Legacy support - redirect to delivered action
+        // ARRIVED status — driver is at customer location, ready to deliver
         return {
           label: "Mark as Delivered",
           icon: "check-circle",
@@ -55,7 +57,7 @@ export default function ActionButtons({
   };
 
   const primaryAction = getActionButton();
-  const showFailButton = currentStatus === "in_progress";
+  const showFailButton = currentStatus === "in_progress" || currentStatus === "picked_up";
   const isCompleted = currentStatus === "delivered";
   const isFailed = currentStatus === "failed";
   const isPending = currentStatus === "pending";

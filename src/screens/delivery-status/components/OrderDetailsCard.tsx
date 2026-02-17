@@ -1,9 +1,12 @@
 import { View, Text, StyleSheet, TouchableOpacity, Linking, Platform } from "react-native";
 import { useState } from "react";
 import MaterialCommunityIcons from "react-native-vector-icons/MaterialCommunityIcons";
+import OrderSourceBadge from "../../../components/common/OrderSourceBadge";
+import type { OrderSource } from "../../../types/api";
 
 interface OrderDetailsCardProps {
   orderId: string;
+  orderSource?: OrderSource;
   customerName?: string;
   customerPhone?: string;
   pickupLocation?: string;
@@ -15,6 +18,7 @@ interface OrderDetailsCardProps {
 
 export default function OrderDetailsCard({
   orderId,
+  orderSource,
   customerName,
   customerPhone,
   pickupLocation,
@@ -70,6 +74,7 @@ export default function OrderDetailsCard({
         <View style={styles.orderIdContainer}>
           <MaterialCommunityIcons name="receipt" size={20} color="#3B82F6" />
           <Text style={styles.orderId}>{orderId}</Text>
+          <OrderSourceBadge orderSource={orderSource} />
         </View>
       </View>
 

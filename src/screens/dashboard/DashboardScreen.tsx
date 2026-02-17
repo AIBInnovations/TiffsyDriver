@@ -21,9 +21,10 @@ import type { DashboardStackParamList } from '../../navigation/types';
 import StatsCard from './components/StatsCard';
 import CustomAlert from '../../components/common/CustomAlert';
 import { useDriverProfileStore } from '../profile/useDriverProfileStore';
-import { getMyBatch, getAvailableBatches, markBatchPickedUp, acceptBatch, getDriverBatchHistory } from '../../services/deliveryService';
+import { getMyBatch, getAvailableBatches, markBatchPickedUp, acceptBatch, getDriverBatchHistory, completeBatch } from '../../services/deliveryService';
+import { startLocationTracking, stopLocationTracking, isLocationTrackingActive } from '../../services/locationService';
 import { getCurrentUser } from '../../services/authService';
-import { getDriverStats } from '../../services/driverProfileService';
+import { getDriverStats, updateDriverStatus, manageShift } from '../../services/driverProfileService';
 import { getNotifications } from '../../services/notificationService';
 import type { Batch, BatchSummary, AvailableBatch, DriverStats, HistoryBatch, HistorySingleOrder } from '../../types/api';
 import AvailableBatchItem from './components/AvailableBatchItem';
@@ -81,6 +82,8 @@ export default function DashboardScreen() {
     icon?: string;
     iconColor?: string;
   }>({ visible: false, title: '', message: '' });
+
+  const [isTogglingOnline, setIsTogglingOnline] = useState(false);
 
   const isOnline = profile.availabilityStatus === 'ONLINE';
   const driverName = profile.fullName || 'Driver';
@@ -160,6 +163,12 @@ export default function DashboardScreen() {
         setCurrentBatch(response.data.batch);
         setBatchSummary(response.data.summary);
         console.log('✅ Current batch loaded:', response.data.batch.batchNumber);
+
+        // Auto-start GPS tracking if batch is active and not already tracking
+        const batchStatus = response.data.batch.status;
+        if ((batchStatus === 'DISPATCHED' || batchStatus === 'IN_PROGRESS') && !isLocationTrackingActive()) {
+          startLocationTracking();
+        }
       } else {
         setCurrentBatch(null);
         setBatchSummary({
@@ -300,6 +309,18 @@ export default function DashboardScreen() {
     return () => clearInterval(interval);
   }, [currentBatch, fetchCurrentBatch]);
 
+  // Auto-poll available batches when no active batch (every 30 seconds)
+  useEffect(() => {
+    if (currentBatch) return;
+
+    const interval = setInterval(() => {
+      console.log('🔄 Polling available batches...');
+      fetchAvailableBatches();
+    }, 30000);
+
+    return () => clearInterval(interval);
+  }, [currentBatch, fetchAvailableBatches]);
+
   // Set status bar color when screen is focused
   useFocusEffect(
     useCallback(() => {
@@ -315,8 +336,8 @@ export default function DashboardScreen() {
     }, [fetchUnreadNotificationCount])
   );
 
-  // Toggle online/offline status
-  const handleToggleOnline = useCallback((value: boolean) => {
+  // Toggle online/offline status with backend shift + status APIs
+  const handleToggleOnline = useCallback(async (value: boolean) => {
     // Prevent going offline if there are active deliveries
     if (!value && batchSummary.pending > 0) {
       setAlertConfig({
@@ -329,9 +350,30 @@ export default function DashboardScreen() {
       return;
     }
 
-    setAvailabilityStatus(value ? 'ONLINE' : 'OFFLINE');
-    showToast(value ? 'You are now online' : 'You are now offline');
-  }, [setAvailabilityStatus, showToast, batchSummary.pending]);
+    if (isTogglingOnline) return;
+    setIsTogglingOnline(true);
+
+    try {
+      if (value) {
+        // Going ONLINE: Start shift first, then set AVAILABLE
+        await manageShift('START');
+        await updateDriverStatus('AVAILABLE');
+        setAvailabilityStatus('ONLINE');
+        showToast('You are now online');
+      } else {
+        // Going OFFLINE: Set OFFLINE first, then end shift
+        await updateDriverStatus('OFFLINE');
+        await manageShift('END');
+        setAvailabilityStatus('OFFLINE');
+        showToast('You are now offline');
+      }
+    } catch (error: any) {
+      console.error('Error toggling online status:', error);
+      showToast(error.message || 'Failed to update status', 'error');
+    } finally {
+      setIsTogglingOnline(false);
+    }
+  }, [setAvailabilityStatus, showToast, batchSummary.pending, isTogglingOnline]);
 
   // Pull to refresh
   const onRefresh = useCallback(async () => {
@@ -419,6 +461,9 @@ export default function DashboardScreen() {
       console.log('📦 Accepting batch:', batchId);
       const response = await acceptBatch(batchId);
       showToast('Batch accepted successfully!', 'success');
+
+      // Start GPS location tracking
+      startLocationTracking();
 
       // Refresh data
       await Promise.all([fetchCurrentBatch(), fetchAvailableBatches()]);
@@ -535,13 +580,25 @@ export default function DashboardScreen() {
       });
       setShowNavigateConfirm(true);
     } else if (currentBatch.status === 'IN_PROGRESS') {
-      // Navigate to active delivery screen
-      navigation.navigate('Deliveries', {
-        screen: 'DeliveriesList',
-        params: { batchId: currentBatch._id },
-      });
+      if (batchSummary.pending === 0) {
+        // All orders done — complete the batch
+        try {
+          await completeBatch(currentBatch._id);
+          await stopLocationTracking();
+          showToast('Batch completed successfully!', 'success');
+          await Promise.all([fetchCurrentBatch(), fetchAvailableBatches()]);
+        } catch (error: any) {
+          showToast(error.message || 'Failed to complete batch', 'error');
+        }
+      } else {
+        // Navigate to active delivery screen
+        navigation.navigate('Deliveries', {
+          screen: 'DeliveriesList',
+          params: { batchId: currentBatch._id },
+        });
+      }
     }
-  }, [currentBatch, navigation, showToast, fetchCurrentBatch]);
+  }, [currentBatch, batchSummary.pending, navigation, showToast, fetchCurrentBatch, fetchAvailableBatches]);
 
   // Get batch status text and color
   const getBatchStatusInfo = () => {
@@ -577,6 +634,7 @@ export default function DashboardScreen() {
       case 'DISPATCHED':
         return 'Navigate to Kitchen';
       case 'IN_PROGRESS':
+        if (batchSummary.pending === 0) return 'Complete Batch';
         return 'Continue Deliveries';
       default:
         return 'View Details';
@@ -625,6 +683,7 @@ export default function DashboardScreen() {
                 trackColor={{ false: '#FCA5A5', true: '#86EFAC' }}
                 thumbColor={isOnline ? '#10B981' : '#EF4444'}
                 style={styles.statusPillSwitch}
+                disabled={isTogglingOnline}
               />
             </View>
           </View>

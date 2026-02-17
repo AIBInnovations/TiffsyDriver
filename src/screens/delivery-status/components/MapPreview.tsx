@@ -12,6 +12,8 @@ interface MapPreviewProps {
   currentStatus?: DeliveryStatusType;
   onStartDelivery?: () => void;
   isUpdating?: boolean;
+  etaSeconds?: number;
+  distanceMeters?: number;
 }
 
 export default function MapPreview({
@@ -22,6 +24,8 @@ export default function MapPreview({
   currentStatus,
   onStartDelivery,
   isUpdating = false,
+  etaSeconds,
+  distanceMeters,
 }: MapPreviewProps) {
   const [showNavigationSheet, setShowNavigationSheet] = useState(false);
 
@@ -164,6 +168,30 @@ export default function MapPreview({
           </View>
         </View>
       </TouchableOpacity>
+
+      {/* ETA and Distance Display */}
+      {(etaSeconds != null || distanceMeters != null) && (
+        <View style={styles.etaContainer}>
+          {etaSeconds != null && (
+            <View style={styles.etaItem}>
+              <MaterialCommunityIcons name="clock-outline" size={16} color="#3B82F6" />
+              <Text style={styles.etaText}>
+                ETA: {etaSeconds < 60 ? '< 1 min' : `${Math.round(etaSeconds / 60)} min`}
+              </Text>
+            </View>
+          )}
+          {distanceMeters != null && (
+            <View style={styles.etaItem}>
+              <MaterialCommunityIcons name="map-marker-distance" size={16} color="#3B82F6" />
+              <Text style={styles.etaText}>
+                {distanceMeters >= 1000
+                  ? `${(distanceMeters / 1000).toFixed(1)} km away`
+                  : `${Math.round(distanceMeters)} m away`}
+              </Text>
+            </View>
+          )}
+        </View>
+      )}
 
       {/* Start Delivery Button - only show when status is pending */}
       {currentStatus === "pending" && onStartDelivery && (
@@ -316,6 +344,26 @@ const styles = StyleSheet.create({
   tapHintText: {
     fontSize: 11,
     color: "#6B7280",
+  },
+  etaContainer: {
+    flexDirection: "row",
+    justifyContent: "center",
+    alignItems: "center",
+    gap: 16,
+    paddingVertical: 10,
+    marginBottom: 4,
+    backgroundColor: "#F0F9FF",
+    borderRadius: 8,
+  },
+  etaItem: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+  },
+  etaText: {
+    fontSize: 14,
+    fontWeight: "600",
+    color: "#1E40AF",
   },
   startDeliveryButton: {
     flexDirection: "row",

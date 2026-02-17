@@ -9,6 +9,10 @@ import type {
   DocumentUpdateRequest,
   DocumentUpdateRequestData,
   DriverStats,
+  DriverAvailabilityStatus,
+  DriverStatusUpdateData,
+  ShiftAction,
+  ShiftManageData,
 } from '../types/api';
 
 // Create authorized headers with Firebase token
@@ -272,6 +276,78 @@ export const getDriverStats = async (): Promise<ApiResponse<DriverStats>> => {
     return data;
   } catch (error: any) {
     console.error('❌ Error getting driver stats:', error);
+    throw error;
+  }
+};
+
+// Update driver availability status
+export const updateDriverStatus = async (
+  status: DriverAvailabilityStatus
+): Promise<ApiResponse<DriverStatusUpdateData>> => {
+  try {
+    console.log('📡 Calling PATCH /driver/status endpoint...');
+    console.log('📡 New status:', status);
+
+    const headers = await createHeaders();
+
+    const response = await fetch(
+      `${API_CONFIG.BASE_URL}${API_CONFIG.ENDPOINTS.DRIVER_STATUS}`,
+      {
+        method: 'PATCH',
+        headers,
+        body: JSON.stringify({ status }),
+      }
+    );
+
+    console.log('📡 Response status:', response.status);
+
+    const data: ApiResponse<DriverStatusUpdateData> = await response.json();
+
+    if (!response.ok) {
+      throw new Error(data.error || data.message || 'Failed to update driver status');
+    }
+
+    console.log('✅ Driver status updated:', data.data.previousStatus, '->', data.data.currentStatus);
+
+    return data;
+  } catch (error: any) {
+    console.error('❌ Error updating driver status:', error);
+    throw error;
+  }
+};
+
+// Manage driver shift (start/end)
+export const manageShift = async (
+  action: ShiftAction
+): Promise<ApiResponse<ShiftManageData>> => {
+  try {
+    console.log('📡 Calling PATCH /driver/shift endpoint...');
+    console.log('📡 Shift action:', action);
+
+    const headers = await createHeaders();
+
+    const response = await fetch(
+      `${API_CONFIG.BASE_URL}${API_CONFIG.ENDPOINTS.DRIVER_SHIFT}`,
+      {
+        method: 'PATCH',
+        headers,
+        body: JSON.stringify({ action }),
+      }
+    );
+
+    console.log('📡 Response status:', response.status);
+
+    const data: ApiResponse<ShiftManageData> = await response.json();
+
+    if (!response.ok) {
+      throw new Error(data.error || data.message || 'Failed to manage shift');
+    }
+
+    console.log('✅ Shift action completed:', action, '- On shift:', data.data.isOnShift);
+
+    return data;
+  } catch (error: any) {
+    console.error('❌ Error managing shift:', error);
     throw error;
   }
 };

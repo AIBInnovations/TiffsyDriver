@@ -63,6 +63,7 @@ export type DeliveriesStackParamList = {
     batchId?: string;
     completedOrderId?: string;
     completedOrderNumber?: string;
+    openAvailableBatches?: boolean;
   } | undefined;
   DeliveryDetail: { deliveryId: string };
   DeliveryStatus: DeliveryStatusParams;

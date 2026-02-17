@@ -1,5 +1,6 @@
 // API Response wrapper
 export interface ApiResponse<T> {
+  success?: boolean;
   message: string;
   data: T;
   error: string | null;
@@ -29,6 +30,27 @@ export interface User {
 
 // Approval Status for Drivers
 export type ApprovalStatus = 'PENDING' | 'APPROVED' | 'REJECTED';
+
+// Driver availability/status (backend status values)
+export type DriverAvailabilityStatus = 'OFFLINE' | 'AVAILABLE' | 'ON_DELIVERY' | 'RETURNING' | 'ON_BREAK';
+
+// Driver Status Update Response
+export interface DriverStatusUpdateData {
+  previousStatus: DriverAvailabilityStatus;
+  currentStatus: DriverAvailabilityStatus;
+  isOnShift: boolean;
+}
+
+// Shift Management
+export type ShiftAction = 'START' | 'END';
+
+// Shift Management Response
+export interface ShiftManageData {
+  isOnShift: boolean;
+  shiftStartedAt?: string;
+  shiftEndedAt?: string;
+  driverStatus: DriverAvailabilityStatus;
+}
 
 // Auth Sync Response
 export interface AuthSyncData {
@@ -78,6 +100,9 @@ export type OrderStatus =
   | 'RETURNED'
   | 'PICKED_UP'  // Legacy support
   | 'OUT_FOR_DELIVERY';  // Legacy support
+
+// Order source types
+export type OrderSource = 'DIRECT' | 'SCHEDULED' | 'AUTO_ORDER';
 
 // Meal window
 export type MealWindow = 'LUNCH' | 'DINNER';
@@ -158,8 +183,11 @@ export interface Order {
   _id: string;
   orderNumber: string;
   status: OrderStatus;
+  orderSource?: OrderSource;
   deliveryAddress: Address;
   items: OrderItem[];
+  grandTotal?: number;
+  userId?: string;
   sequenceNumber?: number;
   assignmentStatus?: string;
   specialInstructions?: string;
@@ -173,6 +201,7 @@ export interface AvailableBatch {
   zone: Zone;
   orderCount: number;
   mealWindow: MealWindow;
+  estimatedEarnings?: number;
 }
 
 // Delivery Assignment interface
@@ -430,6 +459,101 @@ export interface DriverBatchHistoryData {
 }
 
 // ============================================
+// Driver Location & Tracking Types
+// ============================================
+
+// Driver Location Update Request
+export interface DriverLocationUpdate {
+  latitude: number;
+  longitude: number;
+  speed?: number;
+  heading?: number;
+  accuracy?: number;
+}
+
+// Driver Location Update Response
+export interface DriverLocationResponse {
+  updated: boolean;
+  user: boolean;
+  assignment: boolean;
+  latitude: number;
+  longitude: number;
+  timestamp: string;
+}
+
+// Tracking Delivery (per order in tracking response)
+export interface TrackingDelivery {
+  orderId: string;
+  orderNumber: string;
+  orderStatus: OrderStatus;
+  deliveryStatus: string;
+  coordinates: { latitude: number; longitude: number };
+  distanceFromDriverMeters: number;
+  etaSeconds: number;
+  etaStatus: 'ON_TIME' | 'LATE' | 'EARLY' | 'CRITICAL';
+  sequence: {
+    sequenceNumber: number;
+    totalInBatch: number;
+    source: string;
+  };
+}
+
+// Batch Tracking Response
+export interface BatchTrackingData {
+  batchId: string;
+  batchNumber: string;
+  batchStatus: BatchStatus;
+  kitchenId: string;
+  driver: {
+    driverId: string;
+    name: string;
+    latitude: number;
+    longitude: number;
+    updatedAt: string;
+    driverStatus: string;
+  };
+  routeOptimization?: {
+    algorithm: string;
+    totalDistanceMeters: number;
+    totalDurationSeconds: number;
+    improvementPercent: number;
+    optimizedAt: string;
+  };
+  totalOrders: number;
+  deliveredCount: number;
+  failedCount: number;
+  deliveries: TrackingDelivery[];
+}
+
+// Order-Level Tracking Response
+export interface OrderTrackingData {
+  orderId: string;
+  orderNumber: string;
+  orderStatus: OrderStatus;
+  batchId: string;
+  batchStatus: BatchStatus;
+  driver: {
+    driverId: string;
+    name: string;
+    latitude: number;
+    longitude: number;
+    locationUpdatedAt: string;
+  } | null;
+  delivery: {
+    status: string;
+    distanceRemainingMeters: number | null;
+    etaSeconds: number | null;
+    etaStatus: 'ON_TIME' | 'LATE' | 'EARLY' | 'CRITICAL' | null;
+    lastRecalculatedAt: string | null;
+  };
+  sequence: {
+    sequenceNumber: number;
+    totalInBatch: number;
+    source: string;
+  } | null;
+}
+
+// ============================================
 // Notification Types
 // ============================================
 
@@ -439,6 +563,8 @@ export type NotificationType =
   | 'BATCH_ASSIGNED'
   | 'BATCH_UPDATED'
   | 'BATCH_CANCELLED'
+  | 'BATCH_REASSIGNED'
+  | 'BATCH_OPTIMIZED'
   | 'ORDER_READY_FOR_PICKUP'
   | 'ORDER_PICKED_UP'
   | 'ORDER_OUT_FOR_DELIVERY'

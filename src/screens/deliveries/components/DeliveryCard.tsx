@@ -5,6 +5,7 @@ import { Delivery } from "../../../context/DeliveryContext";
 import type { OrderStatus } from "../../../types/api";
 import ActionSheet from "../../../components/common/ActionSheet";
 import CustomAlert from "../../../components/common/CustomAlert";
+import OrderSourceBadge from "../../../components/common/OrderSourceBadge";
 
 interface DeliveryCardProps {
   delivery: Delivery | any; // Allow both old Delivery and API order types
@@ -146,9 +147,12 @@ export default function DeliveryCard({ delivery, onStatusChange, onCallCustomer,
       {/* Header with Order ID and Status */}
       <View style={styles.cardHeader}>
         <Text style={styles.orderId}>{delivery.orderId}</Text>
-        <View style={[styles.statusBadge, { backgroundColor: status.bg }]}>
-          <MaterialCommunityIcons name={status.icon} size={14} color={status.text} />
-          <Text style={[styles.statusText, { color: status.text }]}>{status.label}</Text>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+          <OrderSourceBadge orderSource={delivery.orderSource} />
+          <View style={[styles.statusBadge, { backgroundColor: status.bg }]}>
+            <MaterialCommunityIcons name={status.icon} size={14} color={status.text} />
+            <Text style={[styles.statusText, { color: status.text }]}>{status.label}</Text>
+          </View>
         </View>
       </View>
 

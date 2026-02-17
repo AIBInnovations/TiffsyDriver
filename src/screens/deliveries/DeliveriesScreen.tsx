@@ -31,7 +31,9 @@ import FilterBar from './components/FilterBar';
 import BatchGroup from './components/BatchGroup';
 import AvailableBatchesModal from './components/AvailableBatchesModal';
 import CustomAlert from '../../components/common/CustomAlert';
-import { getMyBatch, getAvailableBatches, updateDeliveryStatus as apiUpdateDeliveryStatus, acceptBatch, getDriverOrders, getDriverBatchHistory } from '../../services/deliveryService';
+import { getMyBatch, getAvailableBatches, updateDeliveryStatus as apiUpdateDeliveryStatus, acceptBatch, getDriverOrders, getDriverBatchHistory, markBatchPickedUp, updateDeliverySequence } from '../../services/deliveryService';
+import { startLocationTracking } from '../../services/locationService';
+import ReorderStopsModal, { type Stop } from './components/ReorderStopsModal';
 import type { Batch, Order, OrderStatus, AvailableBatch, DriverOrder, HistoryBatch, HistorySingleOrder } from '../../types/api';
 
 type FilterStatus = 'all' | 'READY' | 'EN_ROUTE' | 'ARRIVED' | 'DELIVERED' | 'FAILED' | 'RETURNED' | 'PICKED_UP' | 'OUT_FOR_DELIVERY';
@@ -68,6 +70,7 @@ export default function DeliveriesScreen() {
   const selectedBatchId = route.params?.batchId;
   const completedOrderId = route.params?.completedOrderId;
   const completedOrderNumber = route.params?.completedOrderNumber;
+  const openAvailableBatches = route.params?.openAvailableBatches;
 
   // Log route params for debugging
   console.log('📍 DeliveriesScreen route params:', {
@@ -474,6 +477,25 @@ export default function DeliveriesScreen() {
     }, [selectedBatchId, filterStatus, completedOrderId, completedOrderNumber, fetchCurrentBatch, fetchAvailableBatches, fetchDriverOrders, fetchDeliveredOrders, fetchFailedOrders])
   );
 
+  // Auto-poll available batches every 30s when no active batch
+  useEffect(() => {
+    if (activeTab !== 'current' || currentBatch) return;
+
+    const interval = setInterval(() => {
+      console.log('🔄 Auto-polling available batches...');
+      fetchAvailableBatches();
+    }, 30000);
+
+    return () => clearInterval(interval);
+  }, [activeTab, currentBatch, fetchAvailableBatches]);
+
+  // Open available batches modal when navigated with openAvailableBatches param
+  useEffect(() => {
+    if (openAvailableBatches) {
+      setShowAvailableBatchesModal(true);
+    }
+  }, [openAvailableBatches]);
+
   // Pull to refresh
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
@@ -722,6 +744,9 @@ export default function DeliveriesScreen() {
       // Close modal
       setShowAvailableBatchesModal(false);
 
+      // Start GPS location tracking
+      startLocationTracking();
+
       // Refresh data to show the newly accepted batch
       await Promise.all([fetchCurrentBatch(), fetchAvailableBatches()]);
 
@@ -736,6 +761,116 @@ export default function DeliveriesScreen() {
       console.error('❌ Error accepting batch:', error);
       // Re-throw to let modal handle the error display with better messaging
       throw error;
+    }
+  };
+
+  // Pickup state
+  const [isConfirmingPickup, setIsConfirmingPickup] = useState(false);
+
+  // Handle confirm pickup from kitchen
+  const handleConfirmPickup = async () => {
+    if (!currentBatch || isConfirmingPickup) return;
+    setIsConfirmingPickup(true);
+    try {
+      await markBatchPickedUp(currentBatch._id);
+      setAlertConfig({
+        visible: true,
+        title: 'Pickup Confirmed',
+        message: 'Batch marked as picked up. You can now start deliveries!',
+        icon: 'check-circle',
+        iconColor: '#10B981',
+      });
+      await fetchCurrentBatch();
+    } catch (error: any) {
+      setAlertConfig({
+        visible: true,
+        title: 'Error',
+        message: error.message || 'Failed to confirm pickup',
+        icon: 'alert-circle',
+        iconColor: '#EF4444',
+      });
+    } finally {
+      setIsConfirmingPickup(false);
+    }
+  };
+
+  // Handle navigate to kitchen
+  const handleNavigateToKitchen = () => {
+    if (!currentBatch) return;
+    const kitchen = typeof currentBatch.kitchenId === 'object' ? currentBatch.kitchenId : null;
+    if (!kitchen) return;
+
+    const address = [
+      kitchen.address?.addressLine1,
+      kitchen.address?.locality,
+      kitchen.address?.city,
+    ].filter(Boolean).join(', ');
+
+    const encodedAddress = encodeURIComponent(address);
+
+    if (Platform.OS === 'ios') {
+      const appleMapsUrl = `maps://?daddr=${encodedAddress}`;
+      Linking.openURL(appleMapsUrl).catch(() => {
+        Linking.openURL(`https://www.google.com/maps/dir/?api=1&destination=${encodedAddress}`);
+      });
+    } else {
+      Linking.openURL(`https://www.google.com/maps/search/?api=1&query=${encodedAddress}`);
+    }
+  };
+
+  // Reorder stops state
+  const [showReorderModal, setShowReorderModal] = useState(false);
+  const [isSavingReorder, setIsSavingReorder] = useState(false);
+
+  // Get stops for reorder modal
+  const getReorderStops = (): Stop[] => {
+    if (!currentBatch || currentOrders.length === 0) return [];
+    return currentOrders
+      .filter(order => order.status !== 'DELIVERED' && order.status !== 'FAILED')
+      .sort((a, b) => (a.sequenceNumber || 0) - (b.sequenceNumber || 0))
+      .map(order => ({
+        id: order._id,
+        customerName: order.deliveryAddress?.contactName || order.deliveryAddress?.name || 'Customer',
+        address: [
+          order.deliveryAddress?.addressLine1,
+          order.deliveryAddress?.locality || order.deliveryAddress?.area,
+          order.deliveryAddress?.city,
+        ].filter(Boolean).join(', ') || 'Address not available',
+      }));
+  };
+
+  // Handle reorder save
+  const handleReorderSave = async (reorderedStops: Stop[]) => {
+    if (!currentBatch) return;
+    setIsSavingReorder(true);
+    try {
+      const sequence = reorderedStops.map((stop, index) => ({
+        orderId: stop.id,
+        sequenceNumber: index + 1,
+      }));
+      await updateDeliverySequence(currentBatch._id, sequence);
+      setShowReorderModal(false);
+      setAlertConfig({
+        visible: true,
+        title: 'Stops Reordered',
+        message: 'Delivery sequence updated successfully!',
+        icon: 'check-circle',
+        iconColor: '#10B981',
+      });
+      await fetchCurrentBatch();
+    } catch (error: any) {
+      const message = error.message || 'Failed to reorder stops';
+      setAlertConfig({
+        visible: true,
+        title: message.includes('locked') ? 'Sequence Locked' : 'Error',
+        message: message.includes('locked')
+          ? 'The delivery sequence is currently locked and cannot be changed.'
+          : message,
+        icon: message.includes('locked') ? 'lock' : 'alert-circle',
+        iconColor: message.includes('locked') ? '#F59E0B' : '#EF4444',
+      });
+    } finally {
+      setIsSavingReorder(false);
     }
   };
 
@@ -1379,30 +1514,120 @@ export default function DeliveriesScreen() {
                   </View>
                 ) : (
                   <>
+                    {/* Reorder Stops Button - Show when batch is IN_PROGRESS */}
+                    {currentBatch?.status === 'IN_PROGRESS' && currentOrders.length > 1 && (
+                      <View style={styles.reorderButtonContainer}>
+                        <TouchableOpacity
+                          style={styles.reorderButton}
+                          onPress={() => setShowReorderModal(true)}
+                          activeOpacity={0.7}
+                        >
+                          <MaterialCommunityIcons name="swap-vertical" size={18} color="#F56B4C" />
+                          <Text style={styles.reorderButtonText}>Reorder Stops</Text>
+                        </TouchableOpacity>
+                      </View>
+                    )}
+
+                    {/* Kitchen Pickup Card - Show before deliveries when batch is DISPATCHED */}
+                    {currentBatch?.status === 'DISPATCHED' && (
+                      <View style={styles.pickupCard}>
+                        <View style={styles.pickupCardHeader}>
+                          <View style={styles.pickupStepBadge}>
+                            <Text style={styles.pickupStepText}>Step 1</Text>
+                          </View>
+                          <Text style={styles.pickupCardTitle}>Pick Up from Kitchen</Text>
+                        </View>
+
+                        {typeof currentBatch.kitchenId === 'object' && currentBatch.kitchenId && (
+                          <View style={styles.pickupKitchenInfo}>
+                            <View style={styles.pickupInfoRow}>
+                              <MaterialCommunityIcons name="store" size={18} color="#F56B4C" />
+                              <Text style={styles.pickupInfoText}>
+                                {currentBatch.kitchenId.name || 'Kitchen'}
+                              </Text>
+                            </View>
+                            {currentBatch.kitchenId.address && (
+                              <View style={styles.pickupInfoRow}>
+                                <MaterialCommunityIcons name="map-marker" size={18} color="#6B7280" />
+                                <Text style={styles.pickupInfoAddress}>
+                                  {[
+                                    currentBatch.kitchenId.address.addressLine1,
+                                    currentBatch.kitchenId.address.locality,
+                                    currentBatch.kitchenId.address.city,
+                                  ].filter(Boolean).join(', ')}
+                                </Text>
+                              </View>
+                            )}
+                            {currentBatch.kitchenId.phone && (
+                              <View style={styles.pickupInfoRow}>
+                                <MaterialCommunityIcons name="phone" size={18} color="#6B7280" />
+                                <Text style={styles.pickupInfoText}>{currentBatch.kitchenId.phone}</Text>
+                              </View>
+                            )}
+                          </View>
+                        )}
+
+                        <View style={styles.pickupActions}>
+                          <TouchableOpacity
+                            style={styles.pickupNavigateButton}
+                            onPress={handleNavigateToKitchen}
+                            activeOpacity={0.7}
+                          >
+                            <MaterialCommunityIcons name="navigation-variant" size={20} color="#FFFFFF" />
+                            <Text style={styles.pickupNavigateText}>Navigate to Kitchen</Text>
+                          </TouchableOpacity>
+
+                          <TouchableOpacity
+                            style={[styles.pickupConfirmButton, isConfirmingPickup && styles.buttonDisabledStyle]}
+                            onPress={handleConfirmPickup}
+                            disabled={isConfirmingPickup}
+                            activeOpacity={0.7}
+                          >
+                            {isConfirmingPickup ? (
+                              <ActivityIndicator size="small" color="#FFFFFF" />
+                            ) : (
+                              <MaterialCommunityIcons name="check-circle" size={20} color="#FFFFFF" />
+                            )}
+                            <Text style={styles.pickupConfirmText}>
+                              {isConfirmingPickup ? 'Confirming...' : 'Confirm Pickup'}
+                            </Text>
+                          </TouchableOpacity>
+                        </View>
+                      </View>
+                    )}
+
                     {/* Batched Deliveries */}
-                    {batchedDeliveries.map(({ batch, deliveries: batchDeliveries }) => (
-                      <BatchGroup
-                        key={batch._id}
-                        batchId={batch._id}
-                        deliveryCount={batchDeliveries.length}
-                        isExpanded={expandedBatches.includes(batch._id)}
-                        onToggle={() => toggleBatchExpand(batch._id)}
-                      >
-                        {batchDeliveries.map(delivery => (
-                          <SwipeableDeliveryCard
-                            key={delivery.id}
-                            delivery={delivery as any}
-                            onStatusChange={handleStatusChange as any}
-                            onCallCustomer={handleCallCustomer}
-                            onNavigate={handleNavigate}
-                            onCardPress={handleCardPress}
-                            onMarkComplete={handleMarkComplete}
-                            canSwipeToComplete={true}
-                            onDeliveryCompleted={fetchCurrentBatch}
-                          />
-                        ))}
-                      </BatchGroup>
-                    ))}
+                    <View style={currentBatch?.status === 'DISPATCHED' ? styles.deliveriesDimmed : undefined}>
+                      {currentBatch?.status === 'DISPATCHED' && (
+                        <View style={styles.pickupOverlayMessage}>
+                          <MaterialCommunityIcons name="lock" size={16} color="#9CA3AF" />
+                          <Text style={styles.pickupOverlayText}>Pick up from kitchen first to start deliveries</Text>
+                        </View>
+                      )}
+                      {batchedDeliveries.map(({ batch, deliveries: batchDeliveries }) => (
+                        <BatchGroup
+                          key={batch._id}
+                          batchId={batch._id}
+                          deliveryCount={batchDeliveries.length}
+                          isExpanded={expandedBatches.includes(batch._id)}
+                          onToggle={() => toggleBatchExpand(batch._id)}
+                        >
+                          {batchDeliveries.map(delivery => (
+                            <SwipeableDeliveryCard
+                              key={delivery.id}
+                              delivery={delivery as any}
+                              onStatusChange={handleStatusChange as any}
+                              onCallCustomer={handleCallCustomer}
+                              onNavigate={handleNavigate}
+                              onCardPress={currentBatch?.status === 'DISPATCHED' ? undefined : handleCardPress}
+                              onMarkComplete={currentBatch?.status === 'DISPATCHED' ? undefined : handleMarkComplete}
+                              canSwipeToComplete={currentBatch?.status !== 'DISPATCHED'}
+                              onDeliveryCompleted={fetchCurrentBatch}
+                            />
+                          ))}
+                        </BatchGroup>
+                      ))}
+                    </View>
                   </>
                 )}
               </>
@@ -1628,6 +1853,15 @@ export default function DeliveriesScreen() {
         )}
         </Animated.View>
       </ScrollView>
+
+      {/* Reorder Stops Modal */}
+      <ReorderStopsModal
+        visible={showReorderModal}
+        stops={getReorderStops()}
+        onClose={() => setShowReorderModal(false)}
+        onSave={handleReorderSave}
+        isSaving={isSavingReorder}
+      />
 
       {/* Available Batches Modal */}
       <AvailableBatchesModal
@@ -2101,5 +2335,135 @@ const styles = StyleSheet.create({
   historyFilterTextActive: {
     color: 'white',
     fontWeight: '600',
+  },
+  // Kitchen Pickup Card styles
+  pickupCard: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 16,
+    padding: 16,
+    marginHorizontal: 16,
+    marginBottom: 16,
+    borderWidth: 2,
+    borderColor: '#F56B4C',
+    shadowColor: '#F56B4C',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.15,
+    shadowRadius: 8,
+    elevation: 4,
+  },
+  pickupCardHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 14,
+    gap: 10,
+  },
+  pickupStepBadge: {
+    backgroundColor: '#F56B4C',
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 12,
+  },
+  pickupStepText: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#FFFFFF',
+  },
+  pickupCardTitle: {
+    fontSize: 17,
+    fontWeight: '700',
+    color: '#111827',
+  },
+  pickupKitchenInfo: {
+    gap: 8,
+    marginBottom: 16,
+  },
+  pickupInfoRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  pickupInfoText: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: '#374151',
+    flex: 1,
+  },
+  pickupInfoAddress: {
+    fontSize: 14,
+    color: '#6B7280',
+    flex: 1,
+  },
+  pickupActions: {
+    gap: 10,
+  },
+  pickupNavigateButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#3B82F6',
+    paddingVertical: 14,
+    borderRadius: 12,
+    gap: 8,
+  },
+  pickupNavigateText: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: '#FFFFFF',
+  },
+  pickupConfirmButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#10B981',
+    paddingVertical: 14,
+    borderRadius: 12,
+    gap: 8,
+  },
+  pickupConfirmText: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: '#FFFFFF',
+  },
+  buttonDisabledStyle: {
+    opacity: 0.6,
+  },
+  deliveriesDimmed: {
+    opacity: 0.4,
+  },
+  pickupOverlayMessage: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 8,
+    paddingHorizontal: 16,
+    marginBottom: 8,
+    gap: 6,
+  },
+  pickupOverlayText: {
+    fontSize: 13,
+    color: '#9CA3AF',
+    fontWeight: '500',
+  },
+  // Reorder button styles
+  reorderButtonContainer: {
+    paddingHorizontal: 16,
+    marginBottom: 12,
+    alignItems: 'flex-end',
+  },
+  reorderButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#FFF7ED',
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: '#FDBA74',
+    gap: 6,
+  },
+  reorderButtonText: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#F56B4C',
   },
 });

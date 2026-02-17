@@ -14,6 +14,7 @@ interface DeliveryCompleteModalProps {
   };
   onNextDelivery: () => void;
   onViewAllDeliveries: () => void;
+  onCompleteBatch?: () => void;
   onClose: () => void;
 }
 
@@ -25,6 +26,7 @@ export default function DeliveryCompleteModal({
   nextDeliveryInfo,
   onNextDelivery,
   onViewAllDeliveries,
+  onCompleteBatch,
   onClose,
 }: DeliveryCompleteModalProps) {
   return (
@@ -86,10 +88,17 @@ export default function DeliveryCompleteModal({
               </>
             ) : (
               <>
-                <Pressable style={styles.primaryButton} onPress={onViewAllDeliveries}>
-                  <MaterialCommunityIcons name="format-list-bulleted" size={20} color="#FFFFFF" />
-                  <Text style={styles.primaryButtonText}>View Deliveries</Text>
-                </Pressable>
+                {onCompleteBatch ? (
+                  <Pressable style={[styles.primaryButton, { backgroundColor: '#10B981' }]} onPress={onCompleteBatch}>
+                    <MaterialCommunityIcons name="check-all" size={20} color="#FFFFFF" />
+                    <Text style={styles.primaryButtonText}>Complete Batch</Text>
+                  </Pressable>
+                ) : (
+                  <Pressable style={styles.primaryButton} onPress={onViewAllDeliveries}>
+                    <MaterialCommunityIcons name="format-list-bulleted" size={20} color="#FFFFFF" />
+                    <Text style={styles.primaryButtonText}>View Deliveries</Text>
+                  </Pressable>
+                )}
                 <Pressable style={styles.secondaryButton} onPress={onClose}>
                   <Text style={styles.secondaryButtonText}>Close</Text>
                 </Pressable>

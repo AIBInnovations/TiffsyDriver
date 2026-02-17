@@ -6,6 +6,7 @@ import {
   TouchableOpacity,
   RefreshControl,
   StatusBar,
+  ActivityIndicator,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useState, useCallback, useEffect } from "react";
@@ -21,14 +22,16 @@ import FailedDeliveryModal from "./components/FailedDeliveryModal";
 import DeliveryCompleteModal from "./components/DeliveryCompleteModal";
 import NotificationBanner, { NotificationType } from "./components/NotificationBanner";
 import CustomAlert from "../../components/common/CustomAlert";
-import { getMyBatch, updateDeliveryStatus as apiUpdateDeliveryStatus } from "../../services/deliveryService";
-import type { Order, OrderStatus } from "../../types/api";
+import { getMyBatch, updateDeliveryStatus as apiUpdateDeliveryStatus, completeBatch, getBatchTracking } from "../../services/deliveryService";
+import { stopLocationTracking } from "../../services/locationService";
+import type { Order, OrderStatus, OrderSource, BatchSummary, BatchTrackingData } from "../../types/api";
 
 type DeliveryStatusScreenRouteProp = RouteProp<MainTabsParamList, "DeliveryStatus">;
 
 interface DeliveryData {
   deliveryId: string;
   orderId: string;
+  orderSource?: OrderSource;
   customerName: string;
   customerPhone: string;
   pickupLocation: string;
@@ -101,6 +104,15 @@ export default function DeliveryStatusScreen() {
   const [showCompleteModal, setShowCompleteModal] = useState(false);
   const [notification, setNotification] = useState<Notification | null>(null);
   const [errorAlert, setErrorAlert] = useState<{ visible: boolean; message: string }>({ visible: false, message: '' });
+  const [isCompletingBatch, setIsCompletingBatch] = useState(false);
+  const [activeBatchForCompletion, setActiveBatchForCompletion] = useState<{
+    batchId: string;
+    batchNumber: string;
+    summary: BatchSummary;
+  } | null>(null);
+
+  // Tracking data for ETA display
+  const [trackingData, setTrackingData] = useState<BatchTrackingData | null>(null);
 
   // Set status bar colors when screen is focused
   useFocusEffect(
@@ -109,6 +121,28 @@ export default function DeliveryStatusScreen() {
       StatusBar.setBackgroundColor('#FFFFFF');
     }, [])
   );
+
+  // Poll tracking data every 15 seconds when delivery is active
+  useEffect(() => {
+    if (!delivery?.batchId || delivery.currentStatus === 'delivered' || delivery.currentStatus === 'failed') {
+      return;
+    }
+
+    const fetchTracking = async () => {
+      try {
+        const response = await getBatchTracking(delivery.batchId!);
+        if (response.data) {
+          setTrackingData(response.data);
+        }
+      } catch (error) {
+        console.warn('⚠️ Failed to fetch tracking data:', error);
+      }
+    };
+
+    fetchTracking();
+    const interval = setInterval(fetchTracking, 15000);
+    return () => clearInterval(interval);
+  }, [delivery?.batchId, delivery?.currentStatus]);
 
   // Load delivery data
   useEffect(() => {
@@ -154,6 +188,12 @@ export default function DeliveryStatusScreen() {
             console.log('🔍 Using active order:', targetOrder.orderNumber);
           } else {
             console.log('✅ All deliveries completed - no active orders');
+            // Set batch completion data so driver can complete the batch
+            setActiveBatchForCompletion({
+              batchId: batch._id,
+              batchNumber: batch.batchNumber,
+              summary: response.data.summary,
+            });
             setDelivery(null);
             return;
           }
@@ -187,6 +227,7 @@ export default function DeliveryStatusScreen() {
         setDelivery({
           deliveryId: targetOrder._id,
           orderId: targetOrder.orderNumber,
+          orderSource: targetOrder.orderSource,
           customerName: deliveryAddr.contactName || deliveryAddr.name || 'Customer',
           customerPhone: deliveryAddr.contactPhone || deliveryAddr.phone || '',
           pickupLocation: kitchenAddress,
@@ -203,6 +244,7 @@ export default function DeliveryStatusScreen() {
       } else {
         console.log('ℹ️ No active batch/orders found');
         setDelivery(null);
+        setActiveBatchForCompletion(null);
       }
     } catch (error: any) {
       console.error('❌ Error loading delivery data:', error);
@@ -333,6 +375,10 @@ export default function DeliveryStatusScreen() {
 
   const handleStartDelivery = () => {
     updateDeliveryStatus("in_progress");
+  };
+
+  const handleMarkArrived = () => {
+    updateDeliveryStatus("picked_up");
   };
 
   const handleMarkDelivered = () => {
@@ -470,6 +516,34 @@ export default function DeliveryStatusScreen() {
     setShowCompleteModal(false);
   };
 
+  const handleCompleteBatch = async () => {
+    if (!activeBatchForCompletion) return;
+
+    setIsCompletingBatch(true);
+    try {
+      await completeBatch(activeBatchForCompletion.batchId);
+      await stopLocationTracking();
+      showNotification('success', 'Batch Completed!', 'All deliveries have been processed.');
+      setActiveBatchForCompletion(null);
+      // Navigate to Dashboard
+      navigation.navigate('Dashboard' as any);
+    } catch (error: any) {
+      setErrorAlert({
+        visible: true,
+        message: error.message || 'Failed to complete batch. Please try again.',
+      });
+    } finally {
+      setIsCompletingBatch(false);
+    }
+  };
+
+  // Extract ETA and distance from tracking data for current order
+  const currentOrderTracking = trackingData?.deliveries?.find(
+    d => d.orderId === delivery?.deliveryId
+  );
+  const etaSeconds = currentOrderTracking?.etaSeconds;
+  const distanceMeters = currentOrderTracking?.distanceFromDriverMeters;
+
   // Calculate next delivery info for the modal
   const getNextDeliveryInfo = () => {
     if (!delivery || !delivery.stopNumber || !delivery.totalStops) return undefined;
@@ -487,7 +561,7 @@ export default function DeliveryStatusScreen() {
     };
   };
 
-  // Empty state
+  // Empty state — show batch completion if all orders done
   if (!delivery) {
     return (
       <SafeAreaView style={styles.container} edges={["top"]}>
@@ -496,13 +570,64 @@ export default function DeliveryStatusScreen() {
           <Text style={styles.headerTitle}>Delivery Status</Text>
         </View>
         <View style={styles.emptyContainer}>
-          <View style={styles.emptyIcon}>
-            <MaterialCommunityIcons name="check-circle-outline" size={48} color="#10B981" />
-          </View>
-          <Text style={styles.emptyTitle}>No Active Delivery</Text>
-          <Text style={styles.emptySubtitle}>
-            All deliveries completed. Great work!
-          </Text>
+          {activeBatchForCompletion ? (
+            <>
+              <View style={styles.emptyIcon}>
+                <MaterialCommunityIcons name="party-popper" size={48} color="#F56B4C" />
+              </View>
+              <Text style={styles.emptyTitle}>All Deliveries Done!</Text>
+              <Text style={styles.emptySubtitle}>
+                {activeBatchForCompletion.batchNumber}
+              </Text>
+
+              {/* Batch Summary */}
+              <View style={styles.batchSummaryCard}>
+                <View style={styles.batchSummaryRow}>
+                  <View style={styles.batchSummaryStat}>
+                    <Text style={styles.batchSummaryValue}>{activeBatchForCompletion.summary.totalOrders}</Text>
+                    <Text style={styles.batchSummaryLabel}>Total</Text>
+                  </View>
+                  <View style={styles.batchSummaryDivider} />
+                  <View style={styles.batchSummaryStat}>
+                    <Text style={[styles.batchSummaryValue, { color: '#10B981' }]}>{activeBatchForCompletion.summary.delivered}</Text>
+                    <Text style={styles.batchSummaryLabel}>Delivered</Text>
+                  </View>
+                  <View style={styles.batchSummaryDivider} />
+                  <View style={styles.batchSummaryStat}>
+                    <Text style={[styles.batchSummaryValue, { color: '#EF4444' }]}>{activeBatchForCompletion.summary.failed}</Text>
+                    <Text style={styles.batchSummaryLabel}>Failed</Text>
+                  </View>
+                </View>
+              </View>
+
+              {/* Complete Batch Button */}
+              <TouchableOpacity
+                style={styles.completeBatchButton}
+                onPress={handleCompleteBatch}
+                disabled={isCompletingBatch}
+                activeOpacity={0.8}
+              >
+                {isCompletingBatch ? (
+                  <ActivityIndicator size="small" color="#FFFFFF" />
+                ) : (
+                  <MaterialCommunityIcons name="check-all" size={22} color="#FFFFFF" />
+                )}
+                <Text style={styles.completeBatchButtonText}>
+                  {isCompletingBatch ? 'Completing...' : 'Complete Batch'}
+                </Text>
+              </TouchableOpacity>
+            </>
+          ) : (
+            <>
+              <View style={styles.emptyIcon}>
+                <MaterialCommunityIcons name="check-circle-outline" size={48} color="#10B981" />
+              </View>
+              <Text style={styles.emptyTitle}>No Active Delivery</Text>
+              <Text style={styles.emptySubtitle}>
+                All deliveries completed. Great work!
+              </Text>
+            </>
+          )}
           <TouchableOpacity style={styles.refreshButton} onPress={handleRefresh}>
             <MaterialCommunityIcons name="refresh" size={18} color="#3B82F6" />
             <Text style={styles.refreshButtonText}>Refresh</Text>
@@ -564,6 +689,7 @@ export default function DeliveryStatusScreen() {
         {/* Order Details */}
         <OrderDetailsCard
           orderId={delivery.orderId}
+          orderSource={delivery.orderSource}
           customerName={delivery.customerName}
           customerPhone={delivery.customerPhone}
           pickupLocation={delivery.pickupLocation}
@@ -579,12 +705,15 @@ export default function DeliveryStatusScreen() {
           currentStatus={delivery.currentStatus}
           onStartDelivery={handleStartDelivery}
           isUpdating={isUpdating}
+          etaSeconds={etaSeconds}
+          distanceMeters={distanceMeters}
         />
 
         {/* Action Buttons */}
         <ActionButtons
           currentStatus={delivery.currentStatus}
           onStartDelivery={handleStartDelivery}
+          onMarkArrived={handleMarkArrived}
           onMarkDelivered={handleMarkDelivered}
           onMarkFailed={handleMarkFailed}
           isLoading={isUpdating}
@@ -616,6 +745,7 @@ export default function DeliveryStatusScreen() {
         nextDeliveryInfo={getNextDeliveryInfo()}
         onNextDelivery={handleNextDelivery}
         onViewAllDeliveries={handleViewAllDeliveries}
+        onCompleteBatch={handleCompleteBatch}
         onClose={handleCloseCompleteModal}
       />
 
@@ -709,5 +839,64 @@ const styles = StyleSheet.create({
     fontSize: 15,
     fontWeight: "600",
     color: "#3B82F6",
+  },
+  batchSummaryCard: {
+    backgroundColor: "#FFFFFF",
+    borderRadius: 16,
+    padding: 20,
+    marginBottom: 20,
+    width: "100%",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 8,
+    elevation: 2,
+  },
+  batchSummaryRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-around",
+  },
+  batchSummaryStat: {
+    alignItems: "center",
+    flex: 1,
+  },
+  batchSummaryValue: {
+    fontSize: 24,
+    fontWeight: "700",
+    color: "#111827",
+    marginBottom: 4,
+  },
+  batchSummaryLabel: {
+    fontSize: 12,
+    color: "#6B7280",
+    fontWeight: "500",
+  },
+  batchSummaryDivider: {
+    width: 1,
+    height: 40,
+    backgroundColor: "#E5E7EB",
+  },
+  completeBatchButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "#10B981",
+    paddingVertical: 16,
+    paddingHorizontal: 32,
+    borderRadius: 12,
+    gap: 10,
+    width: "100%",
+    marginBottom: 16,
+    shadowColor: "#10B981",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 4,
+  },
+  completeBatchButtonText: {
+    fontSize: 16,
+    fontWeight: "700",
+    color: "#FFFFFF",
   },
 });

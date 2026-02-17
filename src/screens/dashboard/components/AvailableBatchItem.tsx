@@ -53,6 +53,14 @@ export default function AvailableBatchItem({
             <MaterialCommunityIcons name="package" size={16} color="#6B7280" />
             <Text style={styles.detailText}>{batch.orderCount} Orders</Text>
           </View>
+          {batch.estimatedEarnings != null && (
+            <View style={styles.detailItem}>
+              <MaterialCommunityIcons name="currency-inr" size={16} color="#10B981" />
+              <Text style={[styles.detailText, { color: '#10B981', fontWeight: '600' }]}>
+                Est. ₹{batch.estimatedEarnings}
+              </Text>
+            </View>
+          )}
         </View>
       </View>
 

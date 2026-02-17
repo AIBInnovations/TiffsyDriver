@@ -506,7 +506,7 @@ const handleNotificationData = (data: any, navigation?: any) => {
         navigation.navigate('Main', {
           screen: 'Deliveries',
           params: {
-            screen: 'MyBatch',
+            screen: 'DeliveriesList',
             params: {
               batchId: data.batchId,
             },
@@ -535,6 +535,36 @@ const handleNotificationData = (data: any, navigation?: any) => {
       if (navigation) {
         navigation.navigate('Main', {
           screen: 'Deliveries',
+        });
+      }
+      break;
+
+    case 'BATCH_REASSIGNED':
+      // Batch was reassigned to another driver
+      console.log('🔄 Batch reassigned');
+      console.log('🆔 Batch ID:', data.batchId);
+
+      if (navigation) {
+        navigation.navigate('Main', {
+          screen: 'Dashboard',
+        });
+      }
+      break;
+
+    case 'BATCH_OPTIMIZED':
+      // Route optimization completed for current batch
+      console.log('🗺️ Route optimized for batch');
+      console.log('🆔 Batch ID:', data.batchId);
+
+      if (navigation) {
+        navigation.navigate('Main', {
+          screen: 'Deliveries',
+          params: {
+            screen: 'DeliveriesList',
+            params: {
+              batchId: data.batchId,
+            },
+          },
         });
       }
       break;

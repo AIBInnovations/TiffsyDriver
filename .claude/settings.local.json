@@ -6,7 +6,27 @@
       "Bash(./gradlew clean:*)",
       "Bash(cd d:Tiffsy DriverTiffsyDriver)",
       "Bash(git checkout:*)",
-      "Bash(npm install:*)"
+      "Bash(npm install:*)",
+      "Bash(npm run android:*)",
+      "Bash(dir:*)",
+      "Bash(gradlew.bat app:installDebug:*)",
+      "Bash(cmd.exe /c \"cd /d d:\\\\TiffsyDriver && npm run android\")",
+      "Bash(cmd.exe /c \"cd /d d:\\\\TiffsyDriver && npx react-native run-android\")",
+      "Bash(powershell.exe -Command \"Set-Location ''d:\\\\TiffsyDriver''; npm run android\")",
+      "Bash(powershell.exe:*)",
+      "Bash(npx react-native start:*)",
+      "Bash(adb logcat:*)",
+      "Bash(adb shell am force-stop:*)",
+      "Bash(adb shell am start:*)",
+      "Bash(adb install:*)",
+      "Bash(adb shell pm list packages:*)",
+      "Bash(adb shell pm path:*)",
+      "Bash(adb shell dumpsys:*)",
+      "Bash(python3:*)",
+      "Bash(findstr:*)",
+      "Bash(gradlew.bat clean:*)",
+      "Bash(adb shell:*)",
+      "Bash(npx tsc:*)"
     ]
   }
 }

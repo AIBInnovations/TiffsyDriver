@@ -111,6 +111,8 @@ export const getChannelForNotificationType = (type?: string): string => {
     case 'BATCH_ASSIGNED':
     case 'BATCH_UPDATED':
     case 'BATCH_CANCELLED':
+    case 'BATCH_REASSIGNED':
+    case 'BATCH_OPTIMIZED':
       return NOTIFICATION_CHANNELS.BATCH;
 
     case 'ORDER_READY_FOR_PICKUP':

@@ -9,6 +9,10 @@ import type {
   DeliveryStatusUpdateData,
   DriverOrdersData,
   DriverBatchHistoryData,
+  DriverLocationUpdate,
+  DriverLocationResponse,
+  BatchTrackingData,
+  OrderTrackingData,
 } from '../types/api';
 
 // Create authorized headers with Firebase token
@@ -377,6 +381,103 @@ export const getDriverBatchHistory = async (): Promise<ApiResponse<DriverBatchHi
     return data;
   } catch (error: any) {
     console.error('❌ Error getting driver batch history:', error);
+    throw error;
+  }
+};
+
+// Send driver GPS location (fire-and-forget — never throws)
+export const sendDriverLocation = async (
+  locationData: DriverLocationUpdate
+): Promise<void> => {
+  try {
+    const headers = await createHeaders();
+
+    const response = await fetch(
+      `${API_CONFIG.BASE_URL}${API_CONFIG.ENDPOINTS.DRIVER_LOCATION}`,
+      {
+        method: 'POST',
+        headers,
+        body: JSON.stringify(locationData),
+      }
+    );
+
+    if (!response.ok) {
+      const data = await response.json();
+      console.warn('⚠️ Location update failed:', data.message || response.status);
+      return;
+    }
+
+    console.log('📍 Location sent:', locationData.latitude.toFixed(4), locationData.longitude.toFixed(4));
+  } catch (error: any) {
+    // Fire-and-forget: silently log, never throw
+    console.warn('⚠️ Location update error:', error.message);
+  }
+};
+
+// Get batch tracking data with ETAs and distances
+export const getBatchTracking = async (
+  batchId: string
+): Promise<ApiResponse<BatchTrackingData>> => {
+  try {
+    console.log('📡 Calling /delivery/batches/:batchId/tracking endpoint...');
+
+    const headers = await createHeaders();
+
+    const response = await fetch(
+      `${API_CONFIG.BASE_URL}${API_CONFIG.ENDPOINTS.BATCH_TRACKING(batchId)}`,
+      {
+        method: 'GET',
+        headers,
+      }
+    );
+
+    console.log('📡 Tracking response status:', response.status);
+
+    const data: ApiResponse<BatchTrackingData> = await response.json();
+
+    if (!response.ok) {
+      throw new Error(data.error || data.message || 'Failed to get batch tracking');
+    }
+
+    console.log('✅ Tracking data retrieved, deliveries:', data?.data?.deliveries?.length || 0);
+
+    return data;
+  } catch (error: any) {
+    console.error('❌ Error getting batch tracking:', error);
+    throw error;
+  }
+};
+
+// Get individual order tracking data
+export const getOrderTracking = async (
+  orderId: string
+): Promise<ApiResponse<OrderTrackingData>> => {
+  try {
+    console.log('📡 Calling /delivery/orders/:orderId/tracking endpoint...');
+
+    const headers = await createHeaders();
+
+    const response = await fetch(
+      `${API_CONFIG.BASE_URL}${API_CONFIG.ENDPOINTS.ORDER_TRACKING(orderId)}`,
+      {
+        method: 'GET',
+        headers,
+      }
+    );
+
+    console.log('📡 Order tracking response status:', response.status);
+
+    const data: ApiResponse<OrderTrackingData> = await response.json();
+
+    if (!response.ok) {
+      throw new Error(data.error || data.message || 'Failed to get order tracking');
+    }
+
+    console.log('✅ Order tracking data retrieved for:', orderId);
+
+    return data;
+  } catch (error: any) {
+    console.error('❌ Error getting order tracking:', error);
     throw error;
   }
 };

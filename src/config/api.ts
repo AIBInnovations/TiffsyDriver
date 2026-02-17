@@ -26,6 +26,9 @@ export const API_CONFIG = {
     GET_BATCH: (batchId: string) => `/delivery/batches/${batchId}`,
     DRIVER_ORDERS: '/orders/driver',
     DRIVER_BATCH_HISTORY: '/delivery/batches/driver/history',
+    DRIVER_LOCATION: '/delivery/driver/location',
+    BATCH_TRACKING: (batchId: string) => `/delivery/batches/${batchId}/tracking`,
+    ORDER_TRACKING: (orderId: string) => `/delivery/orders/${orderId}/tracking`,
 
     // Driver Profile endpoints
     DRIVER_PROFILE: '/driver/profile',
@@ -33,6 +36,8 @@ export const API_CONFIG = {
     DRIVER_PROFILE_IMAGE: '/driver/profile/image',
     DRIVER_DOCUMENTS_REQUEST: '/driver/documents/request',
     DRIVER_STATS: '/driver/stats',
+    DRIVER_STATUS: '/driver/status',
+    DRIVER_SHIFT: '/driver/shift',
 
     // Notification endpoints
     NOTIFICATIONS: '/notifications',
