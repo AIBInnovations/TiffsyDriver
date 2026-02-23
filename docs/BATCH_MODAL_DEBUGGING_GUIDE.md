@@ -36,7 +36,7 @@ When you open the app and click "View Batches", look for these console logs:
 3. Check API endpoint: `GET /api/delivery/available-batches`
 4. Test backend directly:
    ```bash
-   curl -X GET https://tiffsy-backend.onrender.com/api/delivery/available-batches \
+   curl -X GET https://d31od4t2t5epcb.cloudfront.net/api/delivery/available-batches \
      -H "Authorization: Bearer YOUR_TOKEN"
    ```
 
@@ -131,7 +131,7 @@ Use a REST client (Postman, Insomnia, or curl):
 # Get your auth token from app logs
 # Look for: "Authorization: Bearer YOUR_TOKEN"
 
-curl -X GET https://tiffsy-backend.onrender.com/api/delivery/available-batches \
+curl -X GET https://d31od4t2t5epcb.cloudfront.net/api/delivery/available-batches \
   -H "Content-Type: application/json" \
   -H "Authorization: Bearer YOUR_TOKEN" \
   -v

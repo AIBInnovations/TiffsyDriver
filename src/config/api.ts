@@ -1,7 +1,7 @@
 // API Configuration
 export const API_CONFIG = {
   // Replace with your actual backend URL
-  BASE_URL: 'https://tiffsy-backend.onrender.com/api',
+  BASE_URL: 'https://d31od4t2t5epcb.cloudfront.net/api',
 
   // Timeouts
   TIMEOUT: 30000, // 30 seconds

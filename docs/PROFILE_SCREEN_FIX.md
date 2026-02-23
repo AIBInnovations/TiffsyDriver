@@ -36,7 +36,7 @@ Backend को return करना चाहिए:
 
 ```
 📡 Calling /auth/sync endpoint...
-🌐 Full URL: https://tiffsy-backend.onrender.com/api/auth/sync
+🌐 Full URL: https://d31od4t2t5epcb.cloudfront.net/api/auth/sync
 📡 Response status: 200
 📊 Sync response: {
   isNewUser: false,
@@ -161,7 +161,7 @@ res.json({
 
 ### Test Case 1: New User
 ```bash
-curl -X POST https://tiffsy-backend.onrender.com/api/auth/sync \
+curl -X POST https://d31od4t2t5epcb.cloudfront.net/api/auth/sync \
   -H "Authorization: Bearer YOUR_TOKEN" \
   -H "Content-Type: application/json"
 
@@ -177,7 +177,7 @@ curl -X POST https://tiffsy-backend.onrender.com/api/auth/sync \
 
 ### Test Case 2: Existing User with Complete Profile
 ```bash
-curl -X POST https://tiffsy-backend.onrender.com/api/auth/sync \
+curl -X POST https://d31od4t2t5epcb.cloudfront.net/api/auth/sync \
   -H "Authorization: Bearer YOUR_TOKEN" \
   -H "Content-Type: application/json"
 

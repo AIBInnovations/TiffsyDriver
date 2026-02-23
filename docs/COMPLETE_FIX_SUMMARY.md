@@ -158,7 +158,7 @@ Profile submit करते समय:
 Login करते समय:
 ```
 📡 Calling /auth/sync endpoint...
-🌐 Full URL: https://tiffsy-backend.onrender.com/api/auth/sync
+🌐 Full URL: https://d31od4t2t5epcb.cloudfront.net/api/auth/sync
 📡 Response status: 200
 🔍 FULL BACKEND RESPONSE: {
   "data": {
