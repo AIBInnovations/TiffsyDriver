@@ -14,9 +14,8 @@ import {
   StyleSheet,
   Pressable,
 } from 'react-native';
-import auth from '@react-native-firebase/auth';
 import { AuthStackScreenProps } from "../../navigation/types";
-import { syncUser, getFirebaseToken } from '../../services/authService';
+import { verifyAndSync, resendOTP } from '../../services/authService';
 import { tokenStorage } from '../../utils/tokenStorage';
 import { useDriverProfileStore } from '../profile/useDriverProfileStore';
 import { registerFCMToken } from '../../services/fcmService';
@@ -26,7 +25,7 @@ import { LegalModal } from '../profile/components/ProfileModals';
 type Props = AuthStackScreenProps<'OtpVerify'>;
 
 const OTPVerificationScreen = ({ navigation, route }: Props) => {
-  const { phoneNumber, confirmation } = route.params;
+  const { phoneNumber } = route.params;
   const [otp, setOtp] = useState(['', '', '', '', '', '']);
   const [timer, setTimer] = useState(30);
   const [canResend, setCanResend] = useState(false);
@@ -91,63 +90,42 @@ const OTPVerificationScreen = ({ navigation, route }: Props) => {
     if (code.length === 6) {
       setVerifying(true);
       try {
-        // Step 1: Verify the OTP code with Firebase
-        console.log('🔐 Verifying OTP with Firebase...');
-        const userCredential = await confirmation.confirm(code);
-        console.log('✅ Firebase OTP verified successfully');
-        console.log('👤 User:', userCredential.user.uid);
+        // Verify OTP via backend (MSG91) - also syncs user
+        console.log('Verifying OTP via backend...');
+        const response = await verifyAndSync(phoneNumber, code);
 
-        // Step 2: Get Firebase ID token
-        console.log('🔑 Getting Firebase ID token...');
-        const idToken = await getFirebaseToken();
-
-        // Step 3: Store the token
-        await tokenStorage.setToken(idToken);
-        console.log('💾 Token stored in AsyncStorage');
-
-        // Step 4: Sync with backend
-        console.log('📡 Syncing user with backend...');
-        const syncResponse = await syncUser();
-
-        console.log('📊 Sync response:', {
-          isNewUser: syncResponse.data.isNewUser,
-          isProfileComplete: syncResponse.data.isProfileComplete,
-          userName: syncResponse.data.user?.name,
-          userRole: syncResponse.data.user?.role
+        console.log('Verify response:', {
+          isNewUser: response.data.isNewUser,
+          isProfileComplete: response.data.isProfileComplete,
+          userName: response.data.user?.name,
+          userRole: response.data.user?.role,
         });
 
-        // ⚠️ DEBUG: Show full backend response
-        console.log('🔍 FULL BACKEND RESPONSE:', JSON.stringify(syncResponse, null, 2));
-
-        // Step 5: Register FCM token for push notifications
-        console.log('🔔 Registering FCM token for push notifications...');
+        // Register FCM token (fire-and-forget)
         try {
           const fcmRegistered = await registerFCMToken();
-
-          if (fcmRegistered) {
-            console.log('✅ FCM token registered successfully');
-          } else {
-            console.log('⚠️ FCM token registration failed - likely permission denied');
-            // Show informational alert about notifications
+          if (!fcmRegistered) {
             setAlertConfig({
               visible: true,
               title: 'Notification Permission',
-              message: 'Notification permission was not granted. You can enable it later in your Profile settings to receive important updates about deliveries and batches.',
+              message: 'Notification permission was not granted. You can enable it later in your Profile settings.',
               icon: 'bell-off-outline',
               iconColor: '#F59E0B',
             });
           }
         } catch (fcmError) {
-          console.error('⚠️ Failed to register FCM token (non-critical):', fcmError);
-          // Don't block login if FCM registration fails
+          console.error('Failed to register FCM token (non-critical):', fcmError);
         }
 
-        // Step 6: Handle response based on user status
-        if (syncResponse.data.isNewUser) {
-          // New user - navigate directly to driver registration
-          console.log('👤 New user detected, navigating to driver registration...');
-          navigation.replace('DriverRegistration', { phoneNumber });
-        } else if (syncResponse.data.user?.role !== 'DRIVER') {
+        // Handle response based on user status
+        if (response.data.isNewUser) {
+          // New user - navigate to driver registration with registrationToken
+          console.log('New user detected, navigating to driver registration...');
+          navigation.replace('DriverRegistration', {
+            phoneNumber,
+            registrationToken: response.data.registrationToken,
+          });
+        } else if (response.data.user?.role !== 'DRIVER') {
           // User exists but is not a driver
           setAlertConfig({
             visible: true,
@@ -156,24 +134,21 @@ const OTPVerificationScreen = ({ navigation, route }: Props) => {
             icon: 'account-cancel',
             iconColor: '#EF4444',
             onConfirm: async () => {
-              await auth().signOut();
               await tokenStorage.clearAll();
               navigation.goBack();
             },
           });
         } else {
           // User is a DRIVER - check approval status
-          const { approvalStatus, rejectionReason } = syncResponse.data;
-          console.log('🚗 Driver user, checking approval status:', approvalStatus);
+          const { approvalStatus, rejectionReason } = response.data;
+          console.log('Driver user, checking approval status:', approvalStatus);
 
           switch (approvalStatus) {
             case 'PENDING':
-              console.log('⏳ Driver registration is PENDING approval');
               navigation.replace('ApprovalWaiting', { phoneNumber });
               break;
 
             case 'REJECTED':
-              console.log('❌ Driver registration was REJECTED');
               navigation.replace('Rejection', {
                 phoneNumber,
                 rejectionReason: rejectionReason || 'No reason provided',
@@ -181,25 +156,18 @@ const OTPVerificationScreen = ({ navigation, route }: Props) => {
               break;
 
             case 'APPROVED':
-              console.log('✅ Driver is APPROVED, checking profile completion...');
-              if (!syncResponse.data.isProfileComplete) {
-                console.log('📝 Profile incomplete, navigating to profile completion...');
+              if (!response.data.isProfileComplete) {
                 navigation.replace('ProfileOnboarding', { phoneNumber });
               } else {
-                console.log('✅ Profile complete, setting driver to ONLINE and navigating to main app...');
                 await setAvailabilityStatus('ONLINE');
                 navigation.getParent()?.navigate('Main');
               }
               break;
 
             default:
-              // No approval status (legacy user or not yet registered as driver)
-              console.log('⚠️ No approval status, checking profile completion...');
-              if (!syncResponse.data.isProfileComplete) {
-                console.log('📝 Profile incomplete, navigating to profile completion...');
+              if (!response.data.isProfileComplete) {
                 navigation.replace('ProfileOnboarding', { phoneNumber });
               } else {
-                console.log('✅ Profile complete, setting driver to ONLINE and navigating to main app...');
                 await setAvailabilityStatus('ONLINE');
                 navigation.getParent()?.navigate('Main');
               }
@@ -207,35 +175,21 @@ const OTPVerificationScreen = ({ navigation, route }: Props) => {
         }
 
       } catch (error: any) {
-        console.error('❌ Error during OTP verification:', error);
+        console.error('Error during OTP verification:', error);
 
-        // Check if it's a Firebase OTP error or backend error
-        if (error.code?.includes('auth/')) {
-          setAlertConfig({
-            visible: true,
-            title: 'Invalid OTP',
-            message: 'The code you entered is incorrect. Please try again.',
-            icon: 'lock-alert',
-            iconColor: '#EF4444',
-          });
-        } else {
-          // Backend connection error
-          let errorMessage = error.message || 'Failed to connect to server.';
-
-          if (error.message?.includes('non-JSON response') || error.message?.includes('JSON Parse error')) {
-            errorMessage = 'Cannot connect to backend server.\n\nPlease check:\n1. Backend server is running\n2. Backend URL is correct in src/config/api.ts\n3. Network connection is stable\n\nSee console logs for details.';
-          }
-
-          setAlertConfig({
-            visible: true,
-            title: 'Backend Connection Error',
-            message: errorMessage,
-            icon: 'server-network-off',
-            iconColor: '#EF4444',
-          });
+        let errorMessage = error.message || 'Failed to verify OTP.';
+        if (error.message?.includes('non-JSON response')) {
+          errorMessage = 'Cannot connect to backend server. Please check your connection.';
         }
 
-        // Clear OTP fields on error
+        setAlertConfig({
+          visible: true,
+          title: 'Verification Error',
+          message: errorMessage,
+          icon: 'alert-circle',
+          iconColor: '#EF4444',
+        });
+
         setOtp(['', '', '', '', '', '']);
         inputRefs.current[0]?.focus();
       } finally {
@@ -248,20 +202,10 @@ const OTPVerificationScreen = ({ navigation, route }: Props) => {
     if (canResend) {
       setVerifying(true);
       try {
-        console.log('🔄 Resending OTP...');
+        console.log('Resending OTP...');
 
-        // Remove +91 prefix and space, get just the digits
-        const phoneDigits = phoneNumber.replace(/[^\d]/g, '');
-        const fullPhoneNumber = `+91${phoneDigits}`;
-
-        console.log('📱 Phone number:', fullPhoneNumber);
-
-        // Resend OTP
-        const newConfirmation = await auth().signInWithPhoneNumber(fullPhoneNumber);
-        console.log('✅ OTP resent successfully');
-
-        // Update route params with new confirmation
-        navigation.setParams({ confirmation: newConfirmation });
+        await resendOTP(phoneNumber);
+        console.log('OTP resent successfully');
 
         setTimer(30);
         setCanResend(false);
@@ -276,7 +220,7 @@ const OTPVerificationScreen = ({ navigation, route }: Props) => {
           iconColor: '#10B981',
         });
       } catch (error: any) {
-        console.error('❌ Error resending OTP:', error);
+        console.error('Error resending OTP:', error);
         setAlertConfig({
           visible: true,
           title: 'Error',

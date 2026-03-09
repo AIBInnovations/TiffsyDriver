@@ -14,7 +14,7 @@ import {
   Pressable,
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import auth from '@react-native-firebase/auth';
+import { sendOTP } from '../../services/authService';
 import type { AuthStackScreenProps } from "../../navigation/types";
 import CustomAlert from '../../components/common/CustomAlert';
 import { LegalModal } from '../profile/components/ProfileModals';
@@ -73,16 +73,15 @@ const LoginScreen = ({ navigation }: Props) => {
           console.log('🗑️ Saved phone number cleared (Remember me disabled)');
         }
 
-        const phoneNumber = `+91${phone}`;
-        console.log('📱 Sending OTP to:', phoneNumber);
+        console.log('Sending OTP to:', phone);
 
-        const confirmation = await auth().signInWithPhoneNumber(phoneNumber);
-        console.log('✅ OTP sent successfully');
+        // Send OTP via backend (MSG91)
+        await sendOTP(phone);
+        console.log('OTP sent successfully');
 
-        // Navigate to OTP screen with confirmation object
+        // Navigate to OTP screen
         navigation.navigate('OtpVerify', {
-          phoneNumber: `+91 ${phone}`,
-          confirmation
+          phoneNumber: phone,
         });
       } catch (error: any) {
         console.error('❌ Error sending OTP:', error);

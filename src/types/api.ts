@@ -55,6 +55,8 @@ export interface ShiftManageData {
 // Auth Sync Response
 export interface AuthSyncData {
   user: User | null;
+  token?: string;
+  registrationToken?: string;
   isNewUser: boolean;
   isProfileComplete: boolean;
   approvalStatus?: ApprovalStatus;

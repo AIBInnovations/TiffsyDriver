@@ -13,7 +13,7 @@ import {
 } from 'react-native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import type { RouteProp } from '@react-navigation/core';
-import { registerDriver } from '../../services/authService';
+import { registerDriverWithOtp, registerDriver } from '../../services/authService';
 import type { AuthStackParamList } from '../../navigation/types';
 import type { VehicleDocument, VehicleType, DocumentType } from '../../types/api';
 
@@ -50,7 +50,7 @@ export default function DriverRegistrationScreen({
   navigation,
   route,
 }: DriverRegistrationScreenProps) {
-  const { phoneNumber, reapply } = route.params;
+  const { phoneNumber, registrationToken, reapply } = route.params;
 
   // Personal Info
   const [name, setName] = useState('');
@@ -227,8 +227,15 @@ export default function DriverRegistrationScreen({
           ]
         );
       } else {
-        // Real API call (use when backend is ready)
-        const response = await registerDriver(registrationData);
+        // New user registration uses registrationToken; reapply uses existing JWT
+        if (reapply) {
+          const response = await registerDriver(registrationData);
+        } else if (registrationToken) {
+          const response = await registerDriverWithOtp(registrationToken, registrationData);
+        } else {
+          Alert.alert('Error', 'Registration token is missing. Please verify your OTP again.');
+          return;
+        }
 
         console.log('✅ Driver registration submitted successfully');
 

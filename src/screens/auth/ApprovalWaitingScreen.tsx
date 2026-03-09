@@ -12,8 +12,7 @@ import {
 } from 'react-native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import type { RouteProp } from '@react-navigation/core';
-import { syncUser } from '../../services/authService';
-import { logout } from '../../services/authService';
+import { getCurrentUser, logout } from '../../services/authService';
 import type { AuthStackParamList } from '../../navigation/types';
 
 type ApprovalWaitingScreenNavigationProp = NativeStackNavigationProp<
@@ -42,9 +41,9 @@ export default function ApprovalWaitingScreen({
     setChecking(true);
     try {
       console.log('🔄 Checking approval status...');
-      const syncResponse = await syncUser();
+      const meResponse = await getCurrentUser();
 
-      const { approvalStatus, rejectionReason } = syncResponse.data;
+      const { approvalStatus, rejectionReason } = meResponse.data.user as any;
 
       console.log('📊 Approval status:', approvalStatus);
 

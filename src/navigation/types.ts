@@ -1,22 +1,20 @@
 import type { NativeStackScreenProps } from "@react-navigation/native-stack";
 import type { BottomTabScreenProps } from "@react-navigation/bottom-tabs";
 import type { CompositeScreenProps, NavigatorScreenParams } from "@react-navigation/native";
-import type { FirebaseAuthTypes } from "@react-native-firebase/auth";
 
 // Auth Stack
 export type AuthStackParamList = {
   Login: undefined;
   OtpVerify: {
     phoneNumber: string;
-    confirmation: FirebaseAuthTypes.ConfirmationResult;
   };
-  DriverRegistration: { phoneNumber: string; reapply?: boolean };
+  DriverRegistration: { phoneNumber: string; registrationToken?: string; reapply?: boolean };
   ApprovalWaiting: { phoneNumber: string };
   Rejection: {
     phoneNumber: string;
     rejectionReason: string;
   };
-  ProfileOnboarding: { phoneNumber: string }; // Keep for customers
+  ProfileOnboarding: { phoneNumber: string };
 };
 
 // Delivery Status Screen Params

@@ -2,7 +2,7 @@ import { Platform, PermissionsAndroid } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import notifee, { EventType } from '@notifee/react-native';
 import { API_CONFIG } from '../config/api';
-import { getFirebaseToken } from './authService';
+import { getStoredToken } from './authService';
 import { getChannelForNotificationType } from './notificationChannels';
 
 // Firebase messaging - wrapped to handle missing configuration
@@ -228,8 +228,8 @@ export const registerFCMToken = async (): Promise<boolean> => {
     console.log('📱 Device Type:', deviceType);
     console.log('📱 Device ID:', deviceId);
 
-    // Get Firebase auth token for API call
-    const authToken = await getFirebaseToken();
+    // Get JWT auth token for API call
+    const authToken = await getStoredToken();
 
     // Get notification preferences from storage
     let notificationPreferences = {
@@ -305,8 +305,8 @@ export const removeFCMToken = async (): Promise<boolean> => {
 
     console.log('📡 Removing FCM token from backend...');
 
-    // Get Firebase auth token for API call
-    const authToken = await getFirebaseToken();
+    // Get JWT auth token for API call
+    const authToken = await getStoredToken();
 
     const response = await fetch(
       `${API_CONFIG.BASE_URL}${API_CONFIG.ENDPOINTS.FCM_TOKEN}`,
@@ -704,7 +704,7 @@ export const syncNotificationPreferences = async (preferences: {
       return false;
     }
 
-    const authToken = await getFirebaseToken();
+    const authToken = await getStoredToken();
 
     const response = await fetch(
       `${API_CONFIG.BASE_URL}${API_CONFIG.ENDPOINTS.FCM_TOKEN}`,

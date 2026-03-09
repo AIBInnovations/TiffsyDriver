@@ -1,5 +1,5 @@
 import { API_CONFIG } from '../config/api';
-import { getFirebaseToken } from './authService';
+import { getStoredToken } from './authService';
 import type {
   ApiResponse,
   DriverProfileData,
@@ -15,9 +15,9 @@ import type {
   ShiftManageData,
 } from '../types/api';
 
-// Create authorized headers with Firebase token
+// Create authorized headers with JWT token
 const createHeaders = async () => {
-  const token = await getFirebaseToken();
+  const token = await getStoredToken();
   return {
     'Content-Type': 'application/json',
     'Authorization': `Bearer ${token}`,

@@ -15,7 +15,7 @@ import { AuthStackScreenProps } from "../../navigation/types";
 import { CommonActions } from '@react-navigation/native';
 import MaterialCommunityIcons from "react-native-vector-icons/MaterialCommunityIcons";
 import { updateProfile } from '../../services/authService';
-import auth from '@react-native-firebase/auth';
+import { tokenStorage } from '../../utils/tokenStorage';
 
 type Props = AuthStackScreenProps<'ProfileOnboarding'>;
 
@@ -129,9 +129,9 @@ const ProfileOnboardingScreen = ({ navigation, route }: Props) => {
           [
             {
               text: 'OK',
-              onPress: () => {
-                // Sign out and go back to login
-                auth().signOut();
+              onPress: async () => {
+                // Clear token and go back to login
+                await tokenStorage.clearAll();
                 navigation.dispatch(
                   CommonActions.reset({
                     index: 0,

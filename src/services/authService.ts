@@ -10,106 +10,123 @@ import type {
   DriverRegistrationData,
 } from '../types/api';
 
-// Firebase auth - wrapped to handle missing configuration
-let auth: any = null;
-let isFirebaseAuthAvailable = false;
-
-try {
-  auth = require('@react-native-firebase/auth').default;
-  isFirebaseAuthAvailable = true;
-} catch (error) {
-  console.warn('⚠️ Firebase auth not available');
-}
-
-// Helper to safely get auth instance
-const getAuth = () => {
-  if (!isFirebaseAuthAvailable || !auth) {
-    console.warn('⚠️ Firebase Auth not configured');
-    return null;
+// Get stored JWT token
+export const getStoredToken = async (): Promise<string> => {
+  const token = await tokenStorage.getToken();
+  if (!token) {
+    throw new Error('No auth token found');
   }
-  try {
-    return auth();
-  } catch (error) {
-    console.warn('⚠️ Firebase Auth not initialized:', error);
-    isFirebaseAuthAvailable = false;
-    return null;
-  }
-};
-
-// Get Firebase ID token and log it
-export const getFirebaseToken = async (): Promise<string> => {
-  const authInstance = getAuth();
-  if (!authInstance) {
-    throw new Error('Firebase Auth not configured - add GoogleService-Info.plist');
-  }
-
-  const currentUser = authInstance.currentUser;
-  if (!currentUser) {
-    throw new Error('No authenticated user found');
-  }
-
-  const token = await currentUser.getIdToken();
-  console.log('🔑 Firebase ID Token:', token);
-  console.log('🔑 Token preview:', token.substring(0, 50) + '...');
-
   return token;
 };
 
-// Create authorized headers with Firebase token
+// Create authorized headers with stored JWT token
 const createHeaders = async () => {
-  const token = await getFirebaseToken();
+  const token = await getStoredToken();
   return {
     'Content-Type': 'application/json',
     'Authorization': `Bearer ${token}`,
   };
 };
 
-// Sync user with backend after Firebase authentication
-export const syncUser = async (): Promise<ApiResponse<AuthSyncData>> => {
-  try {
-    const url = `${API_CONFIG.BASE_URL}${API_CONFIG.ENDPOINTS.AUTH_SYNC}`;
-    console.log('📡 Calling /auth/sync endpoint...');
-    console.log('🌐 Full URL:', url);
+// Send OTP to phone number via backend (MSG91)
+export const sendOTP = async (phone: string): Promise<void> => {
+  const url = `${API_CONFIG.BASE_URL}/auth/send-otp`;
+  const response = await fetch(url, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ phone }),
+  });
+  const data = await response.json();
+  if (!response.ok) {
+    throw new Error(data.message || 'Failed to send OTP');
+  }
+};
 
-    const headers = await createHeaders();
+// Verify OTP via backend and get JWT + user data
+export const verifyAndSync = async (phone: string, otp: string): Promise<ApiResponse<AuthSyncData>> => {
+  const url = `${API_CONFIG.BASE_URL}/auth/verify-otp`;
+  const response = await fetch(url, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ phone, otp }),
+  });
+
+  const responseText = await response.text();
+  let data: ApiResponse<AuthSyncData>;
+  try {
+    data = JSON.parse(responseText);
+  } catch {
+    throw new Error(`Backend returned non-JSON response. Status: ${response.status}`);
+  }
+
+  if (!response.ok) {
+    throw new Error(data.message || 'Failed to verify OTP');
+  }
+
+  // Store JWT token if present
+  if (data.data?.token) {
+    await tokenStorage.setToken(data.data.token);
+  }
+
+  // Store user data if present
+  if (data.data?.user) {
+    await tokenStorage.setUserData(data.data.user);
+  }
+
+  return data;
+};
+
+// Resend OTP via backend (MSG91)
+export const resendOTP = async (phone: string): Promise<void> => {
+  const url = `${API_CONFIG.BASE_URL}/auth/resend-otp`;
+  const response = await fetch(url, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ phone }),
+  });
+  const data = await response.json();
+  if (!response.ok) {
+    throw new Error(data.message || 'Failed to resend OTP');
+  }
+};
+
+// Register driver with registrationToken (after OTP verification for new users)
+export const registerDriverWithOtp = async (
+  registrationToken: string,
+  data: DriverRegistrationRequest
+): Promise<ApiResponse<DriverRegistrationData>> => {
+  try {
+    const url = `${API_CONFIG.BASE_URL}/auth/otp/register-driver`;
 
     const response = await fetch(url, {
       method: 'POST',
-      headers,
-      body: JSON.stringify({}),
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${registrationToken}`,
+      },
+      body: JSON.stringify(data),
     });
 
-    console.log('📡 Response status:', response.status);
-    console.log('📡 Response headers:', response.headers);
-
-    // Get response text first to check if it's JSON
     const responseText = await response.text();
-    console.log('📡 Response text preview:', responseText.substring(0, 200));
-
-    // Try to parse as JSON
-    let data: ApiResponse<AuthSyncData>;
+    let responseData: ApiResponse<DriverRegistrationData>;
     try {
-      data = JSON.parse(responseText);
-      console.log('📡 Response data:', JSON.stringify(data, null, 2));
-    } catch (parseError) {
-      console.error('❌ Response is not valid JSON');
-      console.error('📄 Full response:', responseText);
-      throw new Error(`Backend returned non-JSON response. Check if backend URL is correct: ${url}`);
+      responseData = JSON.parse(responseText);
+    } catch {
+      throw new Error(`Backend returned non-JSON response. Status: ${response.status}`);
     }
 
     if (!response.ok) {
-      throw new Error(data.error || data.message || 'Failed to sync user');
+      throw new Error(responseData.message || 'Failed to register driver');
     }
 
-    // Store user data if exists
-    if (data.data.user) {
-      await tokenStorage.setUserData(data.data.user);
-      console.log('✅ User data stored:', data.data.user.name);
+    // Store the JWT token from registration response
+    if (responseData.data?.token) {
+      await tokenStorage.setToken(responseData.data.token);
     }
 
-    return data;
+    return responseData;
   } catch (error: any) {
-    console.error('❌ Error syncing user:', error);
+    console.error('Error registering driver:', error);
     throw error;
   }
 };
@@ -241,35 +258,19 @@ export const registerDriver = async (
 // Logout user
 export const logout = async (): Promise<void> => {
   try {
-    console.log('🚪 Logging out user...');
-
-    // Sign out from Firebase
-    const authInstance = getAuth();
-    if (authInstance) {
-      await authInstance.signOut();
-    }
-
-    // Clear stored data
+    console.log('Logging out user...');
     await tokenStorage.clearAll();
-
-    console.log('✅ Logout successful');
+    console.log('Logout successful');
   } catch (error: any) {
-    console.error('❌ Error during logout:', error);
+    console.error('Error during logout:', error);
     throw error;
   }
 };
 
-// Check if user is authenticated
+// Check if user is authenticated (has stored JWT token)
 export const isAuthenticated = async (): Promise<boolean> => {
   try {
-    const authInstance = getAuth();
-    if (!authInstance) {
-      return false;
-    }
-    const currentUser = authInstance.currentUser;
-    const storedToken = await tokenStorage.getToken();
-
-    return !!(currentUser && storedToken);
+    return await tokenStorage.hasValidToken();
   } catch (error) {
     console.error('Error checking authentication:', error);
     return false;
