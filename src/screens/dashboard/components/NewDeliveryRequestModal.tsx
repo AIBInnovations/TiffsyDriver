@@ -79,7 +79,7 @@ export default function NewDeliveryRequestModal({
           {/* Header */}
           <View style={styles.header}>
             <View style={styles.headerIcon}>
-              <MaterialCommunityIcons name="package-variant" size={28} color="#F56B4C" />
+              <MaterialCommunityIcons name="package-variant" size={28} color="#FE8733" />
             </View>
             <Text style={styles.headerTitle}>New Delivery Request</Text>
             <Text style={styles.headerSubtitle}>{delivery.orderId}</Text>

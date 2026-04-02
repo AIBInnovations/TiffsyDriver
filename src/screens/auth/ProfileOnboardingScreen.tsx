@@ -155,10 +155,10 @@ const ProfileOnboardingScreen = ({ navigation, route }: Props) => {
 
   return (
     <KeyboardAvoidingView
-      style={{ flex: 1, backgroundColor: '#F56B4C' }}
+      style={{ flex: 1, backgroundColor: '#FE8733' }}
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
     >
-      <StatusBar barStyle="light-content" backgroundColor="#F56B4C" />
+      <StatusBar barStyle="light-content" backgroundColor="#FE8733" />
       <ScrollView
         style={{ flex: 1 }}
         contentContainerStyle={{ flexGrow: 1 }}
@@ -168,7 +168,7 @@ const ProfileOnboardingScreen = ({ navigation, route }: Props) => {
         {/* Top header area */}
         <View
           style={{
-            backgroundColor: '#F56B4C',
+            backgroundColor: '#FE8733',
             paddingHorizontal: 20,
             paddingTop: 15,
             paddingBottom: 30,
@@ -254,8 +254,8 @@ const ProfileOnboardingScreen = ({ navigation, route }: Props) => {
                 backgroundColor: '#FEF2F2',
               }}
             >
-              <MaterialCommunityIcons name="camera" size={18} color="#F56B4C" />
-              <Text style={{ color: '#F56B4C', fontSize: 14, fontWeight: '600' }}>
+              <MaterialCommunityIcons name="camera" size={18} color="#FE8733" />
+              <Text style={{ color: '#FE8733', fontSize: 14, fontWeight: '600' }}>
                 Add Photo
               </Text>
             </TouchableOpacity>
@@ -424,20 +424,20 @@ const ProfileOnboardingScreen = ({ navigation, route }: Props) => {
                     borderRadius: 12,
                     backgroundColor: vehicleType === type.id ? '#FEF2F2' : '#F9FAFB',
                     borderWidth: 1.5,
-                    borderColor: vehicleType === type.id ? '#F56B4C' : '#E5E7EB',
+                    borderColor: vehicleType === type.id ? '#FE8733' : '#E5E7EB',
                   }}
                 >
                   <MaterialCommunityIcons
                     name={type.icon}
                     size={28}
-                    color={vehicleType === type.id ? '#F56B4C' : '#6B7280'}
+                    color={vehicleType === type.id ? '#FE8733' : '#6B7280'}
                   />
                   <Text
                     style={{
                       marginTop: 8,
                       fontSize: 13,
                       fontWeight: vehicleType === type.id ? '600' : '500',
-                      color: vehicleType === type.id ? '#F56B4C' : '#6B7280',
+                      color: vehicleType === type.id ? '#FE8733' : '#6B7280',
                     }}
                   >
                     {type.label}
@@ -497,7 +497,7 @@ const ProfileOnboardingScreen = ({ navigation, route }: Props) => {
             onPress={handleSubmit}
             disabled={isSubmitting}
             style={{
-              backgroundColor: isSubmitting ? '#FCA5A5' : '#F56B4C',
+              backgroundColor: isSubmitting ? '#FCA5A5' : '#FE8733',
               borderRadius: 100,
               paddingVertical: 16,
               alignItems: 'center',

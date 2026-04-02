@@ -13,6 +13,7 @@ import { useState, useCallback, useRef, useEffect } from "react";
 import { useNavigation, useFocusEffect } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import MaterialCommunityIcons from "react-native-vector-icons/MaterialCommunityIcons";
+import LinearGradient from "react-native-linear-gradient";
 import type { RootStackParamList, ProfileStackParamList } from "../../navigation/types";
 import type { UpdateVehicleRequest } from "../../types/api";
 import {
@@ -267,8 +268,8 @@ export default function ProfileScreen() {
   // Set status bar color when screen is focused
   useFocusEffect(
     useCallback(() => {
-      StatusBar.setBarStyle('dark-content');
-      StatusBar.setBackgroundColor('#FFFFFF');
+      StatusBar.setBarStyle('light-content');
+      StatusBar.setBackgroundColor('transparent');
     }, [])
   );
 
@@ -350,11 +351,11 @@ export default function ProfileScreen() {
   // Loading skeleton
   if (isLoading && !isHydrated) {
     return (
-      <SafeAreaView style={styles.container} edges={["top"]}>
-        <StatusBar barStyle="dark-content" backgroundColor="#FFFFFF" />
-        <View style={styles.header}>
+      <SafeAreaView style={styles.container} edges={['bottom']}>
+        <StatusBar translucent backgroundColor="transparent" barStyle="light-content" />
+        <LinearGradient colors={['#FD9E2F', '#FF6636']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={[styles.header, { paddingTop: (StatusBar.currentHeight || 0) + 12 }]}>
           <Text style={styles.headerTitle}>Profile</Text>
-        </View>
+        </LinearGradient>
         <ScrollView style={styles.scrollView} contentContainerStyle={styles.scrollContent}>
           {/* Skeleton Header Card */}
           <View style={styles.headerCard}>
@@ -383,16 +384,16 @@ export default function ProfileScreen() {
   }
 
   return (
-    <SafeAreaView style={styles.container} edges={["top"]}>
-      <StatusBar barStyle="dark-content" backgroundColor="#FFFFFF" />
+    <SafeAreaView style={styles.container} edges={['bottom']}>
+      <StatusBar translucent backgroundColor="transparent" barStyle="light-content" />
 
       {/* Header */}
-      <View style={styles.header}>
+      <LinearGradient colors={['#FD9E2F', '#FF6636']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={[styles.header, { paddingTop: (StatusBar.currentHeight || 0) + 12 }]}>
         <Text style={styles.headerTitle}>Profile</Text>
         <Pressable style={styles.helpButton} onPress={() => navigation.navigate("HelpSupport")}>
-          <MaterialCommunityIcons name="help-circle-outline" size={24} color="#6B7280" />
+          <MaterialCommunityIcons name="help-circle-outline" size={24} color="#FFFFFF" />
         </Pressable>
-      </View>
+      </LinearGradient>
 
       <ScrollView
         style={styles.scrollView}
@@ -481,7 +482,7 @@ export default function ProfileScreen() {
             style={styles.editProfileButton}
             onPress={() => setShowEditProfile(true)}
           >
-            <MaterialCommunityIcons name="pencil-outline" size={18} color="#F56B4C" />
+            <MaterialCommunityIcons name="pencil-outline" size={18} color="#FE8733" />
             <Text style={styles.editProfileButtonText}>Edit Profile</Text>
           </Pressable>
         </View>
@@ -689,14 +690,11 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     paddingHorizontal: 16,
     paddingVertical: 12,
-    backgroundColor: "#FFFFFF",
-    borderBottomWidth: 1,
-    borderBottomColor: "#F3F4F6",
   },
   headerTitle: {
     fontSize: 24,
     fontWeight: "700",
-    color: "#111827",
+    color: "#FFFFFF",
   },
   helpButton: {
     padding: 4,
@@ -824,7 +822,7 @@ const styles = StyleSheet.create({
   editProfileButtonText: {
     fontSize: 15,
     fontWeight: "600",
-    color: "#F56B4C",
+    color: "#FE8733",
   },
   savingLabel: {
     fontSize: 12,

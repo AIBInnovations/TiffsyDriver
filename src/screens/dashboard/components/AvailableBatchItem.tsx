@@ -21,7 +21,7 @@ export default function AvailableBatchItem({
       <View style={styles.header}>
         <View style={styles.headerLeft}>
           <View style={styles.iconContainer}>
-            <MaterialCommunityIcons name="package-variant-closed" size={20} color="#F56B4C" />
+            <MaterialCommunityIcons name="package-variant-closed" size={20} color="#FE8733" />
           </View>
           <View>
             <Text style={styles.batchNumber} numberOfLines={1}>
@@ -152,7 +152,7 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   acceptButton: {
-    backgroundColor: '#F56B4C',
+    backgroundColor: '#FE8733',
     borderRadius: 12,
     paddingVertical: 12,
     alignItems: 'center',

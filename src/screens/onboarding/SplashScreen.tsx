@@ -19,7 +19,7 @@ export default function SplashScreen() {
 
   return (
     <View style={styles.container}>
-      <StatusBar barStyle="light-content" backgroundColor="#F56B4C" />
+      <StatusBar barStyle="light-content" backgroundColor="#FE8733" />
 
       {/* Watermark Background Icon */}
       <View style={styles.watermarkContainer}>
@@ -78,7 +78,7 @@ export default function SplashScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#F56B4C",
+    backgroundColor: "#FE8733",
   },
   watermarkContainer: {
     position: 'absolute',
@@ -158,7 +158,7 @@ const styles = StyleSheet.create({
   antenna: {
     width: 4,
     height: 6,
-    backgroundColor: '#F56B4C',
+    backgroundColor: '#FE8733',
     borderRadius: 2,
     marginBottom: 2,
   },
@@ -170,7 +170,7 @@ const styles = StyleSheet.create({
     width: 6,
     height: 6,
     borderRadius: 3,
-    backgroundColor: '#F56B4C',
+    backgroundColor: '#FE8733',
   },
   logoText: {
     fontSize: 36,
@@ -209,7 +209,7 @@ const styles = StyleSheet.create({
     width: 40,
     height: 40,
     borderRadius: 20,
-    backgroundColor: '#F56B4C',
+    backgroundColor: '#FE8733',
     alignItems: 'center',
     justifyContent: 'center',
   },

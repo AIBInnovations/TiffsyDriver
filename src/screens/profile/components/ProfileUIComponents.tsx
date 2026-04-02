@@ -469,7 +469,7 @@ export function ErrorBanner({ message, onRetry, onReset }: ErrorBannerProps) {
 const styles = StyleSheet.create({
   // Avatar
   avatarContainer: {
-    backgroundColor: "#F56B4C",
+    backgroundColor: "#FE8733",
     alignItems: "center",
     justifyContent: "center",
     position: "relative",

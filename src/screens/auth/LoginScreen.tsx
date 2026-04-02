@@ -104,7 +104,7 @@ const LoginScreen = ({ navigation }: Props) => {
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
       keyboardVerticalOffset={0}
     >
-      <StatusBar barStyle="light-content" backgroundColor="#F56B4C" />
+      <StatusBar barStyle="light-content" backgroundColor="#FE8733" />
       <ScrollView
         style={styles.scrollView}
         contentContainerStyle={styles.scrollContent}
@@ -251,7 +251,7 @@ const LoginScreen = ({ navigation }: Props) => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F56B4C',
+    backgroundColor: '#FE8733',
   },
   scrollView: {
     flex: 1,
@@ -261,7 +261,7 @@ const styles = StyleSheet.create({
   },
   header: {
     height: 280,
-    backgroundColor: '#F56B4C',
+    backgroundColor: '#FE8733',
     paddingHorizontal: 20,
     paddingTop: 40,
     justifyContent: 'center',
@@ -363,7 +363,7 @@ const styles = StyleSheet.create({
     fontSize: 14,
   },
   otpButton: {
-    backgroundColor: '#F56B4C',
+    backgroundColor: '#FE8733',
     borderRadius: 100,
     paddingVertical: 15,
     alignItems: 'center',

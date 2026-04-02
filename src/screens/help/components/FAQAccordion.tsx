@@ -61,7 +61,7 @@ function FAQItem({ faq, isExpanded, onToggle }: FAQItemProps) {
             <MaterialCommunityIcons
               name="help-circle-outline"
               size={20}
-              color="#F56B4C"
+              color="#FE8733"
             />
           </View>
           <Text style={styles.faqTitle}>{faq.title}</Text>
@@ -215,7 +215,7 @@ const styles = StyleSheet.create({
   },
   detailBullet: {
     fontSize: 14,
-    color: "#F56B4C",
+    color: "#FE8733",
     marginRight: 8,
     lineHeight: 20,
   },

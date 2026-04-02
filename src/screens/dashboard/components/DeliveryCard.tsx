@@ -212,7 +212,7 @@ const styles = StyleSheet.create({
     fontWeight: '500',
   },
   actionButton: {
-    backgroundColor: '#F56B4C',
+    backgroundColor: '#FE8733',
     borderRadius: 12,
     paddingVertical: 12,
     alignItems: 'center',
@@ -225,9 +225,9 @@ const styles = StyleSheet.create({
   viewDetailsButton: {
     backgroundColor: 'transparent',
     borderWidth: 1.5,
-    borderColor: '#F56B4C',
+    borderColor: '#FE8733',
   },
   viewDetailsText: {
-    color: '#F56B4C',
+    color: '#FE8733',
   },
 });

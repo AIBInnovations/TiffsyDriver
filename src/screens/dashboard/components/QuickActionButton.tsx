@@ -49,7 +49,7 @@ const styles = StyleSheet.create({
     marginBottom: 10,
   },
   primaryButton: {
-    backgroundColor: '#F56B4C',
+    backgroundColor: '#FE8733',
   },
   secondaryButton: {
     backgroundColor: '#F3F4F6',
@@ -57,7 +57,7 @@ const styles = StyleSheet.create({
   outlineButton: {
     backgroundColor: 'transparent',
     borderWidth: 1.5,
-    borderColor: '#F56B4C',
+    borderColor: '#FE8733',
   },
   buttonText: {
     fontSize: 15,
@@ -70,6 +70,6 @@ const styles = StyleSheet.create({
     color: '#374151',
   },
   outlineText: {
-    color: '#F56B4C',
+    color: '#FE8733',
   },
 });

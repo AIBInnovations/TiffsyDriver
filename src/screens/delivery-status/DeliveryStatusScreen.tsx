@@ -12,6 +12,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { useState, useCallback, useEffect } from "react";
 import { useNavigation, useRoute, RouteProp, useFocusEffect } from "@react-navigation/native";
 import MaterialCommunityIcons from "react-native-vector-icons/MaterialCommunityIcons";
+import LinearGradient from "react-native-linear-gradient";
 import { DeliveryStatusType, MainTabsParamList } from "../../navigation/types";
 import ProgressTracker from "./components/ProgressTracker";
 import OrderDetailsCard from "./components/OrderDetailsCard";
@@ -117,8 +118,8 @@ export default function DeliveryStatusScreen() {
   // Set status bar colors when screen is focused
   useFocusEffect(
     useCallback(() => {
-      StatusBar.setBarStyle('dark-content');
-      StatusBar.setBackgroundColor('#FFFFFF');
+      StatusBar.setBarStyle('light-content');
+      StatusBar.setBackgroundColor('transparent');
     }, [])
   );
 
@@ -564,16 +565,16 @@ export default function DeliveryStatusScreen() {
   // Empty state — show batch completion if all orders done
   if (!delivery) {
     return (
-      <SafeAreaView style={styles.container} edges={["top"]}>
-        <StatusBar barStyle="dark-content" backgroundColor="#FFFFFF" />
-        <View style={styles.header}>
+      <SafeAreaView style={styles.container} edges={['bottom']}>
+        <StatusBar translucent backgroundColor="transparent" barStyle="light-content" />
+        <LinearGradient colors={['#FD9E2F', '#FF6636']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={[styles.header, { paddingTop: (StatusBar.currentHeight || 0) + 12 }]}>
           <Text style={styles.headerTitle}>Delivery Status</Text>
-        </View>
+        </LinearGradient>
         <View style={styles.emptyContainer}>
           {activeBatchForCompletion ? (
             <>
               <View style={styles.emptyIcon}>
-                <MaterialCommunityIcons name="party-popper" size={48} color="#F56B4C" />
+                <MaterialCommunityIcons name="party-popper" size={48} color="#FE8733" />
               </View>
               <Text style={styles.emptyTitle}>All Deliveries Done!</Text>
               <Text style={styles.emptySubtitle}>
@@ -638,20 +639,20 @@ export default function DeliveryStatusScreen() {
   }
 
   return (
-    <SafeAreaView style={styles.container} edges={["top"]}>
-      <StatusBar barStyle="dark-content" backgroundColor="#FFFFFF" />
+    <SafeAreaView style={styles.container} edges={['bottom']}>
+      <StatusBar translucent backgroundColor="transparent" barStyle="light-content" />
 
       {/* Header */}
-      <View style={styles.header}>
+      <LinearGradient colors={['#FD9E2F', '#FF6636']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={[styles.header, { paddingTop: (StatusBar.currentHeight || 0) + 12 }]}>
         <TouchableOpacity
           onPress={() => navigation.goBack()}
           style={styles.backButton}
         >
-          <MaterialCommunityIcons name="arrow-left" size={24} color="#374151" />
+          <MaterialCommunityIcons name="arrow-left" size={24} color="#FFFFFF" />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Delivery Status</Text>
         <View style={styles.headerRight} />
-      </View>
+      </LinearGradient>
 
       {/* Notification Banner */}
       {notification && (
@@ -774,9 +775,6 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     paddingHorizontal: 16,
     paddingVertical: 12,
-    backgroundColor: "#FFFFFF",
-    borderBottomWidth: 1,
-    borderBottomColor: "#F3F4F6",
   },
   backButton: {
     padding: 8,
@@ -785,7 +783,7 @@ const styles = StyleSheet.create({
   headerTitle: {
     fontSize: 24,
     fontWeight: "700",
-    color: "#111827",
+    color: "#FFFFFF",
   },
   headerRight: {
     width: 40,

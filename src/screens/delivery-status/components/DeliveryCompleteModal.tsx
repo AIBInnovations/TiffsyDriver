@@ -52,7 +52,7 @@ export default function DeliveryCompleteModal({
           {hasNextDelivery && nextDeliveryInfo && (
             <View style={styles.nextDeliveryCard}>
               <View style={styles.nextDeliveryHeader}>
-                <MaterialCommunityIcons name="arrow-right-circle" size={20} color="#F56B4C" />
+                <MaterialCommunityIcons name="arrow-right-circle" size={20} color="#FE8733" />
                 <Text style={styles.nextDeliveryTitle}>Next Delivery</Text>
                 <View style={styles.stopBadge}>
                   <Text style={styles.stopBadgeText}>
@@ -68,7 +68,7 @@ export default function DeliveryCompleteModal({
           {/* No More Deliveries Message */}
           {!hasNextDelivery && (
             <View style={styles.allDoneCard}>
-              <MaterialCommunityIcons name="party-popper" size={24} color="#F56B4C" />
+              <MaterialCommunityIcons name="party-popper" size={24} color="#FE8733" />
               <Text style={styles.allDoneText}>All deliveries completed!</Text>
               <Text style={styles.allDoneSubtext}>Great job today!</Text>
             </View>
@@ -171,11 +171,11 @@ const styles = StyleSheet.create({
   nextDeliveryTitle: {
     fontSize: 14,
     fontWeight: "600",
-    color: "#F56B4C",
+    color: "#FE8733",
     flex: 1,
   },
   stopBadge: {
-    backgroundColor: "#F56B4C",
+    backgroundColor: "#FE8733",
     paddingHorizontal: 8,
     paddingVertical: 2,
     borderRadius: 10,
@@ -221,7 +221,7 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
-    backgroundColor: "#F56B4C",
+    backgroundColor: "#FE8733",
     paddingVertical: 14,
     borderRadius: 12,
     gap: 8,

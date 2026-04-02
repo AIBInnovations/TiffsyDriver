@@ -107,7 +107,7 @@ const styles = StyleSheet.create({
     width: 40,
     height: 40,
     borderRadius: 12,
-    backgroundColor: '#F56B4C',
+    backgroundColor: '#FE8733',
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -157,7 +157,7 @@ const styles = StyleSheet.create({
     color: '#111827',
   },
   actionButton: {
-    backgroundColor: '#F56B4C',
+    backgroundColor: '#FE8733',
     borderRadius: 12,
     paddingVertical: 12,
     alignItems: 'center',
@@ -170,9 +170,9 @@ const styles = StyleSheet.create({
   viewButton: {
     backgroundColor: 'transparent',
     borderWidth: 1.5,
-    borderColor: '#F56B4C',
+    borderColor: '#FE8733',
   },
   viewButtonText: {
-    color: '#F56B4C',
+    color: '#FE8733',
   },
 });

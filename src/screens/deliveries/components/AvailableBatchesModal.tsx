@@ -115,7 +115,7 @@ export default function AvailableBatchesModal({
                 <MaterialCommunityIcons
                   name="package-variant-closed"
                   size={24}
-                  color="#F56B4C"
+                  color="#FE8733"
                 />
               </View>
               <View>
@@ -277,7 +277,7 @@ export default function AvailableBatchesModal({
         title="Accept Batch"
         message={confirmBatch ? `${confirmBatch.batchNumber}\n\nOrders: ${confirmBatch.orderCount}\nMeal Window: ${confirmBatch.mealWindow}\nZone: ${confirmBatch.zone.name}\n\nAccept this batch and head to ${confirmBatch.kitchen.name}?` : ''}
         icon="package-variant-closed"
-        iconColor="#F56B4C"
+        iconColor="#FE8733"
         buttons={[
           { text: 'Cancel', style: 'cancel', onPress: () => setConfirmBatch(null) },
           { text: 'Accept Batch', style: 'default', onPress: confirmAcceptBatch },
@@ -422,7 +422,7 @@ const styles = StyleSheet.create({
     width: 32,
     height: 32,
     borderRadius: 10,
-    backgroundColor: '#F56B4C',
+    backgroundColor: '#FE8733',
     alignItems: 'center',
     justifyContent: 'center',
     marginRight: 8,

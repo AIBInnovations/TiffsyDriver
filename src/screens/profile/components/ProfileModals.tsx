@@ -181,7 +181,7 @@ export function VehicleModal({
                 <MaterialCommunityIcons
                   name={vehicleIcons[type]}
                   size={24}
-                  color={selectedType === type ? "#F56B4C" : "#6B7280"}
+                  color={selectedType === type ? "#FE8733" : "#6B7280"}
                 />
                 <Text style={[
                   styles.vehicleOptionText,
@@ -345,7 +345,7 @@ export function DocumentsModal({ visible, onClose }: DocumentsModalProps) {
             ]}
           >
             <View style={[styles.listRowIcon, { backgroundColor: "#FEF2F2" }]}>
-              <MaterialCommunityIcons name={doc.icon} size={22} color="#F56B4C" />
+              <MaterialCommunityIcons name={doc.icon} size={22} color="#FE8733" />
             </View>
             <View style={styles.listRowContent}>
               <Text style={styles.listRowTitle}>{doc.title}</Text>
@@ -367,7 +367,7 @@ export function DocumentsModal({ visible, onClose }: DocumentsModalProps) {
           [{ text: "OK" }]
         )}
       >
-        <MaterialCommunityIcons name="upload" size={18} color="#F56B4C" />
+        <MaterialCommunityIcons name="upload" size={18} color="#FE8733" />
         <Text style={styles.outlineButtonText}>Upload Documents</Text>
       </Pressable>
     </BaseModal>
@@ -650,13 +650,13 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   radioCircleActive: {
-    borderColor: "#F56B4C",
+    borderColor: "#FE8733",
   },
   radioInner: {
     width: 12,
     height: 12,
     borderRadius: 6,
-    backgroundColor: "#F56B4C",
+    backgroundColor: "#FE8733",
   },
   listRow: {
     flexDirection: "row",
@@ -731,13 +731,13 @@ const styles = StyleSheet.create({
     paddingVertical: 14,
     borderRadius: 12,
     borderWidth: 1.5,
-    borderColor: "#F56B4C",
+    borderColor: "#FE8733",
     gap: 8,
   },
   outlineButtonText: {
     fontSize: 15,
     fontWeight: "600",
-    color: "#F56B4C",
+    color: "#FE8733",
   },
   infoCard: {
     flexDirection: "row",
@@ -903,7 +903,7 @@ const styles = StyleSheet.create({
     color: "#374151",
   },
   languageOptionTextActive: {
-    color: "#F56B4C",
+    color: "#FE8733",
     fontWeight: "600",
   },
   languageModalButtons: {
@@ -929,7 +929,7 @@ const styles = StyleSheet.create({
     flex: 1,
     paddingVertical: 12,
     borderRadius: 10,
-    backgroundColor: "#F56B4C",
+    backgroundColor: "#FE8733",
     alignItems: "center",
   },
   languageModalSaveText: {
@@ -1086,7 +1086,7 @@ const styles = StyleSheet.create({
   vehicleOptionActive: {
     backgroundColor: "#FEF2F2",
     borderWidth: 1.5,
-    borderColor: "#F56B4C",
+    borderColor: "#FE8733",
   },
   vehicleOptionText: {
     fontSize: 12,
@@ -1094,7 +1094,7 @@ const styles = StyleSheet.create({
     color: "#6B7280",
   },
   vehicleOptionTextActive: {
-    color: "#F56B4C",
+    color: "#FE8733",
     fontWeight: "600",
   },
   vehicleNumberInput: {
@@ -1136,7 +1136,7 @@ const styles = StyleSheet.create({
     flex: 1,
     paddingVertical: 12,
     borderRadius: 10,
-    backgroundColor: "#F56B4C",
+    backgroundColor: "#FE8733",
     alignItems: "center",
   },
   vehicleModalSaveText: {

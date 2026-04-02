@@ -244,7 +244,7 @@ const OTPVerificationScreen = ({ navigation, route }: Props) => {
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
       keyboardVerticalOffset={0}
     >
-      <StatusBar barStyle="light-content" backgroundColor="#F56B4C" />
+      <StatusBar barStyle="light-content" backgroundColor="#FE8733" />
       <ScrollView
         style={otpStyles.scrollView}
         contentContainerStyle={otpStyles.scrollContent}
@@ -405,7 +405,7 @@ const OTPVerificationScreen = ({ navigation, route }: Props) => {
 const otpStyles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F56B4C',
+    backgroundColor: '#FE8733',
   },
   scrollView: {
     flex: 1,
@@ -415,7 +415,7 @@ const otpStyles = StyleSheet.create({
   },
   header: {
     height: 280,
-    backgroundColor: '#F56B4C',
+    backgroundColor: '#FE8733',
     paddingHorizontal: 20,
     paddingTop: 20,
     justifyContent: 'space-between',
@@ -494,15 +494,15 @@ const otpStyles = StyleSheet.create({
     marginBottom: 24,
   },
   resendLink: {
-    color: '#F56B4C',
+    color: '#FE8733',
     fontWeight: '600',
   },
   timerText: {
-    color: '#F56B4C',
+    color: '#FE8733',
     fontWeight: '600',
   },
   submitButton: {
-    backgroundColor: '#F56B4C',
+    backgroundColor: '#FE8733',
     borderRadius: 100,
     paddingVertical: 15,
     alignItems: 'center',

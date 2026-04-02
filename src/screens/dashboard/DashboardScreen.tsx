@@ -17,7 +17,10 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons';
+import LinearGradient from 'react-native-linear-gradient';
 import type { DashboardStackParamList } from '../../navigation/types';
+
+const AnimatedLinearGradient = Animated.createAnimatedComponent(LinearGradient);
 import StatsCard from './components/StatsCard';
 import CustomAlert from '../../components/common/CustomAlert';
 import { useDriverProfileStore } from '../profile/useDriverProfileStore';
@@ -325,7 +328,7 @@ export default function DashboardScreen() {
   useFocusEffect(
     useCallback(() => {
       StatusBar.setBarStyle('light-content');
-      StatusBar.setBackgroundColor('#F56B4C');
+      StatusBar.setBackgroundColor('transparent');
     }, [])
   );
 
@@ -644,10 +647,10 @@ export default function DashboardScreen() {
   // Render loading state
   if (loading) {
     return (
-      <SafeAreaView style={styles.container} edges={['top']}>
-        <StatusBar barStyle="light-content" backgroundColor="#F56B4C" />
+      <SafeAreaView style={styles.container} edges={['bottom']}>
+        <StatusBar translucent backgroundColor="transparent" barStyle="light-content" />
         <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color="#F56B4C" />
+          <ActivityIndicator size="large" color="#FE8733" />
           <Text style={styles.loadingText}>Loading dashboard...</Text>
         </View>
       </SafeAreaView>
@@ -655,13 +658,13 @@ export default function DashboardScreen() {
   }
 
   return (
-    <SafeAreaView style={styles.container} edges={['top']}>
-      <StatusBar barStyle="light-content" backgroundColor="#F56B4C" />
+    <SafeAreaView style={styles.container} edges={['bottom']}>
+      <StatusBar translucent backgroundColor="transparent" barStyle="light-content" />
 
       {/* Main Content Wrapper with Background */}
       <View style={styles.mainWrapper}>
         {/* Header Section - Animated */}
-        <Animated.View style={[styles.header, { transform: [{ translateY: headerTranslateY }] }]}>
+        <AnimatedLinearGradient colors={['#FD9E2F', '#FF6636']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={[styles.header, { paddingTop: (StatusBar.currentHeight || 0) + 12, transform: [{ translateY: headerTranslateY }] }]}>
           <View style={styles.headerLeft}>
             <Text style={styles.greeting}>
               {new Date().getHours() < 12 ? 'Good Morning' :
@@ -708,7 +711,7 @@ export default function DashboardScreen() {
             </TouchableOpacity>
           </View>
 
-        </Animated.View>
+        </AnimatedLinearGradient>
         <ScrollView
           style={styles.scrollView}
           contentContainerStyle={styles.scrollContent}
@@ -718,8 +721,8 @@ export default function DashboardScreen() {
             <RefreshControl
               refreshing={refreshing}
               onRefresh={onRefresh}
-              colors={['#F56B4C']}
-              tintColor="#F56B4C"
+              colors={['#FE8733']}
+              tintColor="#FE8733"
             />
           }
           showsVerticalScrollIndicator={false}
@@ -745,9 +748,9 @@ export default function DashboardScreen() {
               label="Available Batches"
               value={availableBatchesCount.toString()}
               subLabel="Ready to accept"
-              valueColor="#F56B4C"
+              valueColor="#FE8733"
               icon="package-variant"
-              iconColor="#F56B4C"
+              iconColor="#FE8733"
               flex={false}
             />
             <View style={styles.kpiSpacer} />
@@ -860,7 +863,7 @@ export default function DashboardScreen() {
               /* Available Batch Card */
               <View style={styles.availableBatchCard}>
                 <View style={styles.availableBatchHeader}>
-                  <MaterialCommunityIcons name="package-variant-closed" size={48} color="#F56B4C" />
+                  <MaterialCommunityIcons name="package-variant-closed" size={48} color="#FE8733" />
                   <Text style={styles.availableBatchTitle}>New Batch Available!</Text>
                 </View>
 
@@ -987,7 +990,7 @@ export default function DashboardScreen() {
         title="Pickup Batch"
         message="Have you picked up all items from the kitchen?"
         icon="package-variant"
-        iconColor="#F56B4C"
+        iconColor="#FE8733"
         buttons={[
           { text: 'Cancel', style: 'cancel', onPress: () => setShowPickupConfirm(false) },
           { text: 'Yes, Picked Up', style: 'default', onPress: handlePickupConfirm },
@@ -1026,7 +1029,7 @@ export default function DashboardScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F56B4C',
+    backgroundColor: '#FE8733',
   },
   loadingContainer: {
     flex: 1,
@@ -1062,7 +1065,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     paddingTop: 20,
     paddingBottom: 24,
-    backgroundColor: '#F56B4C',
     borderBottomLeftRadius: 24,
     borderBottomRightRadius: 24,
     shadowColor: '#000',
@@ -1095,7 +1097,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     borderWidth: 2,
-    borderColor: '#F56B4C',
+    borderColor: '#FE8733',
   },
   notificationBadgeText: {
     color: '#FFFFFF',
@@ -1247,7 +1249,7 @@ const styles = StyleSheet.create({
   },
   primaryBatchButton: {
     flex: 1,
-    backgroundColor: '#F56B4C',
+    backgroundColor: '#FE8733',
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
@@ -1396,7 +1398,7 @@ const styles = StyleSheet.create({
     marginBottom: 24,
   },
   findBatchesButton: {
-    backgroundColor: '#F56B4C',
+    backgroundColor: '#FE8733',
     paddingHorizontal: 32,
     paddingVertical: 14,
     borderRadius: 12,
@@ -1416,7 +1418,7 @@ const styles = StyleSheet.create({
     borderRadius: 8,
   },
   availableBadgeText: {
-    color: '#F56B4C',
+    color: '#FE8733',
     fontSize: 12,
     fontWeight: '700',
   },
@@ -1446,7 +1448,7 @@ const styles = StyleSheet.create({
     color: '#111827',
   },
   badgeContainer: {
-    backgroundColor: '#F56B4C',
+    backgroundColor: '#FE8733',
     paddingHorizontal: 8,
     paddingVertical: 4,
     borderRadius: 12,

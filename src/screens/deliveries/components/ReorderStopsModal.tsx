@@ -61,7 +61,7 @@ export default function ReorderStopsModal({
             <MaterialCommunityIcons
               name="drag"
               size={24}
-              color={isActive ? "#F56B4C" : "#9CA3AF"}
+              color={isActive ? "#FE8733" : "#9CA3AF"}
             />
           </View>
         </TouchableOpacity>
@@ -147,7 +147,7 @@ const styles = StyleSheet.create({
   saveText: {
     fontSize: 16,
     fontWeight: "600",
-    color: "#F56B4C",
+    color: "#FE8733",
   },
   saveTextDisabled: {
     opacity: 0.5,
@@ -200,7 +200,7 @@ const styles = StyleSheet.create({
     marginRight: 12,
   },
   stopNumberActive: {
-    backgroundColor: "#F56B4C",
+    backgroundColor: "#FE8733",
   },
   stopNumberText: {
     fontSize: 14,

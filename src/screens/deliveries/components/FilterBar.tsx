@@ -104,7 +104,7 @@ export default function FilterBar({ filterStatus, sortBy, onFilterChange, onSort
                 <MaterialCommunityIcons
                   name={option.icon}
                   size={20}
-                  color={sortBy === option.value ? "#F56B4C" : "#6B7280"}
+                  color={sortBy === option.value ? "#FE8733" : "#6B7280"}
                 />
                 <Text
                   style={[
@@ -115,7 +115,7 @@ export default function FilterBar({ filterStatus, sortBy, onFilterChange, onSort
                   {option.label}
                 </Text>
                 {sortBy === option.value && (
-                  <MaterialCommunityIcons name="check" size={20} color="#F56B4C" />
+                  <MaterialCommunityIcons name="check" size={20} color="#FE8733" />
                 )}
               </TouchableOpacity>
             ))}
@@ -156,7 +156,7 @@ const styles = StyleSheet.create({
     gap: 4,
   },
   filterChipActive: {
-    backgroundColor: "#F56B4C",
+    backgroundColor: "#FE8733",
   },
   filterChipText: {
     fontSize: 12,
@@ -212,7 +212,7 @@ const styles = StyleSheet.create({
     color: "#374151",
   },
   sortOptionTextActive: {
-    color: "#F56B4C",
+    color: "#FE8733",
     fontWeight: "600",
   },
 });

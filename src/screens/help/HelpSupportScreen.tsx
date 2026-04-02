@@ -12,6 +12,7 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import MaterialCommunityIcons from "react-native-vector-icons/MaterialCommunityIcons";
+import LinearGradient from "react-native-linear-gradient";
 import { useNavigation } from "@react-navigation/native";
 import { useHelpSupportStore } from "./useHelpSupportStore";
 
@@ -69,14 +70,14 @@ export default function HelpSupportScreen() {
   // Loading State
   if (isLoading && !isHydrated) {
     return (
-      <SafeAreaView style={styles.container} edges={["top"]}>
-        <StatusBar barStyle="dark-content" backgroundColor="#FFFFFF" />
-        <View style={styles.header}>
+      <SafeAreaView style={styles.container} edges={['bottom']}>
+        <StatusBar translucent backgroundColor="transparent" barStyle="light-content" />
+        <LinearGradient colors={['#FD9E2F', '#FF6636']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={[styles.header, { paddingTop: (StatusBar.currentHeight || 0) + 12 }]}>
           <View style={styles.headerLeft}>
             <Skeleton width={180} height={24} borderRadius={6} />
           </View>
           <Skeleton width={80} height={36} borderRadius={8} />
-        </View>
+        </LinearGradient>
         <View style={styles.content}>
           <Skeleton
             width="100%"
@@ -104,11 +105,11 @@ export default function HelpSupportScreen() {
   }
 
   return (
-    <SafeAreaView style={styles.container} edges={["top"]}>
-      <StatusBar barStyle="dark-content" backgroundColor="#FFFFFF" />
+    <SafeAreaView style={styles.container} edges={['bottom']}>
+      <StatusBar translucent backgroundColor="transparent" barStyle="light-content" />
 
       {/* Header */}
-      <View style={styles.header}>
+      <LinearGradient colors={['#FD9E2F', '#FF6636']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={[styles.header, { paddingTop: (StatusBar.currentHeight || 0) + 12 }]}>
         <View style={styles.headerLeft}>
           <Pressable
             onPress={() => navigation.goBack()}
@@ -117,13 +118,13 @@ export default function HelpSupportScreen() {
             <MaterialCommunityIcons
               name="arrow-left"
               size={24}
-              color="#374151"
+              color="#FFFFFF"
             />
           </Pressable>
           <Text style={styles.headerTitle}>Help & Support</Text>
         </View>
         <View style={{ width: 40 }} />
-      </View>
+      </LinearGradient>
 
       <ScrollView
         style={styles.scrollView}
@@ -214,9 +215,6 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     paddingHorizontal: 16,
     paddingVertical: 12,
-    backgroundColor: "#FFFFFF",
-    borderBottomWidth: 1,
-    borderBottomColor: "#E5E7EB",
   },
   headerLeft: {
     flexDirection: "row",
@@ -229,7 +227,7 @@ const styles = StyleSheet.create({
   headerTitle: {
     fontSize: 20,
     fontWeight: "700",
-    color: "#111827",
+    color: "#FFFFFF",
   },
   scrollView: {
     flex: 1,

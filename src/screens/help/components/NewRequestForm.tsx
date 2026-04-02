@@ -445,8 +445,8 @@ const styles = StyleSheet.create({
     borderColor: "#E5E7EB",
   },
   categoryChipSelected: {
-    backgroundColor: "#F56B4C",
-    borderColor: "#F56B4C",
+    backgroundColor: "#FE8733",
+    borderColor: "#FE8733",
   },
   categoryLabel: {
     fontSize: 13,

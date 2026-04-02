@@ -1,7 +1,8 @@
-import { View, Text, ScrollView, TouchableOpacity, Linking, StyleSheet } from "react-native";
+import { View, Text, ScrollView, TouchableOpacity, Linking, StyleSheet, StatusBar } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useNavigation } from "@react-navigation/native";
 import MaterialCommunityIcons from "react-native-vector-icons/MaterialCommunityIcons";
+import LinearGradient from "react-native-linear-gradient";
 
 interface DeliveryDetailScreenProps {
   route?: {
@@ -39,20 +40,21 @@ export default function DeliveryDetailScreen({ route }: DeliveryDetailScreenProp
   };
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={styles.container} edges={['bottom']}>
+      <StatusBar translucent backgroundColor="transparent" barStyle="light-content" />
       {/* Header */}
-      <View style={styles.header}>
+      <LinearGradient colors={['#FD9E2F', '#FF6636']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={[styles.header, { paddingTop: (StatusBar.currentHeight || 0) + 12 }]}>
         <TouchableOpacity
           onPress={() => navigation.goBack()}
           style={styles.backButton}
         >
-          <MaterialCommunityIcons name="arrow-left" size={24} color="#374151" />
+          <MaterialCommunityIcons name="arrow-left" size={24} color="#FFFFFF" />
         </TouchableOpacity>
         <View style={styles.headerTitleContainer}>
           <Text style={styles.deliveryId}>{delivery.id}</Text>
           <Text style={styles.customerName}>{delivery.customerName}</Text>
         </View>
-      </View>
+      </LinearGradient>
 
       <ScrollView style={styles.scrollView}>
 
@@ -123,12 +125,9 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   header: {
-    backgroundColor: 'white',
     padding: 16,
     flexDirection: 'row',
     alignItems: 'center',
-    borderBottomWidth: 1,
-    borderBottomColor: '#F3F4F6',
   },
   backButton: {
     marginRight: 16,
@@ -139,12 +138,12 @@ const styles = StyleSheet.create({
   },
   deliveryId: {
     fontSize: 14,
-    color: '#6B7280',
+    color: 'rgba(255,255,255,0.8)',
   },
   customerName: {
     fontSize: 20,
     fontWeight: '700',
-    color: '#111827',
+    color: '#FFFFFF',
     marginTop: 4,
   },
   card: {

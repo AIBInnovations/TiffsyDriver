@@ -1,8 +1,9 @@
-import { View, Text, TextInput, TouchableOpacity, ScrollView, StyleSheet } from "react-native";
+import { View, Text, TextInput, TouchableOpacity, ScrollView, StyleSheet, StatusBar } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useState } from "react";
 import { useNavigation } from "@react-navigation/native";
 import MaterialCommunityIcons from "react-native-vector-icons/MaterialCommunityIcons";
+import LinearGradient from "react-native-linear-gradient";
 
 export default function EditProfileScreen() {
   const navigation = useNavigation();
@@ -15,18 +16,19 @@ export default function EditProfileScreen() {
   };
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={styles.container} edges={['bottom']}>
+      <StatusBar translucent backgroundColor="transparent" barStyle="light-content" />
       {/* Header */}
-      <View style={styles.header}>
+      <LinearGradient colors={['#FD9E2F', '#FF6636']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={[styles.header, { paddingTop: (StatusBar.currentHeight || 0) + 12 }]}>
         <TouchableOpacity
           onPress={() => navigation.goBack()}
           style={styles.backButton}
         >
-          <MaterialCommunityIcons name="arrow-left" size={24} color="#374151" />
+          <MaterialCommunityIcons name="arrow-left" size={24} color="#FFFFFF" />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Edit Profile</Text>
         <View style={styles.headerRight} />
-      </View>
+      </LinearGradient>
 
       <ScrollView style={styles.scrollView}>
         <View style={styles.content}>
@@ -99,9 +101,6 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     paddingHorizontal: 16,
     paddingVertical: 12,
-    backgroundColor: "#FFFFFF",
-    borderBottomWidth: 1,
-    borderBottomColor: "#F3F4F6",
   },
   backButton: {
     padding: 8,
@@ -110,7 +109,7 @@ const styles = StyleSheet.create({
   headerTitle: {
     fontSize: 20,
     fontWeight: "700",
-    color: "#111827",
+    color: "#FFFFFF",
   },
   headerRight: {
     width: 40,

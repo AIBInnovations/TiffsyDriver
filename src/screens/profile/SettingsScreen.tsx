@@ -1,25 +1,27 @@
-import { View, Text, ScrollView, StyleSheet, TouchableOpacity } from "react-native";
+import { View, Text, ScrollView, StyleSheet, TouchableOpacity, StatusBar } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useNavigation } from "@react-navigation/native";
 import MaterialCommunityIcons from "react-native-vector-icons/MaterialCommunityIcons";
+import LinearGradient from "react-native-linear-gradient";
 import SettingsOption from "./components/SettingsOption";
 import NotificationPreferences from "./components/NotificationPreferences";
 
 export default function SettingsScreen() {
   const navigation = useNavigation();
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={styles.container} edges={['bottom']}>
+      <StatusBar translucent backgroundColor="transparent" barStyle="light-content" />
       <ScrollView style={styles.scrollView}>
-        <View style={styles.header}>
+        <LinearGradient colors={['#FD9E2F', '#FF6636']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={[styles.header, { paddingTop: (StatusBar.currentHeight || 0) + 12 }]}>
           <TouchableOpacity
             onPress={() => navigation.goBack()}
             style={styles.backButton}
           >
-            <MaterialCommunityIcons name="arrow-left" size={24} color="#374151" />
+            <MaterialCommunityIcons name="arrow-left" size={24} color="#FFFFFF" />
           </TouchableOpacity>
           <Text style={styles.title}>Settings</Text>
           <View style={styles.headerRight} />
-        </View>
+        </LinearGradient>
 
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Notifications</Text>
@@ -79,13 +81,10 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   header: {
-    backgroundColor: 'white',
     padding: 16,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    borderBottomWidth: 1,
-    borderBottomColor: '#F3F4F6',
   },
   backButton: {
     padding: 4,
@@ -96,7 +95,7 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 24,
     fontWeight: '700',
-    color: '#111827',
+    color: '#FFFFFF',
   },
   section: {
     marginTop: 16,

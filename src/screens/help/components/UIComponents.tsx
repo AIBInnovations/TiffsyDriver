@@ -244,7 +244,7 @@ export function Button({
   fullWidth,
 }: ButtonProps) {
   const variantStyles = {
-    primary: { bg: "#F56B4C", text: "#FFFFFF" },
+    primary: { bg: "#FE8733", text: "#FFFFFF" },
     secondary: { bg: "#FFFFFF", text: "#374151", border: "#E5E7EB" },
     danger: { bg: "#DC2626", text: "#FFFFFF" },
     ghost: { bg: "transparent", text: "#3B82F6" },
@@ -381,7 +381,7 @@ export function ToggleRow({
         onPress={() => !disabled && onValueChange(!value)}
         style={[
           styles.toggle,
-          { backgroundColor: value ? "#F56B4C" : "#E5E7EB" },
+          { backgroundColor: value ? "#FE8733" : "#E5E7EB" },
         ]}
       >
         <View
@@ -707,13 +707,13 @@ const styles = StyleSheet.create({
     marginRight: 10,
   },
   radioCircleSelected: {
-    borderColor: "#F56B4C",
+    borderColor: "#FE8733",
   },
   radioInner: {
     width: 12,
     height: 12,
     borderRadius: 6,
-    backgroundColor: "#F56B4C",
+    backgroundColor: "#FE8733",
   },
   radioLabel: {
     fontSize: 15,

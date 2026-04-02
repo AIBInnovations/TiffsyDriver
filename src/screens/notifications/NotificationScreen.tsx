@@ -13,6 +13,7 @@ import { useState, useCallback, useEffect } from 'react';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons';
+import LinearGradient from 'react-native-linear-gradient';
 import type { Notification } from '../../types/api';
 import {
   getNotifications,
@@ -196,17 +197,17 @@ export default function NotificationScreen() {
   const unreadCount = notifications.filter(n => !n.isRead).length;
 
   return (
-    <SafeAreaView style={styles.container} edges={['top']}>
-      <StatusBar barStyle="dark-content" backgroundColor="#FFFFFF" />
+    <SafeAreaView style={styles.container} edges={['bottom']}>
+      <StatusBar translucent backgroundColor="transparent" barStyle="light-content" />
 
       {/* Header */}
-      <View style={styles.header}>
+      <LinearGradient colors={['#FD9E2F', '#FF6636']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={[styles.header, { paddingTop: (StatusBar.currentHeight || 0) + 12 }]}>
         <TouchableOpacity
           style={styles.backButton}
           onPress={() => navigation.goBack()}
           activeOpacity={0.7}
         >
-          <MaterialCommunityIcons name="arrow-left" size={24} color="#111827" />
+          <MaterialCommunityIcons name="arrow-left" size={24} color="#FFFFFF" />
         </TouchableOpacity>
 
         <View style={styles.headerCenter}>
@@ -227,12 +228,12 @@ export default function NotificationScreen() {
             <Text style={styles.markAllButtonText}>Mark all read</Text>
           </TouchableOpacity>
         )}
-      </View>
+      </LinearGradient>
 
       {/* Notifications List */}
       {loading ? (
         <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color="#F56B4C" />
+          <ActivityIndicator size="large" color="#FE8733" />
           <Text style={styles.loadingText}>Loading notifications...</Text>
         </View>
       ) : (
@@ -248,8 +249,8 @@ export default function NotificationScreen() {
             <RefreshControl
               refreshing={refreshing}
               onRefresh={onRefresh}
-              colors={['#F56B4C']}
-              tintColor="#F56B4C"
+              colors={['#FE8733']}
+              tintColor="#FE8733"
             />
           }
           ListEmptyComponent={renderEmptyState}
@@ -270,9 +271,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingHorizontal: 16,
     paddingVertical: 12,
-    backgroundColor: '#FFFFFF',
-    borderBottomWidth: 1,
-    borderBottomColor: '#E5E7EB',
   },
   backButton: {
     padding: 4,
@@ -287,7 +285,7 @@ const styles = StyleSheet.create({
   headerTitle: {
     fontSize: 20,
     fontWeight: 'bold',
-    color: '#111827',
+    color: '#FFFFFF',
   },
   headerBadge: {
     marginLeft: 8,
@@ -308,7 +306,7 @@ const styles = StyleSheet.create({
     padding: 8,
   },
   markAllButtonText: {
-    color: '#3B82F6',
+    color: '#FFFFFF',
     fontSize: 14,
     fontWeight: '600',
   },

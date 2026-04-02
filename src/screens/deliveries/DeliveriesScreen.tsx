@@ -24,6 +24,7 @@ import { useState, useCallback, useMemo, useEffect, useRef } from 'react';
 import { useRoute, RouteProp, useFocusEffect, useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons';
+import LinearGradient from 'react-native-linear-gradient';
 import type { DeliveriesStackParamList } from '../../navigation/types';
 import DeliveryCard from './components/DeliveryCard';
 import SwipeableDeliveryCard from './components/SwipeableDeliveryCard';
@@ -417,9 +418,9 @@ export default function DeliveriesScreen() {
   // Update filter and batch when screen comes into focus
   useFocusEffect(
     useCallback(() => {
-      // Set status bar color to match header
-      StatusBar.setBarStyle('dark-content');
-      StatusBar.setBackgroundColor('#FFFFFF');
+      // Set status bar to translucent for gradient header
+      StatusBar.setBarStyle('light-content');
+      StatusBar.setBackgroundColor('transparent');
 
       console.log('🔄 DeliveriesScreen focused - refreshing data...');
 
@@ -1247,10 +1248,10 @@ export default function DeliveriesScreen() {
   // Loading state
   if (loading) {
     return (
-      <SafeAreaView style={styles.container}>
-        <StatusBar barStyle="dark-content" backgroundColor="#FFFFFF" />
+      <SafeAreaView style={styles.container} edges={['bottom']}>
+        <StatusBar translucent backgroundColor="transparent" barStyle="light-content" />
         <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color="#F56B4C" />
+          <ActivityIndicator size="large" color="#FE8733" />
           <Text style={styles.loadingText}>Loading deliveries...</Text>
         </View>
       </SafeAreaView>
@@ -1263,16 +1264,16 @@ export default function DeliveriesScreen() {
   };
 
   return (
-    <SafeAreaView style={styles.container} edges={['top']}>
-      <StatusBar barStyle="dark-content" backgroundColor="#FFFFFF" />
+    <SafeAreaView style={styles.container} edges={['bottom']}>
+      <StatusBar translucent backgroundColor="transparent" barStyle="light-content" />
 
       {/* Sticky Header */}
-      <View style={styles.header}>
+      <LinearGradient colors={['#FD9E2F', '#FF6636']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={[styles.header, { paddingTop: (StatusBar.currentHeight || 0) + 12 }]}>
         <View style={styles.headerTop}>
           <View style={styles.headerTitleContainer}>
             {viewingBatchId && (
               <TouchableOpacity onPress={clearBatchFilter} style={styles.backButton}>
-                <MaterialCommunityIcons name="arrow-left" size={24} color="#374151" />
+                <MaterialCommunityIcons name="arrow-left" size={24} color="#FFFFFF" />
               </TouchableOpacity>
             )}
             <View>
@@ -1305,7 +1306,7 @@ export default function DeliveriesScreen() {
               <MaterialCommunityIcons
                 name={showSearchBar ? "magnify-minus" : "magnify"}
                 size={24}
-                color={showSearchBar ? "#F56B4C" : "#374151"}
+                color={showSearchBar ? "#FE8733" : "#FFFFFF"}
               />
             </View>
           </TouchableOpacity>
@@ -1368,7 +1369,7 @@ export default function DeliveriesScreen() {
             )}
           </View>
         )}
-      </View>
+      </LinearGradient>
 
       {/* Filter Bar - Only show for current tab */}
       {activeTab === 'current' && (
@@ -1418,8 +1419,8 @@ export default function DeliveriesScreen() {
           <RefreshControl
             refreshing={refreshing}
             onRefresh={onRefresh}
-            colors={['#F56B4C']}
-            tintColor="#F56B4C"
+            colors={['#FE8733']}
+            tintColor="#FE8733"
           />
         }
         showsVerticalScrollIndicator={false}
@@ -1522,7 +1523,7 @@ export default function DeliveriesScreen() {
                           onPress={() => setShowReorderModal(true)}
                           activeOpacity={0.7}
                         >
-                          <MaterialCommunityIcons name="swap-vertical" size={18} color="#F56B4C" />
+                          <MaterialCommunityIcons name="swap-vertical" size={18} color="#FE8733" />
                           <Text style={styles.reorderButtonText}>Reorder Stops</Text>
                         </TouchableOpacity>
                       </View>
@@ -1541,7 +1542,7 @@ export default function DeliveriesScreen() {
                         {typeof currentBatch.kitchenId === 'object' && currentBatch.kitchenId && (
                           <View style={styles.pickupKitchenInfo}>
                             <View style={styles.pickupInfoRow}>
-                              <MaterialCommunityIcons name="store" size={18} color="#F56B4C" />
+                              <MaterialCommunityIcons name="store" size={18} color="#FE8733" />
                               <Text style={styles.pickupInfoText}>
                                 {currentBatch.kitchenId.name || 'Kitchen'}
                               </Text>
@@ -1638,7 +1639,7 @@ export default function DeliveriesScreen() {
           <>
             {historyLoading ? (
               <View style={styles.emptyState}>
-                <ActivityIndicator size="large" color="#F56B4C" />
+                <ActivityIndicator size="large" color="#FE8733" />
                 <Text style={styles.loadingText}>Loading history...</Text>
               </View>
             ) : historyBatches.length === 0 && historySingleOrders.length === 0 ? (
@@ -1952,7 +1953,6 @@ const styles = StyleSheet.create({
     color: '#6B7280',
   },
   header: {
-    backgroundColor: 'white',
     paddingHorizontal: 16,
     paddingTop: 16,
     paddingBottom: 6,
@@ -1975,7 +1975,7 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 20,
     fontWeight: '700',
-    color: '#111827',
+    color: '#FFFFFF',
   },
   headerIconButton: {
     padding: 4,
@@ -1985,7 +1985,7 @@ const styles = StyleSheet.create({
     width: 40,
     height: 40,
     borderRadius: 20,
-    backgroundColor: '#F3F4F6',
+    backgroundColor: 'rgba(255,255,255,0.2)',
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -1994,7 +1994,7 @@ const styles = StyleSheet.create({
   },
   subtitle: {
     fontSize: 14,
-    color: '#6B7280',
+    color: 'rgba(255,255,255,0.8)',
     marginTop: 4,
   },
   searchContainer: {
@@ -2046,7 +2046,7 @@ const styles = StyleSheet.create({
   refreshButton: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#F56B4C',
+    backgroundColor: '#FE8733',
     paddingHorizontal: 20,
     paddingVertical: 12,
     borderRadius: 12,
@@ -2137,7 +2137,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     marginTop: 12,
     marginBottom: 10,
-    backgroundColor: '#F3F4F6',
+    backgroundColor: 'rgba(255,255,255,0.25)',
     borderRadius: 10,
     padding: 4,
     position: 'relative',
@@ -2170,7 +2170,7 @@ const styles = StyleSheet.create({
   tabText: {
     fontSize: 15,
     fontWeight: '500',
-    color: '#6B7280',
+    color: 'rgba(255,255,255,0.7)',
   },
   activeTabText: {
     color: '#111827',
@@ -2325,7 +2325,7 @@ const styles = StyleSheet.create({
     marginRight: 8,
   },
   historyFilterChipActive: {
-    backgroundColor: '#F56B4C',
+    backgroundColor: '#FE8733',
   },
   historyFilterText: {
     fontSize: 13,
@@ -2344,8 +2344,8 @@ const styles = StyleSheet.create({
     marginHorizontal: 16,
     marginBottom: 16,
     borderWidth: 2,
-    borderColor: '#F56B4C',
-    shadowColor: '#F56B4C',
+    borderColor: '#FE8733',
+    shadowColor: '#FE8733',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.15,
     shadowRadius: 8,
@@ -2358,7 +2358,7 @@ const styles = StyleSheet.create({
     gap: 10,
   },
   pickupStepBadge: {
-    backgroundColor: '#F56B4C',
+    backgroundColor: '#FE8733',
     paddingHorizontal: 10,
     paddingVertical: 4,
     borderRadius: 12,
@@ -2464,6 +2464,6 @@ const styles = StyleSheet.create({
   reorderButtonText: {
     fontSize: 13,
     fontWeight: '600',
-    color: '#F56B4C',
+    color: '#FE8733',
   },
 });

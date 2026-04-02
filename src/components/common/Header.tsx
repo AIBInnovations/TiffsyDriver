@@ -1,6 +1,7 @@
-import { View, Text, TouchableOpacity, StyleSheet } from "react-native";
+import { View, Text, TouchableOpacity, StyleSheet, StatusBar } from "react-native";
 import { useNavigation } from "@react-navigation/native";
 import MaterialCommunityIcons from "react-native-vector-icons/MaterialCommunityIcons";
+import LinearGradient from "react-native-linear-gradient";
 
 interface HeaderProps {
   title: string;
@@ -12,11 +13,17 @@ export default function Header({ title, showBack = false, rightElement }: Header
   const navigation = useNavigation();
 
   return (
-    <View style={styles.container}>
+    <LinearGradient
+      colors={['#FD9E2F', '#FF6636']}
+      start={{ x: 0, y: 0 }}
+      end={{ x: 1, y: 0 }}
+      style={[styles.container, { paddingTop: (StatusBar.currentHeight || 0) + 12 }]}
+    >
+      <StatusBar translucent backgroundColor="transparent" barStyle="light-content" />
       <View style={styles.leftSection}>
         {showBack && (
           <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
-            <MaterialCommunityIcons name="arrow-left" size={24} color="#374151" />
+            <MaterialCommunityIcons name="arrow-left" size={24} color="#FFFFFF" />
           </TouchableOpacity>
         )}
         <Text style={styles.title} numberOfLines={1}>
@@ -24,7 +31,7 @@ export default function Header({ title, showBack = false, rightElement }: Header
         </Text>
       </View>
       {rightElement && <View>{rightElement}</View>}
-    </View>
+    </LinearGradient>
   );
 }
 
@@ -35,9 +42,6 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     paddingHorizontal: 16,
     paddingVertical: 12,
-    backgroundColor: 'white',
-    borderBottomWidth: 1,
-    borderBottomColor: '#F3F4F6',
   },
   leftSection: {
     flexDirection: 'row',
@@ -51,6 +55,6 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 20,
     fontWeight: '700',
-    color: '#111827',
+    color: '#FFFFFF',
   },
 });

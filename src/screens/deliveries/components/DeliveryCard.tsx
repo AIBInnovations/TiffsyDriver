@@ -159,7 +159,7 @@ export default function DeliveryCard({ delivery, onStatusChange, onCallCustomer,
       {/* Timer for active deliveries */}
       {(delivery.status === "in_progress" || delivery.status === "picked_up" || delivery.status === "EN_ROUTE" || delivery.status === "ARRIVED" || delivery.status === "OUT_FOR_DELIVERY" || delivery.status === "PICKED_UP") && delivery.startTime && (
         <View style={styles.timerContainer}>
-          <MaterialCommunityIcons name="timer-outline" size={16} color="#F56B4C" />
+          <MaterialCommunityIcons name="timer-outline" size={16} color="#FE8733" />
           <Text style={styles.timerText}>Time elapsed: {formatTime(elapsedTime)}</Text>
         </View>
       )}
