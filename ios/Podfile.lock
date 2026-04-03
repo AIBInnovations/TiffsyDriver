@@ -1,27 +1,15 @@
 PODS:
   - boost (1.84.0)
+  - BVLinearGradient (2.8.3):
+    - React-Core
   - DoubleConversion (1.1.6)
   - fast_float (8.0.0)
   - FBLazyVector (0.83.0)
-  - Firebase/Auth (12.6.0):
-    - Firebase/CoreOnly
-    - FirebaseAuth (~> 12.6.0)
   - Firebase/CoreOnly (12.6.0):
     - FirebaseCore (~> 12.6.0)
   - Firebase/Messaging (12.6.0):
     - Firebase/CoreOnly
     - FirebaseMessaging (~> 12.6.0)
-  - FirebaseAppCheckInterop (12.6.0)
-  - FirebaseAuth (12.6.0):
-    - FirebaseAppCheckInterop (~> 12.6.0)
-    - FirebaseAuthInterop (~> 12.6.0)
-    - FirebaseCore (~> 12.6.0)
-    - FirebaseCoreExtension (~> 12.6.0)
-    - GoogleUtilities/AppDelegateSwizzler (~> 8.1)
-    - GoogleUtilities/Environment (~> 8.1)
-    - GTMSessionFetcher/Core (< 6.0, >= 3.4)
-    - RecaptchaInterop (~> 101.0)
-  - FirebaseAuthInterop (12.6.0)
   - FirebaseCore (12.6.0):
     - FirebaseCoreInternal (~> 12.6.0)
     - GoogleUtilities/Environment (~> 8.1)
@@ -73,7 +61,6 @@ PODS:
   - GoogleUtilities/UserDefaults (8.1.0):
     - GoogleUtilities/Logger
     - GoogleUtilities/Privacy
-  - GTMSessionFetcher/Core (5.0.0)
   - hermes-engine (0.14.0):
     - hermes-engine/Pre-built (= 0.14.0)
   - hermes-engine/Pre-built (0.14.0)
@@ -1967,6 +1954,34 @@ PODS:
     - React-RCTFBReactNativeSpec
     - ReactCommon/turbomodule/core
     - SocketRocket
+  - react-native-geolocation (3.4.0):
+    - boost
+    - DoubleConversion
+    - fast_float
+    - fmt
+    - glog
+    - hermes-engine
+    - RCT-Folly
+    - RCT-Folly/Fabric
+    - RCTRequired
+    - RCTTypeSafety
+    - React-Core
+    - React-debug
+    - React-Fabric
+    - React-featureflags
+    - React-graphics
+    - React-ImageManager
+    - React-jsi
+    - React-NativeModulesApple
+    - React-RCTFabric
+    - React-renderercss
+    - React-rendererdebug
+    - React-utils
+    - ReactCodegen
+    - ReactCommon/turbomodule/bridging
+    - ReactCommon/turbomodule/core
+    - SocketRocket
+    - Yoga
   - react-native-safe-area-context (5.6.2):
     - boost
     - DoubleConversion
@@ -2611,7 +2626,6 @@ PODS:
     - React-perflogger (= 0.83.0)
     - React-utils (= 0.83.0)
     - SocketRocket
-  - RecaptchaInterop (101.0.0)
   - RNCAsyncStorage (2.2.0):
     - boost
     - DoubleConversion
@@ -2643,15 +2657,40 @@ PODS:
   - RNFBApp (23.7.0):
     - Firebase/CoreOnly (= 12.6.0)
     - React-Core
-  - RNFBAuth (23.7.0):
-    - Firebase/Auth (= 12.6.0)
-    - React-Core
-    - RNFBApp
   - RNFBMessaging (23.7.0):
     - Firebase/Messaging (= 12.6.0)
     - FirebaseCoreExtension
     - React-Core
     - RNFBApp
+  - RNGestureHandler (2.30.0):
+    - boost
+    - DoubleConversion
+    - fast_float
+    - fmt
+    - glog
+    - hermes-engine
+    - RCT-Folly
+    - RCT-Folly/Fabric
+    - RCTRequired
+    - RCTTypeSafety
+    - React-Core
+    - React-debug
+    - React-Fabric
+    - React-FabricComponents
+    - React-featureflags
+    - React-graphics
+    - React-ImageManager
+    - React-jsi
+    - React-NativeModulesApple
+    - React-RCTFabric
+    - React-renderercss
+    - React-rendererdebug
+    - React-utils
+    - ReactCodegen
+    - ReactCommon/turbomodule/bridging
+    - ReactCommon/turbomodule/core
+    - SocketRocket
+    - Yoga
   - RNNotifee (9.1.8):
     - React-Core
     - RNNotifee/NotifeeCore (= 9.1.8)
@@ -2930,6 +2969,7 @@ PODS:
 
 DEPENDENCIES:
   - boost (from `../node_modules/react-native/third-party-podspecs/boost.podspec`)
+  - BVLinearGradient (from `../node_modules/react-native-linear-gradient`)
   - DoubleConversion (from `../node_modules/react-native/third-party-podspecs/DoubleConversion.podspec`)
   - fast_float (from `../node_modules/react-native/third-party-podspecs/fast_float.podspec`)
   - FBLazyVector (from `../node_modules/react-native/Libraries/FBLazyVector`)
@@ -2973,6 +3013,7 @@ DEPENDENCIES:
   - React-logger (from `../node_modules/react-native/ReactCommon/logger`)
   - React-Mapbuffer (from `../node_modules/react-native/ReactCommon`)
   - React-microtasksnativemodule (from `../node_modules/react-native/ReactCommon/react/nativemodule/microtasks`)
+  - "react-native-geolocation (from `../node_modules/@react-native-community/geolocation`)"
   - react-native-safe-area-context (from `../node_modules/react-native-safe-area-context`)
   - React-NativeModulesApple (from `../node_modules/react-native/ReactCommon/react/nativemodule/core/platform/ios`)
   - React-networking (from `../node_modules/react-native/ReactCommon/react/networking`)
@@ -3009,8 +3050,8 @@ DEPENDENCIES:
   - ReactCommon/turbomodule/core (from `../node_modules/react-native/ReactCommon`)
   - "RNCAsyncStorage (from `../node_modules/@react-native-async-storage/async-storage`)"
   - "RNFBApp (from `../node_modules/@react-native-firebase/app`)"
-  - "RNFBAuth (from `../node_modules/@react-native-firebase/auth`)"
   - "RNFBMessaging (from `../node_modules/@react-native-firebase/messaging`)"
+  - RNGestureHandler (from `../node_modules/react-native-gesture-handler`)
   - "RNNotifee (from `../node_modules/@notifee/react-native`)"
   - RNReanimated (from `../node_modules/react-native-reanimated`)
   - RNScreens (from `../node_modules/react-native-screens`)
@@ -3022,9 +3063,6 @@ DEPENDENCIES:
 SPEC REPOS:
   trunk:
     - Firebase
-    - FirebaseAppCheckInterop
-    - FirebaseAuth
-    - FirebaseAuthInterop
     - FirebaseCore
     - FirebaseCoreExtension
     - FirebaseCoreInternal
@@ -3032,15 +3070,15 @@ SPEC REPOS:
     - FirebaseMessaging
     - GoogleDataTransport
     - GoogleUtilities
-    - GTMSessionFetcher
     - nanopb
     - PromisesObjC
-    - RecaptchaInterop
     - SocketRocket
 
 EXTERNAL SOURCES:
   boost:
     :podspec: "../node_modules/react-native/third-party-podspecs/boost.podspec"
+  BVLinearGradient:
+    :path: "../node_modules/react-native-linear-gradient"
   DoubleConversion:
     :podspec: "../node_modules/react-native/third-party-podspecs/DoubleConversion.podspec"
   fast_float:
@@ -3126,6 +3164,8 @@ EXTERNAL SOURCES:
     :path: "../node_modules/react-native/ReactCommon"
   React-microtasksnativemodule:
     :path: "../node_modules/react-native/ReactCommon/react/nativemodule/microtasks"
+  react-native-geolocation:
+    :path: "../node_modules/@react-native-community/geolocation"
   react-native-safe-area-context:
     :path: "../node_modules/react-native-safe-area-context"
   React-NativeModulesApple:
@@ -3198,10 +3238,10 @@ EXTERNAL SOURCES:
     :path: "../node_modules/@react-native-async-storage/async-storage"
   RNFBApp:
     :path: "../node_modules/@react-native-firebase/app"
-  RNFBAuth:
-    :path: "../node_modules/@react-native-firebase/auth"
   RNFBMessaging:
     :path: "../node_modules/@react-native-firebase/messaging"
+  RNGestureHandler:
+    :path: "../node_modules/react-native-gesture-handler"
   RNNotifee:
     :path: "../node_modules/@notifee/react-native"
   RNReanimated:
@@ -3217,13 +3257,11 @@ EXTERNAL SOURCES:
 
 SPEC CHECKSUMS:
   boost: 7e761d76ca2ce687f7cc98e698152abd03a18f90
+  BVLinearGradient: 880f91a7854faff2df62518f0281afb1c60d49a3
   DoubleConversion: cb417026b2400c8f53ae97020b2be961b59470cb
   fast_float: b32c788ed9c6a8c584d114d0047beda9664e7cc6
   FBLazyVector: a293a88992c4c33f0aee184acab0b64a08ff9458
   Firebase: a451a7b61536298fd5cbfe3a746fd40443a50679
-  FirebaseAppCheckInterop: e2178171b4145013c7c1a3cc464d1d446d3a1896
-  FirebaseAuth: 613c463cb43545a7fd2cd99ade09b78ac472c544
-  FirebaseAuthInterop: db06756ef028006d034b6004dc0c37c24f7828d4
   FirebaseCore: 0e38ad5d62d980a47a64b8e9301ffa311457be04
   FirebaseCoreExtension: 032fd6f8509e591fda8cb76f6651f20d926b121f
   FirebaseCoreInternal: 69bf1306a05b8ac43004f6cc1f804bb7b05b229e
@@ -3233,8 +3271,7 @@ SPEC CHECKSUMS:
   glog: 5683914934d5b6e4240e497e0f4a3b42d1854183
   GoogleDataTransport: aae35b7ea0c09004c3797d53c8c41f66f219d6a7
   GoogleUtilities: 00c88b9a86066ef77f0da2fab05f65d7768ed8e1
-  GTMSessionFetcher: 02d6e866e90bc236f48a703a041dfe43e6221a29
-  hermes-engine: eba5f23d24c8c143a82e0b5e239991109f3ea162
+  hermes-engine: 210c604cd017afdf2c7696d23956aa7f9b2cf19a
   nanopb: fad817b59e0457d11a5dfbde799381cd727c1275
   PromisesObjC: f5707f49cb48b9636751c5b2e7d227e43fba9f47
   RCT-Folly: 59ec0ac1f2f39672a0c6e6cecdd39383b764646f
@@ -3273,6 +3310,7 @@ SPEC CHECKSUMS:
   React-logger: 3fc17afd62cdb87324a345b107b06a90b3e2dea0
   React-Mapbuffer: 5a29b4204d9fb44743c3972ea0ba09bc4a9612d2
   React-microtasksnativemodule: 6930f274bab3ebf3c21ef27b4254621825219d09
+  react-native-geolocation: 6a788ce9bd63469be6b9d181f403ddec235234eb
   react-native-safe-area-context: fea29ae0275beaa22f72d0a8be1eb0ab09c3feae
   React-NativeModulesApple: 8ec75f44d317474025c5540b67ac1af838379dc4
   React-networking: b7a6de066cc739c038f7342932217d6fd362d329
@@ -3307,11 +3345,10 @@ SPEC CHECKSUMS:
   ReactAppDependencyProvider: 23e2bca1661f8781e55fcc05a151fc1df97bc1fb
   ReactCodegen: 7fc8ea04a59f2182fc04721b60fe8a95b1859120
   ReactCommon: ac4ba7ee2c810157492ac424e77ea248f33c6ac4
-  RecaptchaInterop: 11e0b637842dfb48308d242afc3f448062325aba
   RNCAsyncStorage: 8857fb173af29664cb90897903902dc8533e36cc
   RNFBApp: 0f3157e7a912def73edd1268da68f1dcc8c5ed46
-  RNFBAuth: 613c6fe58805a7842c81346224ca48abcead8da3
   RNFBMessaging: 18592d68e034a916ff8ce50ade505f42f4bd59c6
+  RNGestureHandler: 1f7ac76fa9d6ffedfdde38ce781442ffadac8880
   RNNotifee: 4a6ee5c7deaf00e005050052d73ee6315dff7ec9
   RNReanimated: 0a23a0a9721f450580f0fdf04b9ae928cd22915a
   RNScreens: c73f6bcfc19e209736c4e069f62b0f274535214b

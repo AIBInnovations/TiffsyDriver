@@ -11,6 +11,7 @@ import {
   Platform,
   Alert,
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { AuthStackScreenProps } from "../../navigation/types";
 import { CommonActions } from '@react-navigation/native';
 import MaterialCommunityIcons from "react-native-vector-icons/MaterialCommunityIcons";
@@ -32,6 +33,7 @@ const vehicleTypes: VehicleType[] = [
 ];
 
 const ProfileOnboardingScreen = ({ navigation, route }: Props) => {
+  const insets = useSafeAreaInsets();
   const { phoneNumber } = route.params;
 
   // Form state
@@ -155,7 +157,7 @@ const ProfileOnboardingScreen = ({ navigation, route }: Props) => {
 
   return (
     <KeyboardAvoidingView
-      style={{ flex: 1, backgroundColor: '#FE8733' }}
+      style={{ flex: 1, backgroundColor: '#FFFFFF' }}
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
     >
       <StatusBar barStyle="light-content" backgroundColor="#FE8733" />
@@ -170,7 +172,7 @@ const ProfileOnboardingScreen = ({ navigation, route }: Props) => {
           style={{
             backgroundColor: '#FE8733',
             paddingHorizontal: 20,
-            paddingTop: 15,
+            paddingTop: insets.top + 10,
             paddingBottom: 30,
           }}
         >

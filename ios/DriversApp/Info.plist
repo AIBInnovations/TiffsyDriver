@@ -7,7 +7,7 @@
 	<key>CFBundleDevelopmentRegion</key>
 	<string>en</string>
 	<key>CFBundleDisplayName</key>
-	<string>DriversApp</string>
+	<string>Tiffsy Driver</string>
 	<key>CFBundleExecutable</key>
 	<string>$(EXECUTABLE_NAME)</string>
 	<key>CFBundleIdentifier</key>
@@ -34,7 +34,15 @@
 		<true/>
 	</dict>
 	<key>NSLocationWhenInUseUsageDescription</key>
-	<string></string>
+	<string>Tiffsy Driver needs your location to track deliveries, show your position to customers, and optimize delivery routes.</string>
+	<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
+	<string>Tiffsy Driver needs your location in the background to continue tracking deliveries and provide real-time updates to customers.</string>
+	<key>NSLocationAlwaysUsageDescription</key>
+	<string>Tiffsy Driver needs your location in the background to continue tracking deliveries and provide real-time updates to customers.</string>
+	<key>NSCameraUsageDescription</key>
+	<string>Tiffsy Driver needs camera access to capture proof of delivery photos and scan documents.</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>Tiffsy Driver needs photo library access to upload delivery proof and driver documents.</string>
 	<key>RCTNewArchEnabled</key>
 	<true/>
 	<key>UILaunchStoryboardName</key>
@@ -49,7 +57,29 @@
 		<string>UIInterfaceOrientationLandscapeLeft</string>
 		<string>UIInterfaceOrientationLandscapeRight</string>
 	</array>
+	<key>UIAppFonts</key>
+	<array>
+		<string>MaterialCommunityIcons.ttf</string>
+		<string>MaterialIcons.ttf</string>
+		<string>FontAwesome.ttf</string>
+		<string>Ionicons.ttf</string>
+		<string>AntDesign.ttf</string>
+		<string>Entypo.ttf</string>
+		<string>Feather.ttf</string>
+		<string>EvilIcons.ttf</string>
+		<string>Octicons.ttf</string>
+		<string>SimpleLineIcons.ttf</string>
+		<string>Foundation.ttf</string>
+		<string>Fontisto.ttf</string>
+		<string>Zocial.ttf</string>
+	</array>
 	<key>UIViewControllerBasedStatusBarAppearance</key>
 	<false/>
+	<key>UIBackgroundModes</key>
+	<array>
+		<string>location</string>
+		<string>fetch</string>
+		<string>remote-notification</string>
+	</array>
 </dict>
 </plist>

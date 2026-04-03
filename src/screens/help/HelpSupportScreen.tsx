@@ -10,7 +10,7 @@ import {
   StatusBar,
   RefreshControl,
 } from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
+import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 import MaterialCommunityIcons from "react-native-vector-icons/MaterialCommunityIcons";
 import LinearGradient from "react-native-linear-gradient";
 import { useNavigation } from "@react-navigation/native";
@@ -28,6 +28,7 @@ import { ContactModal } from "./components/ContactModal";
 import { SafetyFlow } from "./components/SafetyFlow";
 
 export default function HelpSupportScreen() {
+  const insets = useSafeAreaInsets();
   const navigation = useNavigation();
 
   const {
@@ -72,11 +73,13 @@ export default function HelpSupportScreen() {
     return (
       <SafeAreaView style={styles.container} edges={['bottom']}>
         <StatusBar translucent backgroundColor="transparent" barStyle="light-content" />
-        <LinearGradient colors={['#FD9E2F', '#FF6636']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={[styles.header, { paddingTop: (StatusBar.currentHeight || 0) + 12 }]}>
-          <View style={styles.headerLeft}>
-            <Skeleton width={180} height={24} borderRadius={6} />
+        <LinearGradient colors={['#FD9E2F', '#FF6636']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}>
+          <View style={[styles.header, { paddingTop: insets.top + 16 }]}>
+            <View style={styles.headerLeft}>
+              <Skeleton width={180} height={24} borderRadius={6} />
+            </View>
+            <Skeleton width={80} height={36} borderRadius={8} />
           </View>
-          <Skeleton width={80} height={36} borderRadius={8} />
         </LinearGradient>
         <View style={styles.content}>
           <Skeleton
@@ -109,21 +112,23 @@ export default function HelpSupportScreen() {
       <StatusBar translucent backgroundColor="transparent" barStyle="light-content" />
 
       {/* Header */}
-      <LinearGradient colors={['#FD9E2F', '#FF6636']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={[styles.header, { paddingTop: (StatusBar.currentHeight || 0) + 12 }]}>
-        <View style={styles.headerLeft}>
-          <Pressable
-            onPress={() => navigation.goBack()}
-            style={styles.backButton}
-          >
-            <MaterialCommunityIcons
-              name="arrow-left"
-              size={24}
-              color="#FFFFFF"
-            />
-          </Pressable>
-          <Text style={styles.headerTitle}>Help & Support</Text>
+      <LinearGradient colors={['#FD9E2F', '#FF6636']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}>
+        <View style={[styles.header, { paddingTop: insets.top + 16 }]}>
+          <View style={styles.headerLeft}>
+            <Pressable
+              onPress={() => navigation.goBack()}
+              style={styles.backButton}
+            >
+              <MaterialCommunityIcons
+                name="arrow-left"
+                size={24}
+                color="#FFFFFF"
+              />
+            </Pressable>
+            <Text style={styles.headerTitle}>Help & Support</Text>
+          </View>
+          <View style={{ width: 40 }} />
         </View>
-        <View style={{ width: 40 }} />
       </LinearGradient>
 
       <ScrollView
@@ -214,7 +219,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "space-between",
     paddingHorizontal: 16,
-    paddingVertical: 12,
+    paddingBottom: 16,
   },
   headerLeft: {
     flexDirection: "row",

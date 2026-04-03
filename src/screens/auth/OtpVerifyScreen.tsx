@@ -14,6 +14,7 @@ import {
   StyleSheet,
   Pressable,
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { AuthStackScreenProps } from "../../navigation/types";
 import { verifyAndSync, resendOTP } from '../../services/authService';
 import { tokenStorage } from '../../utils/tokenStorage';
@@ -25,6 +26,7 @@ import { LegalModal } from '../profile/components/ProfileModals';
 type Props = AuthStackScreenProps<'OtpVerify'>;
 
 const OTPVerificationScreen = ({ navigation, route }: Props) => {
+  const insets = useSafeAreaInsets();
   const { phoneNumber } = route.params;
   const [otp, setOtp] = useState(['', '', '', '', '', '']);
   const [timer, setTimer] = useState(30);
@@ -252,7 +254,7 @@ const OTPVerificationScreen = ({ navigation, route }: Props) => {
         showsVerticalScrollIndicator={false}
       >
           {/* Top image / header area */}
-          <View style={otpStyles.header}>
+          <View style={[otpStyles.header, { paddingTop: insets.top + 10 }]}>
             {/* Back arrow in circle */}
             <TouchableOpacity
               onPress={() => navigation.goBack()}
@@ -405,7 +407,7 @@ const OTPVerificationScreen = ({ navigation, route }: Props) => {
 const otpStyles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#FE8733',
+    backgroundColor: '#FFFFFF',
   },
   scrollView: {
     flex: 1,

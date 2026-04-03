@@ -1,5 +1,5 @@
 import { View, Text, ScrollView, TouchableOpacity, Linking, StyleSheet, StatusBar } from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
+import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 import { useNavigation } from "@react-navigation/native";
 import MaterialCommunityIcons from "react-native-vector-icons/MaterialCommunityIcons";
 import LinearGradient from "react-native-linear-gradient";
@@ -13,6 +13,7 @@ interface DeliveryDetailScreenProps {
 }
 
 export default function DeliveryDetailScreen({ route }: DeliveryDetailScreenProps) {
+  const insets = useSafeAreaInsets();
   const navigation = useNavigation();
   const deliveryId = route?.params?.deliveryId || "DEL-001";
 
@@ -43,16 +44,18 @@ export default function DeliveryDetailScreen({ route }: DeliveryDetailScreenProp
     <SafeAreaView style={styles.container} edges={['bottom']}>
       <StatusBar translucent backgroundColor="transparent" barStyle="light-content" />
       {/* Header */}
-      <LinearGradient colors={['#FD9E2F', '#FF6636']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={[styles.header, { paddingTop: (StatusBar.currentHeight || 0) + 12 }]}>
-        <TouchableOpacity
-          onPress={() => navigation.goBack()}
-          style={styles.backButton}
-        >
-          <MaterialCommunityIcons name="arrow-left" size={24} color="#FFFFFF" />
-        </TouchableOpacity>
-        <View style={styles.headerTitleContainer}>
-          <Text style={styles.deliveryId}>{delivery.id}</Text>
-          <Text style={styles.customerName}>{delivery.customerName}</Text>
+      <LinearGradient colors={['#FD9E2F', '#FF6636']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}>
+        <View style={[styles.header, { paddingTop: insets.top + 16 }]}>
+          <TouchableOpacity
+            onPress={() => navigation.goBack()}
+            style={styles.backButton}
+          >
+            <MaterialCommunityIcons name="arrow-left" size={24} color="#FFFFFF" />
+          </TouchableOpacity>
+          <View style={styles.headerTitleContainer}>
+            <Text style={styles.deliveryId}>{delivery.id}</Text>
+            <Text style={styles.customerName}>{delivery.customerName}</Text>
+          </View>
         </View>
       </LinearGradient>
 

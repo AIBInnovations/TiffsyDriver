@@ -1,5 +1,5 @@
 import { View, Text, ScrollView, StyleSheet, TouchableOpacity, StatusBar } from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
+import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 import { useNavigation } from "@react-navigation/native";
 import MaterialCommunityIcons from "react-native-vector-icons/MaterialCommunityIcons";
 import LinearGradient from "react-native-linear-gradient";
@@ -7,20 +7,23 @@ import SettingsOption from "./components/SettingsOption";
 import NotificationPreferences from "./components/NotificationPreferences";
 
 export default function SettingsScreen() {
+  const insets = useSafeAreaInsets();
   const navigation = useNavigation();
   return (
     <SafeAreaView style={styles.container} edges={['bottom']}>
       <StatusBar translucent backgroundColor="transparent" barStyle="light-content" />
       <ScrollView style={styles.scrollView}>
-        <LinearGradient colors={['#FD9E2F', '#FF6636']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={[styles.header, { paddingTop: (StatusBar.currentHeight || 0) + 12 }]}>
-          <TouchableOpacity
-            onPress={() => navigation.goBack()}
-            style={styles.backButton}
-          >
-            <MaterialCommunityIcons name="arrow-left" size={24} color="#FFFFFF" />
-          </TouchableOpacity>
-          <Text style={styles.title}>Settings</Text>
-          <View style={styles.headerRight} />
+        <LinearGradient colors={['#FD9E2F', '#FF6636']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}>
+          <View style={[styles.header, { paddingTop: insets.top + 16 }]}>
+            <TouchableOpacity
+              onPress={() => navigation.goBack()}
+              style={styles.backButton}
+            >
+              <MaterialCommunityIcons name="arrow-left" size={24} color="#FFFFFF" />
+            </TouchableOpacity>
+            <Text style={styles.title}>Settings</Text>
+            <View style={styles.headerRight} />
+          </View>
         </LinearGradient>
 
         <View style={styles.section}>

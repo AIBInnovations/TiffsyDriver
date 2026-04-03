@@ -10,7 +10,7 @@ import {
   Alert,
 } from 'react-native';
 import { useState, useCallback, useEffect } from 'react';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons';
 import LinearGradient from 'react-native-linear-gradient';
@@ -22,6 +22,7 @@ import {
 } from '../../services/notificationService';
 
 export default function NotificationScreen() {
+  const insets = useSafeAreaInsets();
   const navigation = useNavigation();
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [refreshing, setRefreshing] = useState(false);
@@ -201,33 +202,35 @@ export default function NotificationScreen() {
       <StatusBar translucent backgroundColor="transparent" barStyle="light-content" />
 
       {/* Header */}
-      <LinearGradient colors={['#FD9E2F', '#FF6636']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={[styles.header, { paddingTop: (StatusBar.currentHeight || 0) + 12 }]}>
-        <TouchableOpacity
-          style={styles.backButton}
-          onPress={() => navigation.goBack()}
-          activeOpacity={0.7}
-        >
-          <MaterialCommunityIcons name="arrow-left" size={24} color="#FFFFFF" />
-        </TouchableOpacity>
-
-        <View style={styles.headerCenter}>
-          <Text style={styles.headerTitle}>Notifications</Text>
-          {unreadCount > 0 && (
-            <View style={styles.headerBadge}>
-              <Text style={styles.headerBadgeText}>{unreadCount}</Text>
-            </View>
-          )}
-        </View>
-
-        {unreadCount > 0 && (
+      <LinearGradient colors={['#FD9E2F', '#FF6636']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}>
+        <View style={[styles.header, { paddingTop: insets.top + 16 }]}>
           <TouchableOpacity
-            style={styles.markAllButton}
-            onPress={markAllAsRead}
+            style={styles.backButton}
+            onPress={() => navigation.goBack()}
             activeOpacity={0.7}
           >
-            <Text style={styles.markAllButtonText}>Mark all read</Text>
+            <MaterialCommunityIcons name="arrow-left" size={24} color="#FFFFFF" />
           </TouchableOpacity>
-        )}
+
+          <View style={styles.headerCenter}>
+            <Text style={styles.headerTitle}>Notifications</Text>
+            {unreadCount > 0 && (
+              <View style={styles.headerBadge}>
+                <Text style={styles.headerBadgeText}>{unreadCount}</Text>
+              </View>
+            )}
+          </View>
+
+          {unreadCount > 0 && (
+            <TouchableOpacity
+              style={styles.markAllButton}
+              onPress={markAllAsRead}
+              activeOpacity={0.7}
+            >
+              <Text style={styles.markAllButtonText}>Mark all read</Text>
+            </TouchableOpacity>
+          )}
+        </View>
       </LinearGradient>
 
       {/* Notifications List */}
@@ -270,7 +273,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: 16,
-    paddingVertical: 12,
+    paddingBottom: 16,
   },
   backButton: {
     padding: 4,

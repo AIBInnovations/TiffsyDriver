@@ -13,6 +13,7 @@ import {
   Platform,
   Pressable,
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { sendOTP } from '../../services/authService';
 import type { AuthStackScreenProps } from "../../navigation/types";
@@ -25,6 +26,7 @@ const SAVED_PHONE_KEY = '@saved_phone';
 type Props = AuthStackScreenProps<'Login'>;
 
 const LoginScreen = ({ navigation }: Props) => {
+  const insets = useSafeAreaInsets();
   const [phone, setPhone] = useState('');
   const [remember, setRemember] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -113,7 +115,7 @@ const LoginScreen = ({ navigation }: Props) => {
         bounces={false}
       >
         {/* Top header area */}
-        <View style={styles.header}>
+        <View style={[styles.header, { paddingTop: insets.top + 20 }]}>
         <View style={styles.illustrationContainer}>
           <Image
             source={require('../../../assets/images/pana.png')}
@@ -251,7 +253,7 @@ const LoginScreen = ({ navigation }: Props) => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#FE8733',
+    backgroundColor: '#FFFFFF',
   },
   scrollView: {
     flex: 1,
@@ -263,7 +265,6 @@ const styles = StyleSheet.create({
     height: 280,
     backgroundColor: '#FE8733',
     paddingHorizontal: 20,
-    paddingTop: 40,
     justifyContent: 'center',
   },
   illustrationContainer: {

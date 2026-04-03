@@ -1,11 +1,12 @@
 import { View, Text, TextInput, TouchableOpacity, ScrollView, StyleSheet, StatusBar } from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
+import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 import { useState } from "react";
 import { useNavigation } from "@react-navigation/native";
 import MaterialCommunityIcons from "react-native-vector-icons/MaterialCommunityIcons";
 import LinearGradient from "react-native-linear-gradient";
 
 export default function EditProfileScreen() {
+  const insets = useSafeAreaInsets();
   const navigation = useNavigation();
   const [name, setName] = useState("John Driver");
   const [email, setEmail] = useState("john@example.com");
@@ -19,15 +20,17 @@ export default function EditProfileScreen() {
     <SafeAreaView style={styles.container} edges={['bottom']}>
       <StatusBar translucent backgroundColor="transparent" barStyle="light-content" />
       {/* Header */}
-      <LinearGradient colors={['#FD9E2F', '#FF6636']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={[styles.header, { paddingTop: (StatusBar.currentHeight || 0) + 12 }]}>
-        <TouchableOpacity
-          onPress={() => navigation.goBack()}
-          style={styles.backButton}
-        >
-          <MaterialCommunityIcons name="arrow-left" size={24} color="#FFFFFF" />
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>Edit Profile</Text>
-        <View style={styles.headerRight} />
+      <LinearGradient colors={['#FD9E2F', '#FF6636']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}>
+        <View style={[styles.header, { paddingTop: insets.top + 16 }]}>
+          <TouchableOpacity
+            onPress={() => navigation.goBack()}
+            style={styles.backButton}
+          >
+            <MaterialCommunityIcons name="arrow-left" size={24} color="#FFFFFF" />
+          </TouchableOpacity>
+          <Text style={styles.headerTitle}>Edit Profile</Text>
+          <View style={styles.headerRight} />
+        </View>
       </LinearGradient>
 
       <ScrollView style={styles.scrollView}>
@@ -100,7 +103,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "space-between",
     paddingHorizontal: 16,
-    paddingVertical: 12,
+    paddingBottom: 16,
   },
   backButton: {
     padding: 8,

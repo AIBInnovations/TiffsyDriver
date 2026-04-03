@@ -1,5 +1,6 @@
 import { View, Text, TouchableOpacity, StyleSheet, StatusBar } from "react-native";
 import { useNavigation } from "@react-navigation/native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import MaterialCommunityIcons from "react-native-vector-icons/MaterialCommunityIcons";
 import LinearGradient from "react-native-linear-gradient";
 
@@ -11,26 +12,28 @@ interface HeaderProps {
 
 export default function Header({ title, showBack = false, rightElement }: HeaderProps) {
   const navigation = useNavigation();
+  const insets = useSafeAreaInsets();
 
   return (
     <LinearGradient
       colors={['#FD9E2F', '#FF6636']}
       start={{ x: 0, y: 0 }}
       end={{ x: 1, y: 0 }}
-      style={[styles.container, { paddingTop: (StatusBar.currentHeight || 0) + 12 }]}
     >
       <StatusBar translucent backgroundColor="transparent" barStyle="light-content" />
-      <View style={styles.leftSection}>
-        {showBack && (
-          <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
-            <MaterialCommunityIcons name="arrow-left" size={24} color="#FFFFFF" />
-          </TouchableOpacity>
-        )}
-        <Text style={styles.title} numberOfLines={1}>
-          {title}
-        </Text>
+      <View style={[styles.container, { paddingTop: insets.top + 16 }]}>
+        <View style={styles.leftSection}>
+          {showBack && (
+            <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
+              <MaterialCommunityIcons name="arrow-left" size={24} color="#FFFFFF" />
+            </TouchableOpacity>
+          )}
+          <Text style={styles.title} numberOfLines={1}>
+            {title}
+          </Text>
+        </View>
+        {rightElement && <View>{rightElement}</View>}
       </View>
-      {rightElement && <View>{rightElement}</View>}
     </LinearGradient>
   );
 }
@@ -41,7 +44,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: 16,
-    paddingVertical: 12,
+    paddingBottom: 16,
   },
   leftSection: {
     flexDirection: 'row',

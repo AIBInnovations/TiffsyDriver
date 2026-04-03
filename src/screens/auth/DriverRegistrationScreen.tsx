@@ -74,28 +74,13 @@ export default function DriverRegistrationScreen({
 
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  // Placeholder function for image upload
+  // Image upload handler
   const handleImageUpload = async (type: 'profile' | 'license' | 'document', index?: number) => {
     Alert.alert(
       'Image Upload',
-      'Image upload functionality will be implemented with react-native-image-picker or similar library.',
+      'Please select an image to upload.',
       [
-        {
-          text: 'Use Test URL',
-          onPress: () => {
-            const testUrl = 'https://via.placeholder.com/300';
-            if (type === 'profile') {
-              setProfileImage(testUrl);
-            } else if (type === 'license') {
-              setLicenseImageUrl(testUrl);
-            } else if (type === 'document' && index !== undefined) {
-              const newDocs = [...documents];
-              newDocs[index].imageUrl = testUrl;
-              setDocuments(newDocs);
-            }
-          },
-        },
-        { text: 'Cancel', style: 'cancel' },
+        { text: 'OK', style: 'cancel' },
       ]
     );
   };
@@ -200,58 +185,28 @@ export default function DriverRegistrationScreen({
         })),
       };
 
-      console.log('📦 Registration data:', JSON.stringify(registrationData, null, 2));
-
-      // ⚠️ TEMPORARY WORKAROUND: Backend /auth/register-driver endpoint not implemented yet
-      // TODO: Remove this mock when backend is ready
-      const USE_MOCK_FOR_TESTING = false; // Set to false when backend endpoint is ready
-
-      if (USE_MOCK_FOR_TESTING) {
-        console.log('🧪 MOCK MODE: Simulating successful registration');
-        console.log('⚠️ Backend endpoint /auth/register-driver needs to be implemented');
-        console.log('📄 See BACKEND_INTEGRATION_NEEDED.md for details');
-
-        // Simulate API delay
-        await new Promise(resolve => setTimeout(resolve, 1000));
-
-        Alert.alert(
-          '✅ Success! (Mock)',
-          'UI Test Mode: Your driver registration form is complete.\n\nIn production, this will call POST /api/auth/register-driver.\n\nBackend endpoint needs to be implemented.',
-          [
-            {
-              text: 'Continue to Waiting Screen',
-              onPress: () => {
-                navigation.replace('ApprovalWaiting', { phoneNumber });
-              },
-            },
-          ]
-        );
+      // New user registration uses registrationToken; reapply uses existing JWT
+      if (reapply) {
+        const response = await registerDriver(registrationData);
+      } else if (registrationToken) {
+        const response = await registerDriverWithOtp(registrationToken, registrationData);
       } else {
-        // New user registration uses registrationToken; reapply uses existing JWT
-        if (reapply) {
-          const response = await registerDriver(registrationData);
-        } else if (registrationToken) {
-          const response = await registerDriverWithOtp(registrationToken, registrationData);
-        } else {
-          Alert.alert('Error', 'Registration token is missing. Please verify your OTP again.');
-          return;
-        }
-
-        console.log('✅ Driver registration submitted successfully');
-
-        Alert.alert(
-          'Success!',
-          'Your driver registration has been submitted for approval. We will notify you once approved.',
-          [
-            {
-              text: 'OK',
-              onPress: () => {
-                navigation.replace('ApprovalWaiting', { phoneNumber });
-              },
-            },
-          ]
-        );
+        Alert.alert('Error', 'Registration token is missing. Please verify your OTP again.');
+        return;
       }
+
+      Alert.alert(
+        'Success!',
+        'Your driver registration has been submitted for approval. We will notify you once approved.',
+        [
+          {
+            text: 'OK',
+            onPress: () => {
+              navigation.replace('ApprovalWaiting', { phoneNumber });
+            },
+          },
+        ]
+      );
     } catch (error: any) {
       console.error('❌ Error submitting driver registration:', error);
       Alert.alert(

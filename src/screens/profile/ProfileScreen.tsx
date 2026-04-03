@@ -7,8 +7,9 @@ import {
   Pressable,
   StatusBar,
   InteractionManager,
+  Platform,
 } from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
+import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 import { useState, useCallback, useRef, useEffect } from "react";
 import { useNavigation, useFocusEffect } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
@@ -50,6 +51,7 @@ import {
 } from "./components/ProfileModals";
 
 export default function ProfileScreen() {
+  const insets = useSafeAreaInsets();
   const {
     profile,
     isLoading,
@@ -269,7 +271,10 @@ export default function ProfileScreen() {
   useFocusEffect(
     useCallback(() => {
       StatusBar.setBarStyle('light-content');
-      StatusBar.setBackgroundColor('transparent');
+      if (Platform.OS === 'android') {
+        StatusBar.setBackgroundColor('transparent');
+        StatusBar.setTranslucent(true);
+      }
     }, [])
   );
 
@@ -353,8 +358,10 @@ export default function ProfileScreen() {
     return (
       <SafeAreaView style={styles.container} edges={['bottom']}>
         <StatusBar translucent backgroundColor="transparent" barStyle="light-content" />
-        <LinearGradient colors={['#FD9E2F', '#FF6636']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={[styles.header, { paddingTop: (StatusBar.currentHeight || 0) + 12 }]}>
-          <Text style={styles.headerTitle}>Profile</Text>
+        <LinearGradient colors={['#FD9E2F', '#FF6636']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}>
+          <View style={[styles.header, { paddingTop: insets.top + 16 }]}>
+            <Text style={styles.headerTitle}>Profile</Text>
+          </View>
         </LinearGradient>
         <ScrollView style={styles.scrollView} contentContainerStyle={styles.scrollContent}>
           {/* Skeleton Header Card */}
@@ -388,11 +395,13 @@ export default function ProfileScreen() {
       <StatusBar translucent backgroundColor="transparent" barStyle="light-content" />
 
       {/* Header */}
-      <LinearGradient colors={['#FD9E2F', '#FF6636']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={[styles.header, { paddingTop: (StatusBar.currentHeight || 0) + 12 }]}>
-        <Text style={styles.headerTitle}>Profile</Text>
-        <Pressable style={styles.helpButton} onPress={() => navigation.navigate("HelpSupport")}>
-          <MaterialCommunityIcons name="help-circle-outline" size={24} color="#FFFFFF" />
-        </Pressable>
+      <LinearGradient colors={['#FD9E2F', '#FF6636']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}>
+        <View style={[styles.header, { paddingTop: insets.top + 16 }]}>
+          <Text style={styles.headerTitle}>Profile</Text>
+          <Pressable style={styles.helpButton} onPress={() => navigation.navigate("HelpSupport")}>
+            <MaterialCommunityIcons name="help-circle-outline" size={24} color="#FFFFFF" />
+          </Pressable>
+        </View>
       </LinearGradient>
 
       <ScrollView
@@ -689,7 +698,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "space-between",
     paddingHorizontal: 16,
-    paddingVertical: 12,
+    paddingBottom: 16,
   },
   headerTitle: {
     fontSize: 24,

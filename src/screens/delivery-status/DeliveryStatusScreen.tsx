@@ -7,8 +7,9 @@ import {
   RefreshControl,
   StatusBar,
   ActivityIndicator,
+  Platform,
 } from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
+import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 import { useState, useCallback, useEffect } from "react";
 import { useNavigation, useRoute, RouteProp, useFocusEffect } from "@react-navigation/native";
 import MaterialCommunityIcons from "react-native-vector-icons/MaterialCommunityIcons";
@@ -93,6 +94,7 @@ const mapDeliveryStatusToOrderStatus = (status: DeliveryStatusType): OrderStatus
 };
 
 export default function DeliveryStatusScreen() {
+  const insets = useSafeAreaInsets();
   const navigation = useNavigation();
   const route = useRoute<DeliveryStatusScreenRouteProp>();
 
@@ -119,7 +121,10 @@ export default function DeliveryStatusScreen() {
   useFocusEffect(
     useCallback(() => {
       StatusBar.setBarStyle('light-content');
-      StatusBar.setBackgroundColor('transparent');
+      if (Platform.OS === 'android') {
+        StatusBar.setBackgroundColor('transparent');
+        StatusBar.setTranslucent(true);
+      }
     }, [])
   );
 
@@ -567,8 +572,10 @@ export default function DeliveryStatusScreen() {
     return (
       <SafeAreaView style={styles.container} edges={['bottom']}>
         <StatusBar translucent backgroundColor="transparent" barStyle="light-content" />
-        <LinearGradient colors={['#FD9E2F', '#FF6636']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={[styles.header, { paddingTop: (StatusBar.currentHeight || 0) + 12 }]}>
-          <Text style={styles.headerTitle}>Delivery Status</Text>
+        <LinearGradient colors={['#FD9E2F', '#FF6636']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}>
+          <View style={[styles.header, { paddingTop: insets.top + 16 }]}>
+            <Text style={styles.headerTitle}>Delivery Status</Text>
+          </View>
         </LinearGradient>
         <View style={styles.emptyContainer}>
           {activeBatchForCompletion ? (
@@ -643,15 +650,17 @@ export default function DeliveryStatusScreen() {
       <StatusBar translucent backgroundColor="transparent" barStyle="light-content" />
 
       {/* Header */}
-      <LinearGradient colors={['#FD9E2F', '#FF6636']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={[styles.header, { paddingTop: (StatusBar.currentHeight || 0) + 12 }]}>
-        <TouchableOpacity
-          onPress={() => navigation.goBack()}
-          style={styles.backButton}
-        >
-          <MaterialCommunityIcons name="arrow-left" size={24} color="#FFFFFF" />
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>Delivery Status</Text>
-        <View style={styles.headerRight} />
+      <LinearGradient colors={['#FD9E2F', '#FF6636']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}>
+        <View style={[styles.header, { paddingTop: insets.top + 16 }]}>
+          <TouchableOpacity
+            onPress={() => navigation.goBack()}
+            style={styles.backButton}
+          >
+            <MaterialCommunityIcons name="arrow-left" size={24} color="#FFFFFF" />
+          </TouchableOpacity>
+          <Text style={styles.headerTitle}>Delivery Status</Text>
+          <View style={styles.headerRight} />
+        </View>
       </LinearGradient>
 
       {/* Notification Banner */}
@@ -774,7 +783,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "space-between",
     paddingHorizontal: 16,
-    paddingVertical: 12,
+    paddingBottom: 16,
   },
   backButton: {
     padding: 8,

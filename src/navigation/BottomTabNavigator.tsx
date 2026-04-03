@@ -1,4 +1,5 @@
 import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
+import { View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { MainTabsParamList } from "./types";
 import DashboardStackNavigator from "./DashboardStackNavigator";
@@ -17,13 +18,17 @@ export default function BottomTabNavigator() {
       id="BottomTabs"
       screenOptions={{
         headerShown: false,
+        tabBarShadowVisible: false,
+        tabBarBackground: () => (
+          <View style={{ flex: 1, backgroundColor: '#ffffff' }} />
+        ),
         tabBarStyle: {
-          backgroundColor: "#ffffff",
-          borderTopWidth: 1,
-          borderTopColor: "#e5e7eb",
-          paddingBottom: insets.bottom + 10,
-          paddingTop: 10,
-          height: 60 + insets.bottom,
+          backgroundColor: "transparent",
+          borderTopWidth: 0,
+          elevation: 0,
+          paddingBottom: insets.bottom,
+          paddingTop: 8,
+          height: 56 + insets.bottom,
         },
         tabBarActiveTintColor: "#3b82f6",
         tabBarInactiveTintColor: "#6b7280",

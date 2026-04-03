@@ -13,7 +13,7 @@ import {
   Platform,
 } from 'react-native';
 import { useState, useCallback, useEffect, useRef } from 'react';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons';
@@ -34,6 +34,7 @@ import AvailableBatchItem from './components/AvailableBatchItem';
 
 
 export default function DashboardScreen() {
+  const insets = useSafeAreaInsets();
   const navigation = useNavigation<NativeStackNavigationProp<DashboardStackParamList>>();
   const { profile, setAvailabilityStatus } = useDriverProfileStore();
 
@@ -328,7 +329,10 @@ export default function DashboardScreen() {
   useFocusEffect(
     useCallback(() => {
       StatusBar.setBarStyle('light-content');
-      StatusBar.setBackgroundColor('transparent');
+      if (Platform.OS === 'android') {
+        StatusBar.setBackgroundColor('transparent');
+        StatusBar.setTranslucent(true);
+      }
     }, [])
   );
 
@@ -664,57 +668,58 @@ export default function DashboardScreen() {
       {/* Main Content Wrapper with Background */}
       <View style={styles.mainWrapper}>
         {/* Header Section - Animated */}
-        <AnimatedLinearGradient colors={['#FD9E2F', '#FF6636']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={[styles.header, { paddingTop: (StatusBar.currentHeight || 0) + 12, transform: [{ translateY: headerTranslateY }] }]}>
-          <View style={styles.headerLeft}>
-            <Text style={styles.greeting}>
-              {new Date().getHours() < 12 ? 'Good Morning' :
-                new Date().getHours() < 18 ? 'Good Afternoon' : 'Good Evening'}
-            </Text>
-            <Text style={styles.driverName}>{driverName}</Text>
+        <AnimatedLinearGradient colors={['#FD9E2F', '#FF6636']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={[styles.headerGradient, { transform: [{ translateY: headerTranslateY }] }]}>
+          <View style={[styles.headerContent, { paddingTop: insets.top + 16 }]}>
+            <View style={styles.headerLeft}>
+              <Text style={styles.greeting}>
+                {new Date().getHours() < 12 ? 'Good Morning' :
+                  new Date().getHours() < 18 ? 'Good Afternoon' : 'Good Evening'}
+              </Text>
+              <Text style={styles.driverName}>{driverName}</Text>
 
-            {/* Online/Offline Toggle */}
-            <View style={[styles.statusPill, isOnline ? styles.statusPillOnline : styles.statusPillOffline]}>
-              <View style={styles.statusPillContent}>
-                <View style={[styles.statusPillDot, isOnline ? styles.statusPillDotOnline : styles.statusPillDotOffline]} />
-                <Text style={[styles.statusPillText, isOnline ? styles.statusPillTextOnline : styles.statusPillTextOffline]}>
-                  {isOnline ? 'Online' : 'Offline'}
-                </Text>
+              {/* Online/Offline Toggle */}
+              <View style={[styles.statusPill, isOnline ? styles.statusPillOnline : styles.statusPillOffline]}>
+                <View style={styles.statusPillContent}>
+                  <View style={[styles.statusPillDot, isOnline ? styles.statusPillDotOnline : styles.statusPillDotOffline]} />
+                  <Text style={[styles.statusPillText, isOnline ? styles.statusPillTextOnline : styles.statusPillTextOffline]}>
+                    {isOnline ? 'Online' : 'Offline'}
+                  </Text>
+                </View>
+                <Switch
+                  value={isOnline}
+                  onValueChange={handleToggleOnline}
+                  trackColor={{ false: '#FCA5A5', true: '#86EFAC' }}
+                  thumbColor={isOnline ? '#10B981' : '#EF4444'}
+                  style={styles.statusPillSwitch}
+                  disabled={isTogglingOnline}
+                />
               </View>
-              <Switch
-                value={isOnline}
-                onValueChange={handleToggleOnline}
-                trackColor={{ false: '#FCA5A5', true: '#86EFAC' }}
-                thumbColor={isOnline ? '#10B981' : '#EF4444'}
-                style={styles.statusPillSwitch}
-                disabled={isTogglingOnline}
-              />
+            </View>
+
+            {/* Notification Icon */}
+            <View style={styles.headerRight}>
+              <TouchableOpacity
+                style={styles.notificationButton}
+                onPress={() => navigation.navigate('Notifications')}
+              >
+                <MaterialCommunityIcons
+                  name="bell-outline"
+                  size={28}
+                  color="#FFFFFF"
+                />
+                {/* Badge for unread count */}
+                {unreadNotificationCount > 0 && (
+                  <View style={styles.notificationBadge}>
+                    <Text style={styles.notificationBadgeText}>{unreadNotificationCount}</Text>
+                  </View>
+                )}
+              </TouchableOpacity>
             </View>
           </View>
-
-          {/* Notification Icon */}
-          <View style={styles.headerRight}>
-            <TouchableOpacity
-              style={styles.notificationButton}
-              onPress={() => navigation.navigate('Notifications')}
-            >
-              <MaterialCommunityIcons
-                name="bell-outline"
-                size={28}
-                color="#FFFFFF"
-              />
-              {/* Badge for unread count */}
-              {unreadNotificationCount > 0 && (
-                <View style={styles.notificationBadge}>
-                  <Text style={styles.notificationBadgeText}>{unreadNotificationCount}</Text>
-                </View>
-              )}
-            </TouchableOpacity>
-          </View>
-
         </AnimatedLinearGradient>
         <ScrollView
           style={styles.scrollView}
-          contentContainerStyle={styles.scrollContent}
+          contentContainerStyle={[styles.scrollContent, { paddingTop: insets.top + 165 }]}
           onScroll={handleScroll}
           scrollEventThrottle={16}
           refreshControl={
@@ -1029,7 +1034,7 @@ export default function DashboardScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#FE8733',
+    backgroundColor: '#F9FAFB',
   },
   loadingContainer: {
     flex: 1,
@@ -1051,20 +1056,13 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   scrollContent: {
-    paddingTop: 140,
     paddingBottom: 20,
   },
-  header: {
+  headerGradient: {
     position: 'absolute',
     top: 0,
     left: 0,
     right: 0,
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-start',
-    paddingHorizontal: 20,
-    paddingTop: 20,
-    paddingBottom: 24,
     borderBottomLeftRadius: 24,
     borderBottomRightRadius: 24,
     shadowColor: '#000',
@@ -1073,6 +1071,14 @@ const styles = StyleSheet.create({
     shadowRadius: 8,
     elevation: 5,
     zIndex: 100,
+    overflow: 'hidden',
+  },
+  headerContent: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+    paddingHorizontal: 20,
+    paddingBottom: 36,
   },
   headerLeft: {
     flex: 1,
@@ -1080,7 +1086,7 @@ const styles = StyleSheet.create({
   headerRight: {
     justifyContent: 'flex-start',
     alignItems: 'center',
-    paddingTop: 24,
+    paddingTop: 4,
   },
   notificationButton: {
     position: 'relative',

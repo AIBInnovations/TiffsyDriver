@@ -19,7 +19,7 @@ const SCREEN_WIDTH = Dimensions.get('window').width;
 // Tab container has padding 16 on each side from header, plus padding 4 inside
 const TAB_CONTAINER_PADDING = 32 + 8; // header paddingHorizontal (16*2) + tabsContainer padding (4*2)
 const TAB_WIDTH = (SCREEN_WIDTH - TAB_CONTAINER_PADDING) / 2;
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useState, useCallback, useMemo, useEffect, useRef } from 'react';
 import { useRoute, RouteProp, useFocusEffect, useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
@@ -65,6 +65,7 @@ interface LocalDelivery {
 }
 
 export default function DeliveriesScreen() {
+  const insets = useSafeAreaInsets();
   const route = useRoute<RouteProp<DeliveriesStackParamList, 'DeliveriesList'>>();
   const navigation = useNavigation<NativeStackNavigationProp<DeliveriesStackParamList>>();
   const initialFilter = route.params?.initialFilter;
@@ -420,7 +421,10 @@ export default function DeliveriesScreen() {
     useCallback(() => {
       // Set status bar to translucent for gradient header
       StatusBar.setBarStyle('light-content');
-      StatusBar.setBackgroundColor('transparent');
+      if (Platform.OS === 'android') {
+        StatusBar.setBackgroundColor('transparent');
+        StatusBar.setTranslucent(true);
+      }
 
       console.log('🔄 DeliveriesScreen focused - refreshing data...');
 
@@ -1268,7 +1272,8 @@ export default function DeliveriesScreen() {
       <StatusBar translucent backgroundColor="transparent" barStyle="light-content" />
 
       {/* Sticky Header */}
-      <LinearGradient colors={['#FD9E2F', '#FF6636']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={[styles.header, { paddingTop: (StatusBar.currentHeight || 0) + 12 }]}>
+      <LinearGradient colors={['#FD9E2F', '#FF6636']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}>
+        <View style={[styles.header, { paddingTop: insets.top + 16 }]}>
         <View style={styles.headerTop}>
           <View style={styles.headerTitleContainer}>
             {viewingBatchId && (
@@ -1369,6 +1374,7 @@ export default function DeliveriesScreen() {
             )}
           </View>
         )}
+        </View>
       </LinearGradient>
 
       {/* Filter Bar - Only show for current tab */}
