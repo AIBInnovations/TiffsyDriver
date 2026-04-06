@@ -70,4 +70,16 @@ try {
   console.warn('⚠️ Add GoogleService-Info.plist to enable Firebase features');
 }
 
+// Register notifee foreground service handler (required for location tracking notification)
+try {
+  const notifee = require('@notifee/react-native').default;
+  notifee.registerForegroundService(() => {
+    // Foreground service runs as long as the notification is displayed.
+    // Return a promise that never resolves to keep the service alive.
+    return new Promise(() => {});
+  });
+} catch (error) {
+  console.warn('⚠️ Notifee foreground service registration failed:', error);
+}
+
 AppRegistry.registerComponent(appName, () => App);

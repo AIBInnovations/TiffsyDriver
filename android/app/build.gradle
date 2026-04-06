@@ -84,8 +84,8 @@ android {
         applicationId "com.tiffsy.driver"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
-        versionCode 1
-        versionName "1.0"
+        versionCode 2
+        versionName "1.1"
         ndk {
             abiFilters "armeabi-v7a", "arm64-v8a"
         }
@@ -125,6 +125,8 @@ dependencies {
     } else {
         implementation jscFlavor
     }
+
+    implementation project(':react-native-linear-gradient')
 
     // Note: Firebase dependencies (auth, messaging, analytics) are automatically
     // managed by @react-native-firebase packages. Do NOT add direct firebase-bom

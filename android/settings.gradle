@@ -3,4 +3,6 @@ plugins { id("com.facebook.react.settings") }
 extensions.configure(com.facebook.react.ReactSettingsExtension){ ex -> ex.autolinkLibrariesFromCommand() }
 rootProject.name = 'DriversApp'
 include ':app'
+include ':react-native-linear-gradient'
+project(':react-native-linear-gradient').projectDir = new File('../node_modules/react-native-linear-gradient/android')
 includeBuild('../node_modules/@react-native/gradle-plugin')

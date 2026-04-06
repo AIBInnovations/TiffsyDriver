@@ -12,7 +12,7 @@ import {
   Linking,
   Platform,
 } from 'react-native';
-import { useState, useCallback, useEffect, useRef } from 'react';
+import { useState, useCallback, useEffect, useRef, useMemo } from 'react';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
@@ -26,8 +26,7 @@ import CustomAlert from '../../components/common/CustomAlert';
 import { useDriverProfileStore } from '../profile/useDriverProfileStore';
 import { getMyBatch, getAvailableBatches, markBatchPickedUp, acceptBatch, getDriverBatchHistory, completeBatch } from '../../services/deliveryService';
 import { startLocationTracking, stopLocationTracking, isLocationTrackingActive } from '../../services/locationService';
-import { getCurrentUser } from '../../services/authService';
-import { getDriverStats, updateDriverStatus, manageShift } from '../../services/driverProfileService';
+import { getDriverStats, updateDriverStatus, manageShift, getDriverProfile } from '../../services/driverProfileService';
 import { getNotifications } from '../../services/notificationService';
 import type { Batch, BatchSummary, AvailableBatch, DriverStats, HistoryBatch, HistorySingleOrder } from '../../types/api';
 import AvailableBatchItem from './components/AvailableBatchItem';
@@ -36,7 +35,7 @@ import AvailableBatchItem from './components/AvailableBatchItem';
 export default function DashboardScreen() {
   const insets = useSafeAreaInsets();
   const navigation = useNavigation<NativeStackNavigationProp<DashboardStackParamList>>();
-  const { profile, setAvailabilityStatus } = useDriverProfileStore();
+  const { profile, setAvailabilityStatus, updateProfile } = useDriverProfileStore();
 
   // State
   const [refreshing, setRefreshing] = useState(false);
@@ -91,59 +90,31 @@ export default function DashboardScreen() {
 
   const isOnline = profile.availabilityStatus === 'ONLINE';
   const driverName = profile.fullName || 'Driver';
+  const hasBatch = currentBatch !== null;
 
-  // Calculate total delivered count from history
-  const totalDeliveredCount = (() => {
+  const totalDeliveredCount = useMemo(() => {
     let count = 0;
-
-    // Count delivered orders from batches
     historyBatches.forEach(batch => {
-      batch.orders.forEach(order => {
-        if (order.status === 'DELIVERED') {
-          count++;
-        }
-      });
+      batch.orders.forEach(order => { if (order.status === 'DELIVERED') count++; });
     });
-
-    // Count delivered single orders
-    historySingleOrders.forEach(order => {
-      if (order.status === 'DELIVERED') {
-        count++;
-      }
-    });
-
+    historySingleOrders.forEach(order => { if (order.status === 'DELIVERED') count++; });
     return count;
-  })();
+  }, [historyBatches, historySingleOrders]);
 
-  // Calculate total failed count from history
-  const totalFailedCount = (() => {
+  const totalFailedCount = useMemo(() => {
     let count = 0;
-
-    // Count failed orders from batches
     historyBatches.forEach(batch => {
-      batch.orders.forEach(order => {
-        if (order.status === 'FAILED') {
-          count++;
-        }
-      });
+      batch.orders.forEach(order => { if (order.status === 'FAILED') count++; });
     });
-
-    // Count failed single orders
-    historySingleOrders.forEach(order => {
-      if (order.status === 'FAILED') {
-        count++;
-      }
-    });
-
+    historySingleOrders.forEach(order => { if (order.status === 'FAILED') count++; });
     return count;
-  })();
+  }, [historyBatches, historySingleOrders]);
 
-  // Calculate success rate from history
-  const successRate = (() => {
+  const successRate = useMemo(() => {
     const totalCompleted = totalDeliveredCount + totalFailedCount;
     if (totalCompleted === 0) return 0;
     return (totalDeliveredCount / totalCompleted) * 100;
-  })();
+  }, [totalDeliveredCount, totalFailedCount]);
 
   // Show toast with animation
   const showToast = useCallback((message: string, type: 'success' | 'error' = 'success') => {
@@ -249,21 +220,24 @@ export default function DashboardScreen() {
     }
   }, []);
 
-  // Fetch user profile for updated stats
+  // Fetch user profile and sync name/details from backend
   const fetchUserProfile = useCallback(async () => {
     try {
-      console.log('📥 Fetching user profile...');
-      const response = await getCurrentUser();
-
-      // Update profile store with latest data
-      if (response.data.user) {
-        console.log('✅ User profile updated');
-      }
+      const response = await getDriverProfile();
+      if (!response?.data?.user) return;
+      const { user, driverDetails } = response.data;
+      const updates: Record<string, string> = {};
+      if (user._id) updates.driverId = user._id;
+      if (user.name) updates.fullName = user.name;
+      if (user.phone) updates.phone = user.phone;
+      if (user.email !== undefined) updates.email = user.email || '';
+      if (driverDetails?.vehicleType) updates.vehicleType = driverDetails.vehicleType;
+      if (driverDetails?.vehicleNumber) updates.vehicleNumber = driverDetails.vehicleNumber;
+      await updateProfile(updates);
     } catch (error: any) {
       console.error('❌ Error fetching user profile:', error);
-      // Don't show error toast for this
     }
-  }, []);
+  }, [updateProfile]);
 
   // Fetch unread notification count
   const fetchUnreadNotificationCount = useCallback(async () => {
@@ -278,52 +252,53 @@ export default function DashboardScreen() {
     }
   }, []);
 
-  // Initial data load
+  // Initial data load — run once on mount
   useEffect(() => {
     const loadDashboardData = async () => {
       setLoading(true);
       try {
+        // Load critical data first (what's visible above the fold)
         await Promise.all([
           fetchCurrentBatch(),
           fetchAvailableBatches(),
-          fetchDriverStats(),
           fetchUserProfile(),
-          fetchHistory(),
-          fetchUnreadNotificationCount(),
         ]);
       } catch (error) {
         console.error('❌ Error loading dashboard data:', error);
       } finally {
         setLoading(false);
       }
+      // Defer non-critical data so it doesn't block the initial render
+      fetchDriverStats();
+      fetchHistory();
+      fetchUnreadNotificationCount();
     };
 
     loadDashboardData();
-  }, [fetchCurrentBatch, fetchAvailableBatches, fetchDriverStats, fetchUserProfile, fetchHistory, fetchUnreadNotificationCount]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // Auto-refresh current batch if active (every 30 seconds)
   useEffect(() => {
-    if (!currentBatch) return;
+    if (!hasBatch) return;
 
     const interval = setInterval(() => {
-      console.log('🔄 Auto-refreshing current batch...');
       fetchCurrentBatch();
-    }, 30000); // 30 seconds
+    }, 30000);
 
     return () => clearInterval(interval);
-  }, [currentBatch, fetchCurrentBatch]);
+  }, [hasBatch, fetchCurrentBatch]);
 
   // Auto-poll available batches when no active batch (every 30 seconds)
   useEffect(() => {
-    if (currentBatch) return;
+    if (hasBatch) return;
 
     const interval = setInterval(() => {
-      console.log('🔄 Polling available batches...');
       fetchAvailableBatches();
     }, 30000);
 
     return () => clearInterval(interval);
-  }, [currentBatch, fetchAvailableBatches]);
+  }, [hasBatch, fetchAvailableBatches]);
 
   // Set status bar color when screen is focused
   useFocusEffect(
