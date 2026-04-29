@@ -13,6 +13,10 @@ import type {
   DriverLocationResponse,
   BatchTrackingData,
   OrderTrackingData,
+  BatchPickupData,
+  BatchCompleteData,
+  BatchSequenceData,
+  BatchDetailsData,
 } from '../types/api';
 
 // Create authorized headers with JWT token
@@ -128,7 +132,7 @@ export const getMyBatch = async (): Promise<ApiResponse<MyBatchData>> => {
 };
 
 // Mark batch as picked up from kitchen
-export const markBatchPickedUp = async (batchId: string): Promise<ApiResponse<any>> => {
+export const markBatchPickedUp = async (batchId: string): Promise<ApiResponse<BatchPickupData>> => {
   try {
     console.log('📡 Calling /delivery/batches/:batchId/pickup endpoint...');
     console.log('📦 Batch ID:', batchId);
@@ -146,7 +150,7 @@ export const markBatchPickedUp = async (batchId: string): Promise<ApiResponse<an
 
     console.log('📡 Response status:', response.status);
 
-    const data: ApiResponse<any> = await response.json();
+    const data: ApiResponse<BatchPickupData> = await response.json();
 
     if (!response.ok) {
       throw new Error(data.error || data.message || 'Failed to mark batch as picked up');
@@ -212,7 +216,7 @@ export const updateDeliveryStatus = async (
 };
 
 // Complete batch
-export const completeBatch = async (batchId: string): Promise<ApiResponse<any>> => {
+export const completeBatch = async (batchId: string): Promise<ApiResponse<BatchCompleteData>> => {
   try {
     console.log('📡 Calling /delivery/batches/:batchId/complete endpoint...');
     console.log('📦 Batch ID:', batchId);
@@ -230,7 +234,7 @@ export const completeBatch = async (batchId: string): Promise<ApiResponse<any>> 
 
     console.log('📡 Response status:', response.status);
 
-    const data: ApiResponse<any> = await response.json();
+    const data: ApiResponse<BatchCompleteData> = await response.json();
 
     if (!response.ok) {
       throw new Error(data.error || data.message || 'Failed to complete batch');
@@ -252,7 +256,7 @@ export const completeBatch = async (batchId: string): Promise<ApiResponse<any>> 
 export const updateDeliverySequence = async (
   batchId: string,
   sequence: Array<{ orderId: string; sequenceNumber: number }>
-): Promise<ApiResponse<any>> => {
+): Promise<ApiResponse<BatchSequenceData>> => {
   try {
     console.log('📡 Calling /delivery/batches/:batchId/sequence endpoint...');
     console.log('📦 Batch ID:', batchId);
@@ -270,7 +274,7 @@ export const updateDeliverySequence = async (
 
     console.log('📡 Response status:', response.status);
 
-    const data: ApiResponse<any> = await response.json();
+    const data: ApiResponse<BatchSequenceData> = await response.json();
 
     if (!response.ok) {
       throw new Error(data.error || data.message || 'Failed to update delivery sequence');
@@ -286,7 +290,7 @@ export const updateDeliverySequence = async (
 };
 
 // Get specific batch details
-export const getBatchDetails = async (batchId: string): Promise<ApiResponse<any>> => {
+export const getBatchDetails = async (batchId: string): Promise<ApiResponse<BatchDetailsData>> => {
   try {
     console.log('📡 Calling /delivery/batches/:batchId endpoint...');
     console.log('📦 Batch ID:', batchId);
@@ -303,7 +307,7 @@ export const getBatchDetails = async (batchId: string): Promise<ApiResponse<any>
 
     console.log('📡 Response status:', response.status);
 
-    const data: ApiResponse<any> = await response.json();
+    const data: ApiResponse<BatchDetailsData> = await response.json();
 
     if (!response.ok) {
       throw new Error(data.error || data.message || 'Failed to get batch details');

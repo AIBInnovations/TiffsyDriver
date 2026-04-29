@@ -229,6 +229,29 @@ export interface BatchSummary {
   failed: number;
 }
 
+// Response for PATCH /api/delivery/batches/:id/pickup
+export interface BatchPickupData {
+  batch: Batch;
+}
+
+// Response for PATCH /api/delivery/batches/:id/complete
+export interface BatchCompleteData {
+  batch: Batch;
+  summary: { totalOrders: number; delivered: number; failed: number };
+}
+
+// Response for PATCH /api/delivery/batches/:id/sequence
+export interface BatchSequenceData {
+  batch: Batch;
+}
+
+// Response for GET /api/delivery/batches/:id
+export interface BatchDetailsData {
+  batch: Batch;
+  orders: Order[];
+  assignments: DeliveryAssignment[];
+}
+
 // Current Batch Response
 export interface MyBatchData {
   batch: Batch | null;
