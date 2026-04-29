@@ -63,38 +63,6 @@ export const getDriverProfile = async (): Promise<ApiResponse<DriverProfileData>
 
     console.log('✅ Driver profile retrieved');
 
-    // Detailed structure logging
-    console.log('📊 Response structure:');
-    console.log('  - Top level keys:', Object.keys(data));
-    console.log('  - data keys:', Object.keys(data?.data || {}));
-    console.log('  - data type:', typeof data?.data);
-
-    // Check for user data (expected structure)
-    console.log('📊 User data check:');
-    console.log('  - user exists:', !!data?.data?.user);
-    console.log('  - user keys:', data?.data?.user ? Object.keys(data.data.user) : 'N/A');
-    console.log('  - user._id:', data?.data?.user?._id);
-    console.log('  - user.name:', data?.data?.user?.name);
-    console.log('  - user.role:', data?.data?.user?.role);
-
-    // Check for driver details (optional)
-    console.log('📊 Driver details check:');
-    console.log('  - driverDetails exists:', !!data?.data?.driverDetails);
-    console.log('  - driverDetails keys:', data?.data?.driverDetails ? Object.keys(data.data.driverDetails) : 'N/A');
-
-    // Check for statistics (optional)
-    console.log('📊 Statistics check:');
-    console.log('  - statistics exists:', !!data?.data?.statistics);
-    console.log('  - statistics keys:', data?.data?.statistics ? Object.keys(data.data.statistics) : 'N/A');
-
-    // Check for old structure (profile instead of user) - should not exist anymore
-    console.log('📊 Legacy structure check (should be undefined):');
-    console.log('  - data.profile exists (OLD):', !!(data?.data as any)?.profile);
-    console.log('  - data.stats exists (OLD):', !!(data?.data as any)?.stats);
-
-    // Full data dump for debugging (can be removed later)
-    console.log('📊 Full response.data:', JSON.stringify(data?.data, null, 2));
-
     return data;
   } catch (error: any) {
     console.error('❌ Error getting driver profile:', error);
