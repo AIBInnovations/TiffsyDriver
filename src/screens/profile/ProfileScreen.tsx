@@ -30,7 +30,6 @@ import {
 } from "../../services/driverProfileService";
 import {
   removeFCMToken,
-  syncNotificationPreferences,
   checkNotificationPermission,
   requestNotificationPermission
 } from "../../services/fcmService";
@@ -213,25 +212,13 @@ export default function ProfileScreen() {
     }
   }, [fetchBackendProfile, showToast]);
 
-  // Handle preference changes with debounced "saved" indicator
+  // Handle preference changes with debounced "saved" indicator.
+  // Note: notification preferences are local-state only — backend doesn't yet
+  // store them. When that's added, also call a sync API here.
   const handlePrefChange = useCallback(
     async (updateFn: () => Promise<void>) => {
       setIsSavingPrefs(true);
       await updateFn();
-
-      // Sync notification preferences to backend
-      try {
-        // Get updated preferences from profile after the update
-        const profileData = await updateFn();
-
-        // Sync to backend in background (don't block UI)
-        syncNotificationPreferences(profile.notificationPrefs).catch((error) => {
-          console.error('Failed to sync notification preferences to backend:', error);
-          // Non-critical error, don't show to user
-        });
-      } catch (error) {
-        console.error('Error syncing preferences:', error);
-      }
 
       if (saveTimeoutRef.current) {
         clearTimeout(saveTimeoutRef.current);
@@ -241,7 +228,7 @@ export default function ProfileScreen() {
         showToast("Saved", "success");
       }, 600);
     },
-    [showToast, profile.notificationPrefs]
+    [showToast]
   );
 
   // Cleanup timeout on unmount

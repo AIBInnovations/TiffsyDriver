@@ -687,56 +687,6 @@ export const setupTokenRefreshListener = () => {
   return unsubscribe;
 };
 
-// Sync notification preferences to backend
-// Call this when user changes notification settings in Profile
-export const syncNotificationPreferences = async (preferences: {
-  newAssignment: boolean;
-  batchUpdates: boolean;
-  promotions: boolean;
-}): Promise<boolean> => {
-  try {
-    console.log('📡 Syncing notification preferences to backend...');
-    console.log('📋 Preferences:', preferences);
-
-    const fcmToken = await getStoredFCMToken();
-    if (!fcmToken) {
-      console.log('⚠️ No FCM token found, skipping backend sync');
-      return false;
-    }
-
-    const authToken = await getStoredToken();
-
-    const response = await fetch(
-      `${API_CONFIG.BASE_URL}${API_CONFIG.ENDPOINTS.FCM_TOKEN}`,
-      {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${authToken}`,
-        },
-        body: JSON.stringify({
-          fcmToken,
-          deviceType: Platform.OS === 'ios' ? 'IOS' : 'ANDROID',
-          deviceId: await getDeviceId(),
-          notificationPreferences: preferences,
-        }),
-      }
-    );
-
-    const data = await response.json();
-
-    if (!response.ok) {
-      throw new Error(data.message || 'Failed to sync preferences');
-    }
-
-    console.log('✅ Notification preferences synced to backend');
-    return true;
-  } catch (error: any) {
-    console.error('❌ Error syncing notification preferences:', error);
-    return false;
-  }
-};
-
 /**
  * Test local notification display
  * Use this to verify that notifee is working correctly
