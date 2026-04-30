@@ -985,12 +985,12 @@ export default function DeliveriesScreen() {
       orderId: order.orderNumber,
       customerName,
       customerPhone,
-      pickupLocation: currentBatch && typeof currentBatch.kitchenId === 'object'
+      pickupLocation: currentBatch
         ? [
             currentBatch.kitchenId.name,
             currentBatch.kitchenId.address?.addressLine1,
-            currentBatch.kitchenId.address?.locality || currentBatch.kitchenId.address?.area,
-            currentBatch.kitchenId.address?.city
+            currentBatch.kitchenId.address?.locality,
+            currentBatch.kitchenId.address?.city,
           ].filter(Boolean).join(', ')
         : 'Kitchen',
       dropoffLocation,

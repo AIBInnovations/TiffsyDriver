@@ -149,11 +149,13 @@ export interface Zone {
 }
 
 // Batch interface
+// kitchenId and zoneId are always populated objects when returned by backend
+// (delivery.controller.js populates them on every getMyBatch / getBatchById call)
 export interface Batch {
   _id: string;
   batchNumber: string;
-  kitchenId: string | Kitchen;
-  zoneId: string | Zone;
+  kitchenId: Kitchen;
+  zoneId: Zone;
   driverId?: string;
   menuType: string;
   mealWindow: MealWindow;

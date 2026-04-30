@@ -205,37 +205,34 @@ export default function DeliveryStatusScreen() {
           }
         }
 
-        const kitchen = typeof batch.kitchenId === 'object' ? batch.kitchenId : null;
-        // Use full address for Google Maps navigation
-        const kitchenAddr = kitchen?.address;
+        const kitchenAddr = batch.kitchenId.address;
         const kitchenAddress = kitchenAddr ?
           [
-            kitchenAddr.addressLine1 || kitchenAddr.line1 || kitchenAddr.street,
-            kitchenAddr.addressLine2 || kitchenAddr.line2,
-            kitchenAddr.locality || kitchenAddr.area,
+            kitchenAddr.addressLine1,
+            kitchenAddr.addressLine2,
+            kitchenAddr.locality,
             kitchenAddr.city,
             kitchenAddr.state,
-            kitchenAddr.pincode || kitchenAddr.postalCode || kitchenAddr.zipCode
+            kitchenAddr.pincode,
           ].filter(Boolean).join(', ') :
           'Kitchen';
 
         const deliveryAddr = targetOrder.deliveryAddress;
         const dropoffAddr = [
-          deliveryAddr.flatNumber,
-          deliveryAddr.street || deliveryAddr.addressLine1,
+          deliveryAddr.addressLine1,
           deliveryAddr.addressLine2,
           deliveryAddr.landmark,
-          deliveryAddr.locality || deliveryAddr.area,
+          deliveryAddr.locality,
           deliveryAddr.city,
-          deliveryAddr.pincode
+          deliveryAddr.pincode,
         ].filter(Boolean).join(', ');
 
         setDelivery({
           deliveryId: targetOrder._id,
           orderId: targetOrder.orderNumber,
           orderSource: targetOrder.orderSource,
-          customerName: deliveryAddr.contactName || deliveryAddr.name || 'Customer',
-          customerPhone: deliveryAddr.contactPhone || deliveryAddr.phone || '',
+          customerName: deliveryAddr.contactName || 'Customer',
+          customerPhone: deliveryAddr.contactPhone || '',
           pickupLocation: kitchenAddress,
           dropoffLocation: dropoffAddr,
           deliveryWindow: batch.mealWindow,
