@@ -12,7 +12,6 @@ export const API_CONFIG = {
     AUTH_SYNC: '/auth/sync',
     AUTH_ME: '/auth/me',
     AUTH_PROFILE: '/auth/profile',
-    REGISTER_DRIVER: '/auth/register-driver',
     FCM_TOKEN: '/auth/fcm-token',
 
     // Delivery endpoints
@@ -38,6 +37,9 @@ export const API_CONFIG = {
     DRIVER_STATS: '/driver/stats',
     DRIVER_STATUS: '/driver/status',
     DRIVER_SHIFT: '/driver/shift',
+
+    // Upload endpoint (Cloudinary)
+    UPLOAD: '/upload',
 
     // Notification endpoints
     NOTIFICATIONS: '/notifications',

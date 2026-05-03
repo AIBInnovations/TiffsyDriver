@@ -201,60 +201,6 @@ export const updateProfile = async (
   }
 };
 
-// Register driver with admin approval
-export const registerDriver = async (
-  data: DriverRegistrationRequest
-): Promise<ApiResponse<DriverRegistrationData>> => {
-  try {
-    console.log('📡 Calling /auth/register-driver endpoint...');
-    console.log('📝 Driver data:', JSON.stringify(data, null, 2));
-
-    const headers = await createHeaders();
-
-    const response = await fetch(
-      `${API_CONFIG.BASE_URL}${API_CONFIG.ENDPOINTS.REGISTER_DRIVER}`,
-      {
-        method: 'POST',
-        headers,
-        body: JSON.stringify(data),
-      }
-    );
-
-    console.log('📡 Response status:', response.status);
-    console.log('📡 Response content-type:', response.headers.get('content-type'));
-
-    const responseText = await response.text();
-    console.log('📡 Response preview:', responseText.substring(0, 500));
-    console.log('📡 Full response length:', responseText.length);
-
-    let responseData: ApiResponse<DriverRegistrationData>;
-    try {
-      responseData = JSON.parse(responseText);
-      console.log('📡 Response data:', JSON.stringify(responseData, null, 2));
-    } catch (parseError) {
-      console.error('❌ Response is not valid JSON');
-      console.error('📄 Full response text:', responseText);
-      console.error('⚠️ This usually means:');
-      console.error('   1. The endpoint /auth/register-driver does not exist on backend');
-      console.error('   2. Backend is returning an HTML error page');
-      console.error('   3. Backend URL is incorrect');
-      console.error('🔗 Full URL:', `${API_CONFIG.BASE_URL}${API_CONFIG.ENDPOINTS.REGISTER_DRIVER}`);
-      throw new Error(`Backend returned non-JSON response. Status: ${response.status}. Check console for full response.`);
-    }
-
-    if (!response.ok) {
-      throw new Error(
-        responseData.error || responseData.message || 'Failed to register driver'
-      );
-    }
-
-    return responseData;
-  } catch (error: any) {
-    console.error('❌ Error registering driver:', error);
-    throw error;
-  }
-};
-
 // Logout user
 export const logout = async (): Promise<void> => {
   try {

@@ -9,7 +9,6 @@ import {
   KeyboardAvoidingView,
   Platform,
   ActivityIndicator,
-  Alert,
 } from "react-native";
 import { useState, useEffect } from "react";
 import { SafeAreaView } from "react-native-safe-area-context";
@@ -19,6 +18,8 @@ import {
   VehicleType,
 } from "../useDriverProfileStore";
 import { SegmentedControl } from "./ProfileUIComponents";
+import CustomAlert from "../../../components/common/CustomAlert";
+import { useAlert } from "../../../hooks/useAlert";
 
 interface EditProfileSheetProps {
   visible: boolean;
@@ -46,6 +47,7 @@ export default function EditProfileSheet({
   const [vehicleNumber, setVehicleNumber] = useState(profile.vehicleNumber);
   const [errors, setErrors] = useState<FormErrors>({});
   const [isSaving, setIsSaving] = useState(false);
+  const { alertProps, showAlert } = useAlert();
 
   // Reset form when profile changes or modal opens
   useEffect(() => {
@@ -96,7 +98,7 @@ export default function EditProfileSheet({
       });
       onClose();
     } catch (e) {
-      Alert.alert("Error", "Couldn't save locally. Try again.");
+      showAlert({ title: "Error", message: "Couldn't save locally. Try again.", icon: "alert-circle", iconColor: "#EF4444" });
     } finally {
       setIsSaving(false);
     }
@@ -253,6 +255,7 @@ export default function EditProfileSheet({
           </View>
         </KeyboardAvoidingView>
       </SafeAreaView>
+      <CustomAlert {...alertProps} />
     </Modal>
   );
 }

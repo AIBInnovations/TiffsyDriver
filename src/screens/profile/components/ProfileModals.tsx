@@ -5,12 +5,13 @@ import {
   Pressable,
   ScrollView,
   StyleSheet,
-  Alert,
 } from "react-native";
 import { useState } from "react";
 import { SafeAreaView } from "react-native-safe-area-context";
 import MaterialCommunityIcons from "react-native-vector-icons/MaterialCommunityIcons";
 import { Language, languageLabels, VehicleType, vehicleTypeLabels } from "../useDriverProfileStore";
+import CustomAlert from "../../../components/common/CustomAlert";
+import { useAlert } from "../../../hooks/useAlert";
 
 // ─────────────────────────────────────────────────────────────
 // Base Modal Wrapper
@@ -306,6 +307,7 @@ interface DocumentsModalProps {
 }
 
 export function DocumentsModal({ visible, onClose }: DocumentsModalProps) {
+  const { alertProps, showAlert } = useAlert();
   const documents = [
     {
       icon: "card-account-details-outline",
@@ -361,15 +363,18 @@ export function DocumentsModal({ visible, onClose }: DocumentsModalProps) {
 
       <Pressable
         style={styles.outlineButton}
-        onPress={() => Alert.alert(
-          "Coming Soon",
-          "Document upload functionality will be available soon. Please contact support for manual verification.",
-          [{ text: "OK" }]
-        )}
+        onPress={() => showAlert({
+          title: "Coming Soon",
+          message: "Document upload functionality will be available soon. Please contact support for manual verification.",
+          icon: "clock-outline",
+          iconColor: "#3B82F6",
+        })}
       >
         <MaterialCommunityIcons name="upload" size={18} color="#FE8733" />
         <Text style={styles.outlineButtonText}>Upload Documents</Text>
       </Pressable>
+
+      <CustomAlert {...alertProps} />
     </BaseModal>
   );
 }

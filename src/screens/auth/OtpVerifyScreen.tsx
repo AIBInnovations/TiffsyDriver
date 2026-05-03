@@ -154,6 +154,7 @@ const OTPVerificationScreen = ({ navigation, route }: Props) => {
               navigation.replace('Rejection', {
                 phoneNumber,
                 rejectionReason: rejectionReason || 'No reason provided',
+                registrationToken: response.data.registrationToken,
               });
               break;
 

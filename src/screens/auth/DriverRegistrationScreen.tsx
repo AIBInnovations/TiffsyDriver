@@ -1,19 +1,26 @@
-import React, { useState } from 'react';
+import React, { useRef, useState } from 'react';
 import {
   View,
   Text,
+  Image,
   TouchableOpacity,
   StyleSheet,
-  SafeAreaView,
   StatusBar,
   TextInput,
   ScrollView,
-  Alert,
   ActivityIndicator,
+  Platform,
+  PermissionsAndroid,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { launchCamera, launchImageLibrary, type Asset } from 'react-native-image-picker';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import type { RouteProp } from '@react-navigation/core';
-import { registerDriverWithOtp, registerDriver } from '../../services/authService';
+import { registerDriverWithOtp } from '../../services/authService';
+import { uploadImage, type UploadFolder } from '../../services/uploadService';
+import ActionSheet from '../../components/common/ActionSheet';
+import CustomAlert from '../../components/common/CustomAlert';
+import { useAlert } from '../../hooks/useAlert';
 import type { AuthStackParamList } from '../../navigation/types';
 import type { VehicleDocument, VehicleType, DocumentType } from '../../types/api';
 
@@ -73,16 +80,121 @@ export default function DriverRegistrationScreen({
   ]);
 
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [uploadingProfile, setUploadingProfile] = useState(false);
+  const [uploadingLicense, setUploadingLicense] = useState(false);
+  const [uploadingDocIndex, setUploadingDocIndex] = useState<number | null>(null);
+  const { alertProps, showAlert } = useAlert();
+  const [pickerTarget, setPickerTarget] = useState<
+    { type: 'profile' | 'license' | 'document'; index?: number } | null
+  >(null);
+  // Ref preserves the target across the ActionSheet close → onPress timing gap
+  const pickerTargetRef = useRef<{ type: 'profile' | 'license' | 'document'; index?: number } | null>(null);
 
-  // Image upload handler
-  const handleImageUpload = async (type: 'profile' | 'license' | 'document', index?: number) => {
-    Alert.alert(
-      'Image Upload',
-      'Please select an image to upload.',
-      [
-        { text: 'OK', style: 'cancel' },
-      ]
-    );
+  const requestCameraPermission = async (): Promise<boolean> => {
+    if (Platform.OS !== 'android') return true;
+    try {
+      const granted = await PermissionsAndroid.request(
+        PermissionsAndroid.PERMISSIONS.CAMERA,
+        {
+          title: 'Camera Permission',
+          message: 'Tiffsy Driver needs camera access to capture your license, profile, and vehicle document photos.',
+          buttonPositive: 'Allow',
+          buttonNegative: 'Deny',
+        }
+      );
+      return granted === PermissionsAndroid.RESULTS.GRANTED;
+    } catch {
+      return false;
+    }
+  };
+
+  const uploadAsset = async (
+    asset: Asset,
+    target: { type: 'profile' | 'license' | 'document'; index?: number }
+  ) => {
+    if (!asset.uri) return;
+    const folder: UploadFolder =
+      target.type === 'profile' ? 'driver-profiles' :
+      target.type === 'license' ? 'driver-licenses' : 'vehicle-documents';
+
+    if (target.type === 'profile') setUploadingProfile(true);
+    else if (target.type === 'license') setUploadingLicense(true);
+    else if (target.type === 'document' && typeof target.index === 'number') setUploadingDocIndex(target.index);
+
+    try {
+      const uploaded = await uploadImage(
+        { uri: asset.uri, fileName: asset.fileName, type: asset.type },
+        folder
+      );
+
+      if (target.type === 'profile') {
+        setProfileImage(uploaded.url);
+      } else if (target.type === 'license') {
+        setLicenseImageUrl(uploaded.url);
+      } else if (target.type === 'document' && typeof target.index === 'number') {
+        updateDocument(target.index, 'imageUrl', uploaded.url);
+      }
+    } catch (error: any) {
+      console.error('❌ Image upload failed:', error);
+      showAlert({ title: 'Upload Failed', message: error.message || 'Could not upload image. Please try again.', icon: 'alert-circle', iconColor: '#EF4444' });
+    } finally {
+      setUploadingProfile(false);
+      setUploadingLicense(false);
+      setUploadingDocIndex(null);
+    }
+  };
+
+  const handlePickFromCamera = async () => {
+    const target = pickerTargetRef.current;
+    if (!target) return;
+    pickerTargetRef.current = null;
+
+    const hasPermission = await requestCameraPermission();
+    if (!hasPermission) {
+      showAlert({ title: 'Permission Required', message: 'Camera permission is needed to take a photo. You can enable it in your device settings.', icon: 'camera-off', iconColor: '#F59E0B' });
+      return;
+    }
+
+    const result = await launchCamera({
+      mediaType: 'photo',
+      quality: 0.8,
+      maxWidth: 1600,
+      maxHeight: 1600,
+      saveToPhotos: false,
+    });
+    if (result.didCancel) return;
+    if (result.errorCode) {
+      showAlert({ title: 'Camera Error', message: result.errorMessage || `Could not open camera (${result.errorCode}).`, icon: 'camera-off', iconColor: '#EF4444' });
+      return;
+    }
+    const asset = result.assets?.[0];
+    if (asset) await uploadAsset(asset, target);
+  };
+
+  const handlePickFromGallery = async () => {
+    const target = pickerTargetRef.current;
+    if (!target) return;
+    pickerTargetRef.current = null;
+
+    const result = await launchImageLibrary({
+      mediaType: 'photo',
+      quality: 0.8,
+      maxWidth: 1600,
+      maxHeight: 1600,
+      selectionLimit: 1,
+    });
+    if (result.didCancel) return;
+    if (result.errorCode) {
+      showAlert({ title: 'Gallery Error', message: result.errorMessage || `Could not open gallery (${result.errorCode}).`, icon: 'image-off', iconColor: '#EF4444' });
+      return;
+    }
+    const asset = result.assets?.[0];
+    if (asset) await uploadAsset(asset, target);
+  };
+
+  const handleImageUpload = (type: 'profile' | 'license' | 'document', index?: number) => {
+    pickerTargetRef.current = { type, index };
+    setPickerTarget({ type, index });
   };
 
   const addDocument = () => {
@@ -94,7 +206,7 @@ export default function DriverRegistrationScreen({
       const newDocs = documents.filter((_, i) => i !== index);
       setDocuments(newDocs);
     } else {
-      Alert.alert('Required', 'At least one document is required');
+      showAlert({ title: 'Required', message: 'At least one document is required', icon: 'alert-circle-outline', iconColor: '#F59E0B' });
     }
   };
 
@@ -111,49 +223,44 @@ export default function DriverRegistrationScreen({
   };
 
   const validateForm = (): boolean => {
+    const warn = (title: string, message: string) =>
+      showAlert({ title, message, icon: 'alert-circle-outline', iconColor: '#F59E0B' });
+
     if (!name.trim()) {
-      Alert.alert('Required', 'Please enter your full name');
+      warn('Required', 'Please enter your full name');
       return false;
     }
-
     if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-      Alert.alert('Invalid Email', 'Please enter a valid email address');
+      warn('Invalid Email', 'Please enter a valid email address');
       return false;
     }
-
     if (!licenseNumber.trim()) {
-      Alert.alert('Required', 'Please enter your license number');
+      warn('Required', 'Please enter your license number');
       return false;
     }
-
     if (!licenseImageUrl) {
-      Alert.alert('Required', 'Please upload your license photo');
+      warn('Required', 'Please upload your license photo');
       return false;
     }
-
     if (!vehicleName.trim()) {
-      Alert.alert('Required', 'Please enter your vehicle name/model');
+      warn('Required', 'Please enter your vehicle name/model');
       return false;
     }
-
     if (!vehicleNumber.trim()) {
-      Alert.alert('Required', 'Please enter your vehicle number');
+      warn('Required', 'Please enter your vehicle number');
       return false;
     }
-
     if (!/^[A-Z]{2}[0-9]{1,2}[A-Z]{0,3}[0-9]{4}$/.test(vehicleNumber.toUpperCase())) {
-      Alert.alert('Invalid Format', 'Vehicle number should be in format: MH12AB1234');
+      warn('Invalid Format', 'Vehicle number should be in format: MH12AB1234');
       return false;
     }
-
     if (documents.length === 0) {
-      Alert.alert('Required', 'Please add at least one vehicle document');
+      warn('Required', 'Please add at least one vehicle document');
       return false;
     }
-
     for (let i = 0; i < documents.length; i++) {
       if (!documents[i].imageUrl) {
-        Alert.alert('Required', `Please upload document ${i + 1}`);
+        warn('Required', `Please upload document ${i + 1}`);
         return false;
       }
     }
@@ -185,41 +292,42 @@ export default function DriverRegistrationScreen({
         })),
       };
 
-      // New user registration uses registrationToken; reapply uses existing JWT
-      if (reapply) {
-        const response = await registerDriver(registrationData);
-      } else if (registrationToken) {
-        const response = await registerDriverWithOtp(registrationToken, registrationData);
+      // Both new registrations and re-applications go through /auth/otp/register-driver.
+      // The backend handles REJECTED drivers by updating their existing record.
+      if (registrationToken) {
+        await registerDriverWithOtp(registrationToken, registrationData);
       } else {
-        Alert.alert('Error', 'Registration token is missing. Please verify your OTP again.');
+        showAlert({ title: 'Error', message: 'Registration token is missing. Please verify your OTP again.', icon: 'alert-circle', iconColor: '#EF4444' });
         return;
       }
 
-      Alert.alert(
-        'Success!',
-        'Your driver registration has been submitted for approval. We will notify you once approved.',
-        [
+      showAlert({
+        title: 'Success!',
+        message: 'Your driver registration has been submitted for approval. We will notify you once approved.',
+        icon: 'check-circle',
+        iconColor: '#10B981',
+        buttons: [
           {
             text: 'OK',
-            onPress: () => {
-              navigation.replace('ApprovalWaiting', { phoneNumber });
-            },
+            onPress: () => navigation.replace('ApprovalWaiting', { phoneNumber }),
           },
-        ]
-      );
+        ],
+      });
     } catch (error: any) {
       console.error('❌ Error submitting driver registration:', error);
-      Alert.alert(
-        'Error',
-        error.message || 'Failed to submit registration. Please try again.'
-      );
+      showAlert({
+        title: 'Error',
+        message: error.message || 'Failed to submit registration. Please try again.',
+        icon: 'alert-circle',
+        iconColor: '#EF4444',
+      });
     } finally {
       setIsSubmitting(false);
     }
   };
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
       <StatusBar barStyle="dark-content" backgroundColor="#FFFFFF" />
 
       {/* Header */}
@@ -264,12 +372,20 @@ export default function DriverRegistrationScreen({
 
           <Text style={styles.label}>Profile Photo</Text>
           <TouchableOpacity
-            style={styles.uploadButton}
+            style={[styles.uploadButton, profileImage && styles.uploadButtonSuccess]}
             onPress={() => handleImageUpload('profile')}
+            disabled={uploadingProfile}
           >
-            <Text style={styles.uploadButtonText}>
-              {profileImage ? '✓ Photo Added' : '+ Upload Photo'}
-            </Text>
+            {uploadingProfile ? (
+              <ActivityIndicator color="#FE8733" />
+            ) : profileImage ? (
+              <View style={styles.uploadButtonInner}>
+                <Image source={{ uri: profileImage }} style={styles.thumbnail} />
+                <Text style={styles.uploadButtonText}>✓ Photo Added (tap to change)</Text>
+              </View>
+            ) : (
+              <Text style={styles.uploadButtonText}>+ Upload Photo</Text>
+            )}
           </TouchableOpacity>
         </View>
 
@@ -291,10 +407,18 @@ export default function DriverRegistrationScreen({
           <TouchableOpacity
             style={[styles.uploadButton, licenseImageUrl && styles.uploadButtonSuccess]}
             onPress={() => handleImageUpload('license')}
+            disabled={uploadingLicense}
           >
-            <Text style={styles.uploadButtonText}>
-              {licenseImageUrl ? '✓ License Photo Added' : '+ Upload License Photo'}
-            </Text>
+            {uploadingLicense ? (
+              <ActivityIndicator color="#FE8733" />
+            ) : licenseImageUrl ? (
+              <View style={styles.uploadButtonInner}>
+                <Image source={{ uri: licenseImageUrl }} style={styles.thumbnail} />
+                <Text style={styles.uploadButtonText}>✓ License Photo Added (tap to change)</Text>
+              </View>
+            ) : (
+              <Text style={styles.uploadButtonText}>+ Upload License Photo</Text>
+            )}
           </TouchableOpacity>
 
           <Text style={styles.label}>License Expiry Date</Text>
@@ -397,10 +521,18 @@ export default function DriverRegistrationScreen({
               <TouchableOpacity
                 style={[styles.uploadButton, doc.imageUrl && styles.uploadButtonSuccess]}
                 onPress={() => handleImageUpload('document', index)}
+                disabled={uploadingDocIndex === index}
               >
-                <Text style={styles.uploadButtonText}>
-                  {doc.imageUrl ? '✓ Document Added' : '+ Upload Document'}
-                </Text>
+                {uploadingDocIndex === index ? (
+                  <ActivityIndicator color="#FE8733" />
+                ) : doc.imageUrl ? (
+                  <View style={styles.uploadButtonInner}>
+                    <Image source={{ uri: doc.imageUrl }} style={styles.thumbnail} />
+                    <Text style={styles.uploadButtonText}>✓ Document Added (tap to change)</Text>
+                  </View>
+                ) : (
+                  <Text style={styles.uploadButtonText}>+ Upload Document</Text>
+                )}
               </TouchableOpacity>
 
               <Text style={styles.label}>Expiry Date (Optional)</Text>
@@ -436,6 +568,19 @@ export default function DriverRegistrationScreen({
 
         <View style={{ height: 40 }} />
       </ScrollView>
+
+      <ActionSheet
+        visible={pickerTarget !== null}
+        title="Upload Photo"
+        message="Choose a source"
+        onClose={() => setPickerTarget(null)}
+        options={[
+          { label: 'Take Photo', icon: 'camera', iconColor: '#FE8733', onPress: handlePickFromCamera },
+          { label: 'Choose from Gallery', icon: 'image-multiple', iconColor: '#3B82F6', onPress: handlePickFromGallery },
+        ]}
+      />
+
+      <CustomAlert {...alertProps} />
     </SafeAreaView>
   );
 }
@@ -522,6 +667,17 @@ const styles = StyleSheet.create({
     color: '#FF6B35',
     fontSize: 14,
     fontWeight: '500',
+  },
+  uploadButtonInner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  thumbnail: {
+    width: 48,
+    height: 48,
+    borderRadius: 6,
+    backgroundColor: '#E5E7EB',
   },
   vehicleTypeContainer: {
     flexDirection: 'row',

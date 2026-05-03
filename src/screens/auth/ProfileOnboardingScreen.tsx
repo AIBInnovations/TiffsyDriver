@@ -9,7 +9,6 @@ import {
   KeyboardAvoidingView,
   ScrollView,
   Platform,
-  Alert,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { AuthStackScreenProps } from "../../navigation/types";
@@ -17,6 +16,8 @@ import { CommonActions } from '@react-navigation/native';
 import MaterialCommunityIcons from "react-native-vector-icons/MaterialCommunityIcons";
 import { updateProfile } from '../../services/authService';
 import { tokenStorage } from '../../utils/tokenStorage';
+import CustomAlert from '../../components/common/CustomAlert';
+import { useAlert } from '../../hooks/useAlert';
 
 type Props = AuthStackScreenProps<'ProfileOnboarding'>;
 
@@ -43,6 +44,7 @@ const ProfileOnboardingScreen = ({ navigation, route }: Props) => {
   const [vehicleType, setVehicleType] = useState<'BIKE' | 'SCOOTER' | 'CAR'>('BIKE');
   const [vehicleNumber, setVehicleNumber] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const { alertProps, showAlert } = useAlert();
 
   // Input refs
   const emailRef = useRef<TextInput>(null);
@@ -56,24 +58,24 @@ const ProfileOnboardingScreen = ({ navigation, route }: Props) => {
   };
 
   const handleSubmit = async () => {
+    const warn = (title: string, message: string) =>
+      showAlert({ title, message, icon: 'alert-circle-outline', iconColor: '#F59E0B' });
+
     // Validation
     if (!fullName.trim()) {
-      Alert.alert('Required', 'Please enter your full name');
+      warn('Required', 'Please enter your full name');
       return;
     }
-
     if (!email.trim() || !validateEmail(email)) {
-      Alert.alert('Invalid Email', 'Please enter a valid email address');
+      warn('Invalid Email', 'Please enter a valid email address');
       return;
     }
-
     if (!licenseNumber.trim()) {
-      Alert.alert('Required', 'Please enter your driver license number');
+      warn('Required', 'Please enter your driver license number');
       return;
     }
-
     if (!vehicleNumber.trim()) {
-      Alert.alert('Required', 'Please enter your vehicle number');
+      warn('Required', 'Please enter your vehicle number');
       return;
     }
 
@@ -104,51 +106,48 @@ const ProfileOnboardingScreen = ({ navigation, route }: Props) => {
       console.log('📊 Response:', response);
 
       // Navigate to main app
-      Alert.alert(
-        'Success',
-        'Profile created successfully!',
-        [
+      showAlert({
+        title: 'Success',
+        message: 'Profile created successfully!',
+        icon: 'check-circle',
+        iconColor: '#10B981',
+        buttons: [
           {
             text: 'Continue',
-            onPress: () => {
-              navigation.dispatch(
-                CommonActions.reset({
-                  index: 0,
-                  routes: [{ name: 'Main' }],
-                })
-              );
-            }
-          }
-        ]
-      );
+            onPress: () => navigation.dispatch(
+              CommonActions.reset({ index: 0, routes: [{ name: 'Main' }] })
+            ),
+          },
+        ],
+      });
     } catch (error: any) {
       console.error('❌ Error saving profile:', error);
 
       if (error.message?.includes('User not found') || error.message?.includes('Unauthorized')) {
-        Alert.alert(
-          'Account Not Found',
-          'Your driver account has not been created yet. Please contact administration to create your driver account first.\n\nPhone: ' + phoneNumber,
-          [
+        showAlert({
+          title: 'Account Not Found',
+          message: 'Your driver account has not been created yet. Please contact administration to create your driver account first.\n\nPhone: ' + phoneNumber,
+          icon: 'account-off',
+          iconColor: '#EF4444',
+          buttons: [
             {
               text: 'OK',
               onPress: async () => {
-                // Clear token and go back to login
                 await tokenStorage.clearAll();
                 navigation.dispatch(
-                  CommonActions.reset({
-                    index: 0,
-                    routes: [{ name: 'Login' }],
-                  })
+                  CommonActions.reset({ index: 0, routes: [{ name: 'Login' }] })
                 );
-              }
-            }
-          ]
-        );
+              },
+            },
+          ],
+        });
       } else {
-        Alert.alert(
-          'Error',
-          'Failed to save profile: ' + (error.message || 'Unknown error') + '\n\nPlease try again or contact support.'
-        );
+        showAlert({
+          title: 'Error',
+          message: 'Failed to save profile: ' + (error.message || 'Unknown error') + '\n\nPlease try again or contact support.',
+          icon: 'alert-circle',
+          iconColor: '#EF4444',
+        });
       }
 
       setIsSubmitting(false);
@@ -542,6 +541,7 @@ const ProfileOnboardingScreen = ({ navigation, route }: Props) => {
           </View>
         </View>
       </ScrollView>
+      <CustomAlert {...alertProps} />
     </KeyboardAvoidingView>
   );
 };

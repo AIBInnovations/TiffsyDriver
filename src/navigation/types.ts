@@ -13,6 +13,7 @@ export type AuthStackParamList = {
   Rejection: {
     phoneNumber: string;
     rejectionReason: string;
+    registrationToken?: string;
   };
   ProfileOnboarding: { phoneNumber: string };
 };

@@ -7,7 +7,6 @@ import {
   StatusBar,
   RefreshControl,
   ActivityIndicator,
-  Alert,
 } from 'react-native';
 import { useState, useCallback, useEffect } from 'react';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -15,6 +14,8 @@ import { useNavigation } from '@react-navigation/native';
 import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons';
 import LinearGradient from 'react-native-linear-gradient';
 import type { Notification } from '../../types/api';
+import CustomAlert from '../../components/common/CustomAlert';
+import { useAlert } from '../../hooks/useAlert';
 import {
   getNotifications,
   markNotificationAsRead,
@@ -27,6 +28,7 @@ export default function NotificationScreen() {
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [refreshing, setRefreshing] = useState(false);
   const [loading, setLoading] = useState(true);
+  const { alertProps, showAlert } = useAlert();
 
   // Load notifications on mount
   useEffect(() => {
@@ -42,10 +44,12 @@ export default function NotificationScreen() {
       console.log('📬 Loaded notifications:', response.data.notifications.length);
     } catch (error: any) {
       console.error('❌ Failed to load notifications:', error);
-      Alert.alert(
-        'Error',
-        error.message || 'Failed to load notifications. Please try again.',
-      );
+      showAlert({
+        title: 'Error',
+        message: error.message || 'Failed to load notifications. Please try again.',
+        icon: 'alert-circle',
+        iconColor: '#EF4444',
+      });
     } finally {
       setLoading(false);
     }
@@ -133,10 +137,12 @@ export default function NotificationScreen() {
       console.log('✅ Marked all notifications as read:', response.data.updatedCount);
     } catch (error: any) {
       console.error('❌ Failed to mark all notifications as read:', error);
-      Alert.alert(
-        'Error',
-        error.message || 'Failed to mark all notifications as read. Please try again.',
-      );
+      showAlert({
+        title: 'Error',
+        message: error.message || 'Failed to mark all notifications as read. Please try again.',
+        icon: 'alert-circle',
+        iconColor: '#EF4444',
+      });
       // Reload notifications to get correct state
       loadNotifications();
     }
@@ -260,6 +266,8 @@ export default function NotificationScreen() {
           showsVerticalScrollIndicator={false}
         />
       )}
+
+      <CustomAlert {...alertProps} />
     </SafeAreaView>
   );
 }

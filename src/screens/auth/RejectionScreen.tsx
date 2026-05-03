@@ -1,18 +1,20 @@
-import React from 'react';
+import React, { useState } from 'react';
 import {
   View,
   Text,
   TouchableOpacity,
   StyleSheet,
-  SafeAreaView,
   StatusBar,
-  Alert,
   Linking,
   ScrollView,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import type { RouteProp } from '@react-navigation/core';
 import { logout } from '../../services/authService';
+import CustomAlert from '../../components/common/CustomAlert';
+import ActionSheet from '../../components/common/ActionSheet';
+import { useAlert } from '../../hooks/useAlert';
 import type { AuthStackParamList } from '../../navigation/types';
 
 type RejectionScreenNavigationProp = NativeStackNavigationProp<
@@ -31,60 +33,38 @@ export default function RejectionScreen({
   navigation,
   route,
 }: RejectionScreenProps) {
-  const { phoneNumber, rejectionReason } = route.params;
+  const { phoneNumber, rejectionReason, registrationToken } = route.params;
+  const [contactSheetVisible, setContactSheetVisible] = useState(false);
+  const { alertProps, showAlert } = useAlert();
 
   const handleReapply = () => {
-    Alert.alert(
-      'Re-apply',
-      'You can now update your information and re-submit your driver registration.',
-      [
+    showAlert({
+      title: 'Re-apply',
+      message: 'You can now update your information and re-submit your driver registration.',
+      icon: 'refresh',
+      iconColor: '#3B82F6',
+      buttons: [
+        { text: 'Cancel', style: 'cancel' },
         {
           text: 'Continue',
-          onPress: () => {
-            navigation.replace('DriverRegistration', {
-              phoneNumber,
-              reapply: true,
-            });
-          },
+          onPress: () => navigation.replace('DriverRegistration', { phoneNumber, reapply: true, registrationToken }),
         },
-        {
-          text: 'Cancel',
-          style: 'cancel',
-        },
-      ]
-    );
+      ],
+    });
   };
 
   const handleContactSupport = () => {
-    Alert.alert(
-      'Contact Support',
-      'How would you like to contact us?',
-      [
-        {
-          text: 'Call',
-          onPress: () => Linking.openURL('tel:+919522455243'),
-        },
-        {
-          text: 'WhatsApp',
-          onPress: () => Linking.openURL('https://wa.me/919522455243'),
-        },
-        {
-          text: 'Cancel',
-          style: 'cancel',
-        },
-      ]
-    );
+    setContactSheetVisible(true);
   };
 
-  const handleLogout = async () => {
-    Alert.alert(
-      'Logout',
-      'Are you sure you want to logout?',
-      [
-        {
-          text: 'Cancel',
-          style: 'cancel',
-        },
+  const handleLogout = () => {
+    showAlert({
+      title: 'Logout',
+      message: 'Are you sure you want to logout?',
+      icon: 'logout',
+      iconColor: '#EF4444',
+      buttons: [
+        { text: 'Cancel', style: 'cancel' },
         {
           text: 'Logout',
           style: 'destructive',
@@ -92,17 +72,22 @@ export default function RejectionScreen({
             try {
               await logout();
               navigation.replace('Login');
-            } catch (error: any) {
-              Alert.alert('Error', 'Failed to logout. Please try again.');
+            } catch {
+              showAlert({
+                title: 'Error',
+                message: 'Failed to logout. Please try again.',
+                icon: 'alert-circle',
+                iconColor: '#EF4444',
+              });
             }
           },
         },
-      ]
-    );
+      ],
+    });
   };
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
       <StatusBar barStyle="dark-content" backgroundColor="#FFFFFF" />
 
       <ScrollView
@@ -185,6 +170,19 @@ export default function RejectionScreen({
           </Text>
         </View>
       </ScrollView>
+
+      <ActionSheet
+        visible={contactSheetVisible}
+        title="Contact Support"
+        message="How would you like to contact us?"
+        onClose={() => setContactSheetVisible(false)}
+        options={[
+          { label: 'Call', icon: 'phone', iconColor: '#10B981', onPress: () => Linking.openURL('tel:+919522455243') },
+          { label: 'WhatsApp', icon: 'whatsapp', iconColor: '#25D366', onPress: () => Linking.openURL('https://wa.me/919522455243') },
+        ]}
+      />
+
+      <CustomAlert {...alertProps} />
     </SafeAreaView>
   );
 }

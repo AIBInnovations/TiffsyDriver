@@ -4,15 +4,17 @@ import {
   Text,
   TouchableOpacity,
   StyleSheet,
-  SafeAreaView,
   StatusBar,
   ActivityIndicator,
-  Alert,
   Linking,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import type { RouteProp } from '@react-navigation/core';
 import { getCurrentUser, logout } from '../../services/authService';
+import CustomAlert from '../../components/common/CustomAlert';
+import ActionSheet from '../../components/common/ActionSheet';
+import { useAlert } from '../../hooks/useAlert';
 import type { AuthStackParamList } from '../../navigation/types';
 
 type ApprovalWaitingScreenNavigationProp = NativeStackNavigationProp<
@@ -36,6 +38,8 @@ export default function ApprovalWaitingScreen({
 }: ApprovalWaitingScreenProps) {
   const { phoneNumber } = route.params;
   const [checking, setChecking] = useState(false);
+  const [contactSheetVisible, setContactSheetVisible] = useState(false);
+  const { alertProps, showAlert } = useAlert();
 
   const handleCheckStatus = async () => {
     setChecking(true);
@@ -49,19 +53,18 @@ export default function ApprovalWaitingScreen({
 
       switch (approvalStatus) {
         case 'APPROVED':
-          Alert.alert(
-            'Approved! 🎉',
-            'Your driver registration has been approved. Welcome to Tiffsy!',
-            [
+          showAlert({
+            title: 'Approved! 🎉',
+            message: 'Your driver registration has been approved. Welcome to Tiffsy!',
+            icon: 'check-circle',
+            iconColor: '#10B981',
+            buttons: [
               {
                 text: 'Continue',
-                onPress: () => {
-                  // Navigate to Main app
-                  navigation.getParent()?.navigate('Main');
-                },
+                onPress: () => navigation.getParent()?.navigate('Main'),
               },
-            ]
-          );
+            ],
+          });
           break;
 
         case 'REJECTED':
@@ -72,62 +75,47 @@ export default function ApprovalWaitingScreen({
           break;
 
         case 'PENDING':
-          Alert.alert(
-            'Still Pending',
-            'Your registration is still under review. We will notify you once approved.',
-            [{ text: 'OK' }]
-          );
+          showAlert({
+            title: 'Still Pending',
+            message: 'Your registration is still under review. We will notify you once approved.',
+            icon: 'clock-outline',
+            iconColor: '#F59E0B',
+          });
           break;
 
         default:
-          Alert.alert(
-            'Status Unknown',
-            'Could not determine your approval status. Please contact support.',
-            [{ text: 'OK' }]
-          );
+          showAlert({
+            title: 'Status Unknown',
+            message: 'Could not determine your approval status. Please contact support.',
+            icon: 'help-circle-outline',
+            iconColor: '#6B7280',
+          });
       }
     } catch (error: any) {
       console.error('❌ Error checking status:', error);
-      Alert.alert(
-        'Error',
-        error.message || 'Failed to check approval status. Please try again.',
-        [{ text: 'OK' }]
-      );
+      showAlert({
+        title: 'Error',
+        message: error.message || 'Failed to check approval status. Please try again.',
+        icon: 'alert-circle',
+        iconColor: '#EF4444',
+      });
     } finally {
       setChecking(false);
     }
   };
 
   const handleContactSupport = () => {
-    Alert.alert(
-      'Contact Support',
-      'How would you like to contact us?',
-      [
-        {
-          text: 'Call',
-          onPress: () => Linking.openURL('tel:+919522455243'),
-        },
-        {
-          text: 'WhatsApp',
-          onPress: () => Linking.openURL('https://wa.me/919522455243'),
-        },
-        {
-          text: 'Cancel',
-          style: 'cancel',
-        },
-      ]
-    );
+    setContactSheetVisible(true);
   };
 
-  const handleLogout = async () => {
-    Alert.alert(
-      'Logout',
-      'Are you sure you want to logout?',
-      [
-        {
-          text: 'Cancel',
-          style: 'cancel',
-        },
+  const handleLogout = () => {
+    showAlert({
+      title: 'Logout',
+      message: 'Are you sure you want to logout?',
+      icon: 'logout',
+      iconColor: '#EF4444',
+      buttons: [
+        { text: 'Cancel', style: 'cancel' },
         {
           text: 'Logout',
           style: 'destructive',
@@ -135,17 +123,22 @@ export default function ApprovalWaitingScreen({
             try {
               await logout();
               navigation.replace('Login');
-            } catch (error: any) {
-              Alert.alert('Error', 'Failed to logout. Please try again.');
+            } catch {
+              showAlert({
+                title: 'Error',
+                message: 'Failed to logout. Please try again.',
+                icon: 'alert-circle',
+                iconColor: '#EF4444',
+              });
             }
           },
         },
-      ]
-    );
+      ],
+    });
   };
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
       <StatusBar barStyle="dark-content" backgroundColor="#FFFFFF" />
 
       <View style={styles.content}>
@@ -212,6 +205,19 @@ export default function ApprovalWaitingScreen({
           Phone: {phoneNumber}
         </Text>
       </View>
+
+      <ActionSheet
+        visible={contactSheetVisible}
+        title="Contact Support"
+        message="How would you like to contact us?"
+        onClose={() => setContactSheetVisible(false)}
+        options={[
+          { label: 'Call', icon: 'phone', iconColor: '#10B981', onPress: () => Linking.openURL('tel:+919522455243') },
+          { label: 'WhatsApp', icon: 'whatsapp', iconColor: '#25D366', onPress: () => Linking.openURL('https://wa.me/919522455243') },
+        ]}
+      />
+
+      <CustomAlert {...alertProps} />
     </SafeAreaView>
   );
 }
