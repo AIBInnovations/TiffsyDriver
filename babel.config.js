@@ -8,7 +8,10 @@ module.exports = function (api) {
     ],
     plugins: [
       ...(isProduction ? ['transform-remove-console'] : []),
-      'react-native-reanimated/plugin',
+      // Reanimated 4 + worklets 0.7+ use the worklets package's plugin directly.
+      // Using the old 'react-native-reanimated/plugin' here ships an outdated
+      // worklets transformer that mismatches the runtime and red-screens the app.
+      'react-native-worklets/plugin',
     ],
   };
 };

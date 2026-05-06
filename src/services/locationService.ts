@@ -73,22 +73,31 @@ const getCurrentLocationWithDetails = (timeoutMs = 20000): Promise<DriverLocatio
   });
 };
 
-// Quickly probes whether device location services (GPS) are actually enabled.
-// Permission grant is separate from the system-wide Location toggle — the user
-// can grant permission while GPS is still off, in which case getCurrentPosition
-// times out silently. We use a short timeout so we can prompt the user to
-// enable GPS instead of silently never sending pings.
+// Quickly probes whether device location services are enabled. We use the
+// LOW-accuracy provider with a generous maximumAge so we accept a cached
+// network/cell fix from the last 5 minutes — the goal is to confirm location
+// services are ON, not to get a precise GPS fix. If the system reports
+// POSITION_UNAVAILABLE the master Location toggle is off; everything else
+// (cold GPS, brief network outage) we treat as "enabled" so we don't block
+// the driver on a slow first fix.
 const detectLocationServicesState = async (): Promise<{ enabled: boolean; reason?: string }> => {
-  try {
-    await getCurrentLocationWithDetails(6000);
-    return { enabled: true };
-  } catch (error: any) {
-    // Geolocation error codes: 1=PERMISSION_DENIED, 2=POSITION_UNAVAILABLE, 3=TIMEOUT
-    const code = error?.code;
-    if (code === 2) return { enabled: false, reason: 'Location services are turned off on this device.' };
-    if (code === 3) return { enabled: false, reason: 'No GPS fix could be acquired. Make sure GPS is on and you have a clear sky view.' };
-    return { enabled: false, reason: error?.message || 'Could not access GPS.' };
-  }
+  return new Promise((resolve) => {
+    Geolocation.getCurrentPosition(
+      () => resolve({ enabled: true }),
+      (error: any) => {
+        const code = error?.code;
+        if (code === 2) {
+          resolve({ enabled: false, reason: 'Location services (GPS) are turned off on this device.' });
+        } else {
+          // PERMISSION_DENIED (1) shouldn't reach here (we just granted) and
+          // TIMEOUT (3) is treated as "enabled but slow" — let tracking start
+          // and the FGS notification will surface any further problems.
+          resolve({ enabled: true });
+        }
+      },
+      { enableHighAccuracy: false, timeout: 8000, maximumAge: 5 * 60 * 1000 }
+    );
+  });
 };
 
 // Open the Android Location Services system settings so the user can enable GPS.
