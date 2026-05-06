@@ -74,9 +74,8 @@ try {
 try {
   const notifee = require('@notifee/react-native').default;
   notifee.registerForegroundService(() => {
-    // Foreground service runs as long as the notification is displayed.
-    // Return a promise that never resolves to keep the service alive.
-    return new Promise(() => {});
+    const { runLocationForegroundService } = require('./src/services/locationService');
+    return runLocationForegroundService();
   });
 } catch (error) {
   console.warn('⚠️ Notifee foreground service registration failed:', error);

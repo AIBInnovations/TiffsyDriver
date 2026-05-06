@@ -33,7 +33,7 @@ import BatchGroup from './components/BatchGroup';
 import AvailableBatchesModal from './components/AvailableBatchesModal';
 import CustomAlert from '../../components/common/CustomAlert';
 import { getMyBatch, getAvailableBatches, updateDeliveryStatus as apiUpdateDeliveryStatus, acceptBatch, getDriverOrders, getDriverBatchHistory, markBatchPickedUp, updateDeliverySequence } from '../../services/deliveryService';
-import { startLocationTracking } from '../../services/locationService';
+import { startLocationTracking, isLocationTrackingActive } from '../../services/locationService';
 import ReorderStopsModal, { type Stop } from './components/ReorderStopsModal';
 import type { Batch, Order, OrderStatus, AvailableBatch, DriverOrder, HistoryBatch, HistorySingleOrder } from '../../types/api';
 
@@ -155,6 +155,7 @@ export default function DeliveriesScreen() {
   const [newBatchMessage, setNewBatchMessage] = useState('');
   const [showCompletionToast, setShowCompletionToast] = useState(false);
   const [completionMessage, setCompletionMessage] = useState('');
+  const [showLocationTrackingPrompt, setShowLocationTrackingPrompt] = useState(false);
 
   // Custom alert states
   const [alertConfig, setAlertConfig] = useState<{
@@ -183,6 +184,17 @@ export default function DeliveriesScreen() {
   const [historySingleOrders, setHistorySingleOrders] = useState<HistorySingleOrder[]>([]);
   const [expandedHistoryBatches, setExpandedHistoryBatches] = useState<string[]>([]);
   const [historyLoading, setHistoryLoading] = useState(false);
+
+  const promptLocationTracking = useCallback(() => {
+    if (!isLocationTrackingActive()) {
+      setShowLocationTrackingPrompt(true);
+    }
+  }, []);
+
+  const handleStartLocationTracking = useCallback(async () => {
+    setShowLocationTrackingPrompt(false);
+    await startLocationTracking();
+  }, []);
 
   // Filtered history batches
   const filteredHistoryBatches = useMemo(() => {
@@ -749,8 +761,8 @@ export default function DeliveriesScreen() {
       // Close modal
       setShowAvailableBatchesModal(false);
 
-      // Start GPS location tracking
-      startLocationTracking();
+      // Ask the driver before starting GPS location tracking.
+      promptLocationTracking();
 
       // Refresh data to show the newly accepted batch
       await Promise.all([fetchCurrentBatch(), fetchAvailableBatches()]);
@@ -985,9 +997,9 @@ export default function DeliveriesScreen() {
       orderId: order.orderNumber,
       customerName,
       customerPhone,
-      pickupLocation: currentBatch
+      pickupLocation: currentBatch && typeof currentBatch.kitchenId === 'object' && currentBatch.kitchenId
         ? [
-            currentBatch.kitchenId.name,
+            currentBatch.kitchenId.name || 'Kitchen',
             currentBatch.kitchenId.address?.addressLine1,
             currentBatch.kitchenId.address?.locality,
             currentBatch.kitchenId.address?.city,
@@ -1061,7 +1073,7 @@ export default function DeliveriesScreen() {
       // Safely build pickup location with null checks
       const pickupParts = [];
       if (batch?.kitchen) {
-        if (batch.kitchen.name) pickupParts.push(batch.kitchen.name);
+        if (batch.kitchen?.name) pickupParts.push(batch.kitchen.name);
         if (batch.kitchen.address?.addressLine1) pickupParts.push(batch.kitchen.address.addressLine1);
         if (batch.kitchen.address?.locality || batch.kitchen.address?.area) {
           pickupParts.push(batch.kitchen.address.locality || batch.kitchen.address.area);
@@ -1743,7 +1755,7 @@ export default function DeliveriesScreen() {
                                 <View style={styles.historyBatchInfoRow}>
                                   <MaterialCommunityIcons name="store" size={16} color="#6B7280" />
                                   <Text style={styles.historyBatchInfoText}>
-                                    {batch.kitchen.name || 'Unknown Kitchen'}
+                                    {batch.kitchen?.name || 'Unknown Kitchen'}
                                   </Text>
                                 </View>
                               )}
@@ -1751,7 +1763,7 @@ export default function DeliveriesScreen() {
                                 <View style={styles.historyBatchInfoRow}>
                                   <MaterialCommunityIcons name="map-marker" size={16} color="#6B7280" />
                                   <Text style={styles.historyBatchInfoText}>
-                                    {batch.zone.name || 'Unknown Zone'}
+                                    {batch.zone?.name || 'Unknown Zone'}
                                   </Text>
                                 </View>
                               )}
@@ -1938,6 +1950,19 @@ export default function DeliveriesScreen() {
         iconColor={alertConfig.iconColor}
         buttons={[{ text: 'OK', style: 'default' }]}
         onClose={() => setAlertConfig({ visible: false, title: '', message: '' })}
+      />
+
+      <CustomAlert
+        visible={showLocationTrackingPrompt}
+        title="Enable Background Tracking"
+        message="Tiffsy will share your live location with kitchen and admin teams while this delivery batch is active, even when the app is in the background."
+        icon="map-marker-radius"
+        iconColor="#10B981"
+        buttons={[
+          { text: 'Not Now', style: 'cancel', onPress: () => setShowLocationTrackingPrompt(false) },
+          { text: 'Allow Tracking', style: 'default', onPress: handleStartLocationTracking },
+        ]}
+        onClose={() => setShowLocationTrackingPrompt(false)}
       />
     </SafeAreaView>
   );

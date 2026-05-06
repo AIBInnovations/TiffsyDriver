@@ -25,7 +25,7 @@ import StatsCard from './components/StatsCard';
 import CustomAlert from '../../components/common/CustomAlert';
 import { useDriverProfileStore } from '../profile/useDriverProfileStore';
 import { getMyBatch, getAvailableBatches, markBatchPickedUp, acceptBatch, getDriverBatchHistory, completeBatch } from '../../services/deliveryService';
-import { startLocationTracking, stopLocationTracking, isLocationTrackingActive } from '../../services/locationService';
+import { startLocationTracking, stopLocationTracking, isLocationTrackingActive, openAppSettings, openLocationSettings, LocationTrackingError } from '../../services/locationService';
 import { getDriverStats, updateDriverStatus, manageShift, getDriverProfile } from '../../services/driverProfileService';
 import { getNotifications } from '../../services/notificationService';
 import type { Batch, BatchSummary, AvailableBatch, DriverStats, HistoryBatch, HistorySingleOrder } from '../../types/api';
@@ -77,6 +77,7 @@ export default function DashboardScreen() {
   // Custom alert states
   const [showPickupConfirm, setShowPickupConfirm] = useState(false);
   const [showNavigateConfirm, setShowNavigateConfirm] = useState(false);
+  const [showLocationTrackingPrompt, setShowLocationTrackingPrompt] = useState(false);
   const [navigationKitchen, setNavigationKitchen] = useState<{ name: string; address: string; coordinates?: { latitude: number; longitude: number } } | null>(null);
   const [alertConfig, setAlertConfig] = useState<{
     visible: boolean;
@@ -84,6 +85,7 @@ export default function DashboardScreen() {
     message: string;
     icon?: string;
     iconColor?: string;
+    buttons?: { text: string; style?: 'default' | 'cancel' | 'destructive'; onPress?: () => void }[];
   }>({ visible: false, title: '', message: '' });
 
   const [isTogglingOnline, setIsTogglingOnline] = useState(false);
@@ -128,6 +130,59 @@ export default function DashboardScreen() {
     ]).start(() => setToastVisible(false));
   }, [toastOpacity]);
 
+  const promptLocationTracking = useCallback(() => {
+    if (!isLocationTrackingActive()) {
+      setShowLocationTrackingPrompt(true);
+    }
+  }, []);
+
+  const handleStartLocationTracking = useCallback(async () => {
+    setShowLocationTrackingPrompt(false);
+    try {
+      await startLocationTracking();
+      showToast('Location tracking enabled');
+    } catch (error: any) {
+      if (error instanceof LocationTrackingError && error.code === 'BACKGROUND_PERMISSION_MISSING') {
+        setAlertConfig({
+          visible: true,
+          title: 'Enable "All the time" Location',
+          message: 'Tracking is running, but to keep updating customers when the app is fully closed, please open settings and set Location to "Allow all the time".',
+          icon: 'map-marker-radius',
+          iconColor: '#F59E0B',
+          buttons: [
+            { text: 'Later', style: 'cancel' },
+            { text: 'Open Settings', style: 'default', onPress: () => { openAppSettings(); } },
+          ],
+        });
+        return;
+      }
+      if (error instanceof LocationTrackingError && error.code === 'LOCATION_SERVICES_OFF') {
+        setAlertConfig({
+          visible: true,
+          title: 'Turn on Location (GPS)',
+          message: error.message + '\n\nPlease enable Location Services in your phone settings, then come back and tap "Allow Tracking" again.',
+          icon: 'crosshairs-gps',
+          iconColor: '#EF4444',
+          buttons: [
+            { text: 'Cancel', style: 'cancel' },
+            { text: 'Open Location Settings', style: 'default', onPress: () => { openLocationSettings(); } },
+          ],
+        });
+        return;
+      }
+      const message = error instanceof LocationTrackingError
+        ? error.message
+        : (error?.message || 'Failed to enable location tracking');
+      setAlertConfig({
+        visible: true,
+        title: 'Location Tracking Failed',
+        message,
+        icon: 'alert-circle',
+        iconColor: '#EF4444',
+      });
+    }
+  }, [showToast]);
+
   // Fetch current batch from backend
   const fetchCurrentBatch = useCallback(async () => {
     try {
@@ -142,7 +197,7 @@ export default function DashboardScreen() {
         // Auto-start GPS tracking if batch is active and not already tracking
         const batchStatus = response.data.batch.status;
         if ((batchStatus === 'DISPATCHED' || batchStatus === 'IN_PROGRESS') && !isLocationTrackingActive()) {
-          startLocationTracking();
+          promptLocationTracking();
         }
       } else {
         setCurrentBatch(null);
@@ -158,7 +213,7 @@ export default function DashboardScreen() {
       console.error('❌ Error fetching current batch:', error);
       showToast('Failed to load current batch', 'error');
     }
-  }, [showToast]);
+  }, [promptLocationTracking, showToast]);
 
   // Fetch available batches
   const fetchAvailableBatches = useCallback(async () => {
@@ -444,8 +499,8 @@ export default function DashboardScreen() {
       const response = await acceptBatch(batchId);
       showToast('Batch accepted successfully!', 'success');
 
-      // Start GPS location tracking
-      startLocationTracking();
+      // Ask the driver before starting GPS location tracking.
+      promptLocationTracking();
 
       // Refresh data
       await Promise.all([fetchCurrentBatch(), fetchAvailableBatches()]);
@@ -464,7 +519,7 @@ export default function DashboardScreen() {
       setAcceptingBatch(false);
       setAcceptingBatchId(null);
     }
-  }, [acceptingBatch, fetchCurrentBatch, fetchAvailableBatches, navigation, showToast]);
+  }, [acceptingBatch, fetchCurrentBatch, fetchAvailableBatches, navigation, promptLocationTracking, showToast]);
 
   // Reject a batch (simply close/dismiss)
   const handleRejectBatch = useCallback(() => {
@@ -556,7 +611,7 @@ export default function DashboardScreen() {
 
       // Set navigation data and show confirmation
       setNavigationKitchen({
-        name: kitchen.name,
+        name: kitchen.name || 'Kitchen',
         address: kitchenAddress,
         coordinates: coordinates ? { latitude: coordinates.latitude, longitude: coordinates.longitude } : undefined,
       });
@@ -799,7 +854,7 @@ export default function DashboardScreen() {
                     <MaterialCommunityIcons name="store" size={20} color="#6B7280" />
                     <View style={styles.kitchenTextContainer}>
                       <Text style={styles.kitchenName} numberOfLines={1} ellipsizeMode="tail">
-                        {currentBatch.kitchenId.name}
+                        {currentBatch.kitchenId.name || 'Kitchen'}
                       </Text>
                       <Text style={styles.kitchenArea} numberOfLines={1} ellipsizeMode="tail">
                         {[
@@ -851,13 +906,13 @@ export default function DashboardScreen() {
                   <View style={styles.batchInfoRow}>
                     <MaterialCommunityIcons name="store" size={20} color="#6B7280" />
                     <Text style={styles.batchInfoLabel}>Kitchen:</Text>
-                    <Text style={styles.batchInfoValue}>{availableBatches[0].kitchen.name}</Text>
+                    <Text style={styles.batchInfoValue}>{availableBatches[0].kitchen?.name || 'Kitchen N/A'}</Text>
                   </View>
 
                   <View style={styles.batchInfoRow}>
                     <MaterialCommunityIcons name="map-marker" size={20} color="#6B7280" />
                     <Text style={styles.batchInfoLabel}>Zone:</Text>
-                    <Text style={styles.batchInfoValue}>{availableBatches[0].zone.name}</Text>
+                    <Text style={styles.batchInfoValue}>{availableBatches[0].zone?.name || 'Zone N/A'}</Text>
                   </View>
 
                   <View style={styles.batchInfoRow}>
@@ -992,6 +1047,20 @@ export default function DashboardScreen() {
         onClose={() => setShowNavigateConfirm(false)}
       />
 
+      {/* Location Tracking Permission Alert */}
+      <CustomAlert
+        visible={showLocationTrackingPrompt}
+        title="Enable Background Tracking"
+        message="Tiffsy will share your live location with kitchen and admin teams while this delivery batch is active, even when the app is in the background."
+        icon="map-marker-radius"
+        iconColor="#10B981"
+        buttons={[
+          { text: 'Not Now', style: 'cancel', onPress: () => setShowLocationTrackingPrompt(false) },
+          { text: 'Allow Tracking', style: 'default', onPress: handleStartLocationTracking },
+        ]}
+        onClose={() => setShowLocationTrackingPrompt(false)}
+      />
+
       {/* General Alert */}
       <CustomAlert
         visible={alertConfig.visible}
@@ -999,7 +1068,7 @@ export default function DashboardScreen() {
         message={alertConfig.message}
         icon={alertConfig.icon}
         iconColor={alertConfig.iconColor}
-        buttons={[{ text: 'OK', style: 'default' }]}
+        buttons={alertConfig.buttons || [{ text: 'OK', style: 'default' }]}
         onClose={() => setAlertConfig({ visible: false, title: '', message: '' })}
       />
     </SafeAreaView >

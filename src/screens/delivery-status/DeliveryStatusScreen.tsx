@@ -205,7 +205,7 @@ export default function DeliveryStatusScreen() {
           }
         }
 
-        const kitchenAddr = batch.kitchenId.address;
+        const kitchenAddr = batch.kitchenId?.address;
         const kitchenAddress = kitchenAddr ?
           [
             kitchenAddr.addressLine1,

@@ -110,10 +110,10 @@ export const markAllNotificationsAsRead = async (): Promise<ApiResponse<{ update
     const url = `${API_CONFIG.BASE_URL}${API_CONFIG.ENDPOINTS.MARK_ALL_NOTIFICATIONS_READ}`;
 
     console.log('📡 Request URL:', url);
-    console.log('📡 Request method: PATCH');
+    console.log('📡 Request method: POST');
 
     const response = await fetch(url, {
-      method: 'PATCH',
+      method: 'POST',
       headers,
     });
 

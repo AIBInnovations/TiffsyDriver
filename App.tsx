@@ -7,6 +7,7 @@ import { GestureHandlerRootView } from "react-native-gesture-handler";
 import RootNavigator from "./src/navigation/RootNavigator";
 import { initializeFCMListeners, setupTokenRefreshListener } from "./src/services/fcmService";
 import { createNotificationChannels } from "./src/services/notificationChannels";
+import { clearStaleTrackingState } from "./src/services/locationService";
 
 export default function App() {
   const navigationRef = useRef<any>(null);
@@ -18,6 +19,10 @@ export default function App() {
 
       // Create notification channels for Android
       await createNotificationChannels();
+
+      // Wipe any "should be tracking" flag left over from a previous crash so we
+      // don't auto-retry the foreground service from a cold-boot context.
+      await clearStaleTrackingState();
 
       // Set up foreground, background, and notification opened listeners
       const unsubscribeFCM = initializeFCMListeners(navigationRef.current);

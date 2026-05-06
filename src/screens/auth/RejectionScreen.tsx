@@ -7,11 +7,12 @@ import {
   StatusBar,
   Linking,
   ScrollView,
+  ActivityIndicator,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import type { RouteProp } from '@react-navigation/core';
-import { logout } from '../../services/authService';
+import { logout, sendOTP } from '../../services/authService';
 import CustomAlert from '../../components/common/CustomAlert';
 import ActionSheet from '../../components/common/ActionSheet';
 import { useAlert } from '../../hooks/useAlert';
@@ -35,6 +36,7 @@ export default function RejectionScreen({
 }: RejectionScreenProps) {
   const { phoneNumber, rejectionReason, registrationToken } = route.params;
   const [contactSheetVisible, setContactSheetVisible] = useState(false);
+  const [reapplying, setReapplying] = useState(false);
   const { alertProps, showAlert } = useAlert();
 
   const handleReapply = () => {
@@ -47,7 +49,30 @@ export default function RejectionScreen({
         { text: 'Cancel', style: 'cancel' },
         {
           text: 'Continue',
-          onPress: () => navigation.replace('DriverRegistration', { phoneNumber, reapply: true, registrationToken }),
+          onPress: async () => {
+            // If we already have a registrationToken (came in via OTP verify),
+            // jump straight to the registration form. Otherwise we arrived here
+            // from cold-start bootstrap and need a fresh OTP to mint one.
+            if (registrationToken) {
+              navigation.replace('DriverRegistration', { phoneNumber, reapply: true, registrationToken });
+              return;
+            }
+
+            setReapplying(true);
+            try {
+              await sendOTP(phoneNumber);
+              navigation.replace('OtpVerify', { phoneNumber });
+            } catch (error: any) {
+              showAlert({
+                title: 'Error',
+                message: error?.message || 'Failed to send OTP. Please try again.',
+                icon: 'alert-circle',
+                iconColor: '#EF4444',
+              });
+            } finally {
+              setReapplying(false);
+            }
+          },
         },
       ],
     });
@@ -140,9 +165,14 @@ export default function RejectionScreen({
           <TouchableOpacity
             style={styles.primaryButton}
             onPress={handleReapply}
+            disabled={reapplying}
             activeOpacity={0.8}
           >
-            <Text style={styles.primaryButtonText}>Re-apply</Text>
+            {reapplying ? (
+              <ActivityIndicator color="#FFFFFF" />
+            ) : (
+              <Text style={styles.primaryButtonText}>Re-apply</Text>
+            )}
           </TouchableOpacity>
 
           {/* Secondary Actions */}

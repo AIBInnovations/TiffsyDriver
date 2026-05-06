@@ -1,4 +1,4 @@
-import { Platform, PermissionsAndroid } from 'react-native';
+import { Platform, PermissionsAndroid, AppState } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import notifee, { EventType } from '@notifee/react-native';
 import { API_CONFIG } from '../config/api';
@@ -96,6 +96,30 @@ export const checkNotificationPermission = async (): Promise<boolean> => {
   }
 };
 
+// Wait until the Android Activity is attached. PermissionsAndroid.request throws
+// "Tried to use permissions API while not attached to an Activity" if called too
+// early during launch or while the activity is mid-transition.
+const waitForActiveAppState = async (timeoutMs = 4000): Promise<boolean> => {
+  if (AppState.currentState === 'active') return true;
+  return new Promise<boolean>((resolve) => {
+    let done = false;
+    const sub = AppState.addEventListener('change', (state) => {
+      if (state === 'active' && !done) {
+        done = true;
+        sub.remove();
+        resolve(true);
+      }
+    });
+    setTimeout(() => {
+      if (!done) {
+        done = true;
+        sub.remove();
+        resolve(AppState.currentState === 'active');
+      }
+    }, timeoutMs);
+  });
+};
+
 // Request notification permission (Android & iOS)
 export const requestNotificationPermission = async (): Promise<boolean> => {
   try {
@@ -105,18 +129,45 @@ export const requestNotificationPermission = async (): Promise<boolean> => {
     if (Platform.OS === 'android') {
       // Android 13+ (API level 33+) requires runtime permission for POST_NOTIFICATIONS
       if (Platform.Version >= 33) {
+        // Fast path: already granted? PermissionsAndroid.check works even if Activity isn't attached.
+        const alreadyGranted = await PermissionsAndroid.check(
+          PermissionsAndroid.PERMISSIONS.POST_NOTIFICATIONS
+        );
+        if (alreadyGranted) {
+          console.log('✅ POST_NOTIFICATIONS already granted');
+          return true;
+        }
+
+        // Wait for the Activity to be attached before prompting; otherwise the
+        // native call throws IllegalStateException.
+        const activityReady = await waitForActiveAppState();
+        if (!activityReady) {
+          console.warn('⏸ Skipping POST_NOTIFICATIONS prompt — Activity not attached');
+          return false;
+        }
+
         console.log('📱 Android 13+: Requesting POST_NOTIFICATIONS permission');
 
-        const granted = await PermissionsAndroid.request(
-          PermissionsAndroid.PERMISSIONS.POST_NOTIFICATIONS,
-          {
-            title: 'Notification Permission',
-            message: 'Tiffsy Driver needs notification permission to send you important updates about your deliveries and batches.',
-            buttonNeutral: 'Ask Me Later',
-            buttonNegative: 'Cancel',
-            buttonPositive: 'OK',
+        let granted: string;
+        try {
+          granted = await PermissionsAndroid.request(
+            PermissionsAndroid.PERMISSIONS.POST_NOTIFICATIONS,
+            {
+              title: 'Notification Permission',
+              message: 'Tiffsy Driver needs notification permission to send you important updates about your deliveries and batches.',
+              buttonNeutral: 'Ask Me Later',
+              buttonNegative: 'Cancel',
+              buttonPositive: 'OK',
+            }
+          );
+        } catch (error: any) {
+          const msg = String(error?.message || error);
+          if (msg.includes('not attached to an Activity')) {
+            console.warn('⏸ POST_NOTIFICATIONS prompt skipped — Activity detached mid-call');
+            return false;
           }
-        );
+          throw error;
+        }
 
         if (granted === PermissionsAndroid.RESULTS.GRANTED) {
           console.log('✅ Android notification permission granted');
@@ -166,7 +217,10 @@ export const requestNotificationPermission = async (): Promise<boolean> => {
   }
 };
 
-// Get FCM token
+// Get FCM token. Note: token retrieval does NOT require POST_NOTIFICATIONS on Android —
+// that permission is only needed to display the notification UI. We try to ask the user
+// for it, but we still register the token with the backend either way so push delivery
+// works as soon as permission is granted later.
 export const getFCMToken = async (): Promise<string | null> => {
   try {
     const msg = getMessaging();
@@ -175,10 +229,8 @@ export const getFCMToken = async (): Promise<string | null> => {
       return null;
     }
 
-    const hasPermission = await requestNotificationPermission();
-    if (!hasPermission) {
-      return null;
-    }
+    // Best-effort: ask for notification permission, but never block token retrieval on it.
+    requestNotificationPermission().catch(() => {});
 
     const fcmToken = await msg.getToken();
     console.log('🔔 FCM Token:', fcmToken);

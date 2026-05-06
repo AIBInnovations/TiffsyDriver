@@ -62,7 +62,7 @@ export default function AvailableBatchesModal({
       setAlertConfig({
         visible: true,
         title: 'Batch Accepted!',
-        message: `${batch.batchNumber} has been assigned to you.\n\nHead to ${batch.kitchen.name} to pick up ${batch.orderCount} ${batch.orderCount === 1 ? 'order' : 'orders'}.`,
+        message: `${batch.batchNumber} has been assigned to you.\n\nHead to ${batch.kitchen?.name || 'the kitchen'} to pick up ${batch.orderCount} ${batch.orderCount === 1 ? 'order' : 'orders'}.`,
         icon: 'check-circle',
         iconColor: '#10B981',
       });
@@ -275,7 +275,7 @@ export default function AvailableBatchesModal({
       <CustomAlert
         visible={!!confirmBatch}
         title="Accept Batch"
-        message={confirmBatch ? `${confirmBatch.batchNumber}\n\nOrders: ${confirmBatch.orderCount}\nMeal Window: ${confirmBatch.mealWindow}\nZone: ${confirmBatch.zone.name}\n\nAccept this batch and head to ${confirmBatch.kitchen.name}?` : ''}
+        message={confirmBatch ? `${confirmBatch.batchNumber}\n\nOrders: ${confirmBatch.orderCount}\nMeal Window: ${confirmBatch.mealWindow}\nZone: ${confirmBatch.zone?.name || 'Zone N/A'}\n\nAccept this batch and head to ${confirmBatch.kitchen?.name || 'the kitchen'}?` : ''}
         icon="package-variant-closed"
         iconColor="#FE8733"
         buttons={[

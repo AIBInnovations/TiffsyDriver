@@ -14,6 +14,8 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { launchCamera, launchImageLibrary, type Asset } from 'react-native-image-picker';
+import DateTimePicker, { type DateTimePickerEvent } from '@react-native-community/datetimepicker';
+import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import type { RouteProp } from '@react-navigation/core';
 import { registerDriverWithOtp } from '../../services/authService';
@@ -89,6 +91,55 @@ export default function DriverRegistrationScreen({
   >(null);
   // Ref preserves the target across the ActionSheet close → onPress timing gap
   const pickerTargetRef = useRef<{ type: 'profile' | 'license' | 'document'; index?: number } | null>(null);
+
+  // Date picker state — null when closed, otherwise identifies which date is being edited
+  const [datePickerTarget, setDatePickerTarget] = useState<
+    { type: 'license' } | { type: 'document'; index: number } | null
+  >(null);
+
+  const formatDate = (d: Date): string => {
+    const yyyy = d.getFullYear();
+    const mm = String(d.getMonth() + 1).padStart(2, '0');
+    const dd = String(d.getDate()).padStart(2, '0');
+    return `${yyyy}-${mm}-${dd}`;
+  };
+
+  const parseDate = (s: string): Date | null => {
+    if (!s) return null;
+    const d = new Date(s);
+    return isNaN(d.getTime()) ? null : d;
+  };
+
+  const formatDateForDisplay = (s: string): string => {
+    const d = parseDate(s);
+    if (!d) return '';
+    return d.toLocaleDateString(undefined, { day: '2-digit', month: 'short', year: 'numeric' });
+  };
+
+  const handleDateChange = (event: DateTimePickerEvent, selected?: Date) => {
+    const target = datePickerTarget;
+    // On Android, the picker dismisses itself; iOS stays inline
+    if (Platform.OS === 'android') {
+      setDatePickerTarget(null);
+    }
+    if (event.type === 'dismissed' || !selected || !target) return;
+
+    const formatted = formatDate(selected);
+    if (target.type === 'license') {
+      setLicenseExpiryDate(formatted);
+    } else {
+      updateDocument(target.index, 'expiryDate', formatted);
+    }
+  };
+
+  const getCurrentPickerDate = (): Date => {
+    if (!datePickerTarget) return new Date();
+    const value =
+      datePickerTarget.type === 'license'
+        ? licenseExpiryDate
+        : documents[datePickerTarget.index]?.expiryDate || '';
+    return parseDate(value) || new Date();
+  };
 
   const requestCameraPermission = async (): Promise<boolean> => {
     if (Platform.OS !== 'android') return true;
@@ -422,13 +473,16 @@ export default function DriverRegistrationScreen({
           </TouchableOpacity>
 
           <Text style={styles.label}>License Expiry Date</Text>
-          <TextInput
-            style={styles.input}
-            value={licenseExpiryDate}
-            onChangeText={setLicenseExpiryDate}
-            placeholder="YYYY-MM-DD (optional)"
-            placeholderTextColor="#999"
-          />
+          <TouchableOpacity
+            style={styles.dateInput}
+            onPress={() => setDatePickerTarget({ type: 'license' })}
+            activeOpacity={0.7}
+          >
+            <Text style={[styles.dateInputText, !licenseExpiryDate && styles.dateInputPlaceholder]}>
+              {licenseExpiryDate ? formatDateForDisplay(licenseExpiryDate) : 'Select date (optional)'}
+            </Text>
+            <MaterialCommunityIcons name="calendar-month-outline" size={22} color="#666666" />
+          </TouchableOpacity>
         </View>
 
         {/* Vehicle Details */}
@@ -536,13 +590,16 @@ export default function DriverRegistrationScreen({
               </TouchableOpacity>
 
               <Text style={styles.label}>Expiry Date (Optional)</Text>
-              <TextInput
-                style={styles.input}
-                value={doc.expiryDate}
-                onChangeText={(text) => updateDocument(index, 'expiryDate', text)}
-                placeholder="YYYY-MM-DD"
-                placeholderTextColor="#999"
-              />
+              <TouchableOpacity
+                style={styles.dateInput}
+                onPress={() => setDatePickerTarget({ type: 'document', index })}
+                activeOpacity={0.7}
+              >
+                <Text style={[styles.dateInputText, !doc.expiryDate && styles.dateInputPlaceholder]}>
+                  {doc.expiryDate ? formatDateForDisplay(doc.expiryDate) : 'Select date'}
+                </Text>
+                <MaterialCommunityIcons name="calendar-month-outline" size={22} color="#666666" />
+              </TouchableOpacity>
             </View>
           ))}
 
@@ -581,6 +638,16 @@ export default function DriverRegistrationScreen({
       />
 
       <CustomAlert {...alertProps} />
+
+      {datePickerTarget && (
+        <DateTimePicker
+          value={getCurrentPickerDate()}
+          mode="date"
+          display={Platform.OS === 'ios' ? 'spinner' : 'calendar'}
+          minimumDate={new Date()}
+          onChange={handleDateChange}
+        />
+      )}
     </SafeAreaView>
   );
 }
@@ -650,6 +717,24 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: '#1A1A1A',
     backgroundColor: '#FAFAFA',
+  },
+  dateInput: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    borderWidth: 1,
+    borderColor: '#E0E0E0',
+    borderRadius: 8,
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+    backgroundColor: '#FAFAFA',
+  },
+  dateInputText: {
+    fontSize: 16,
+    color: '#1A1A1A',
+  },
+  dateInputPlaceholder: {
+    color: '#999',
   },
   uploadButton: {
     borderWidth: 1,

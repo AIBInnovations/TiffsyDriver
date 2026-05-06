@@ -38,13 +38,13 @@ export default function AvailableBatchItem({
           <View style={styles.detailItem}>
             <MaterialCommunityIcons name="store" size={16} color="#6B7280" />
             <Text style={styles.detailText} numberOfLines={1}>
-              {batch.kitchen.name}
+              {batch.kitchen?.name || 'Kitchen N/A'}
             </Text>
           </View>
           <View style={styles.detailItem}>
             <MaterialCommunityIcons name="map-marker" size={16} color="#6B7280" />
             <Text style={styles.detailText} numberOfLines={1}>
-              {batch.zone.name}
+              {batch.zone?.name || 'Zone N/A'}
             </Text>
           </View>
         </View>

@@ -389,10 +389,17 @@ export const getDriverBatchHistory = async (): Promise<ApiResponse<DriverBatchHi
   }
 };
 
-// Send driver GPS location (fire-and-forget — never throws)
+export type LocationPushResult =
+  | { ok: true; coords: string }
+  | { ok: false; kind: 'rejected'; status: number; detail: string }
+  | { ok: false; kind: 'network'; detail: string };
+
+// Send driver GPS location. Returns a structured result so the caller can show
+// the user exactly what happened (visible in the FGS notification body).
 export const sendDriverLocation = async (
   locationData: DriverLocationUpdate
-): Promise<void> => {
+): Promise<LocationPushResult> => {
+  const coords = `${locationData.latitude.toFixed(5)},${locationData.longitude.toFixed(5)}`;
   try {
     const headers = await createHeaders();
 
@@ -405,16 +412,22 @@ export const sendDriverLocation = async (
       }
     );
 
+    const rawBody = await response.text();
+    let parsedBody: any = null;
+    try { parsedBody = rawBody ? JSON.parse(rawBody) : null; } catch { /* ignore */ }
+
     if (!response.ok) {
-      const data = await response.json();
-      console.warn('⚠️ Location update failed:', data.message || response.status);
-      return;
+      const detail = parsedBody?.error || parsedBody?.message || rawBody || '(empty body)';
+      console.error(`❌ Location update REJECTED [${response.status}]:`, detail);
+      return { ok: false, kind: 'rejected', status: response.status, detail: String(detail) };
     }
 
-    console.log('📍 Location sent:', locationData.latitude.toFixed(4), locationData.longitude.toFixed(4));
+    console.log('📍 Location sent OK:', coords, '—', parsedBody?.message || 'ok');
+    return { ok: true, coords };
   } catch (error: any) {
-    // Fire-and-forget: silently log, never throw
-    console.warn('⚠️ Location update error:', error.message);
+    const detail = error?.message || String(error);
+    console.error('❌ Location update network error:', detail);
+    return { ok: false, kind: 'network', detail };
   }
 };
 
