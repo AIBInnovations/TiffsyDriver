@@ -1,12 +1,18 @@
-import { View, Text, StyleSheet, TouchableOpacity, Linking, Platform } from "react-native";
+import { View, Text, StyleSheet, TouchableOpacity } from "react-native";
 import { useState } from "react";
 import MaterialCommunityIcons from "react-native-vector-icons/MaterialCommunityIcons";
 import { DeliveryStatusType } from "../../../navigation/types";
 import ActionSheet from "../../../components/common/ActionSheet";
+import { openExternalNavigation, type Coordinates, type NavigateTarget } from "../../../utils/maps";
 
 interface MapPreviewProps {
   pickupLocation?: string;
   dropoffLocation?: string;
+  pickupCoordinates?: Coordinates;
+  dropoffCoordinates?: Coordinates;
+  pickupLabel?: string;
+  dropoffLabel?: string;
+  onNavigate?: (target: NavigateTarget) => void;
   showRoutePreview?: boolean;
   isLoading?: boolean;
   currentStatus?: DeliveryStatusType;
@@ -19,6 +25,11 @@ interface MapPreviewProps {
 export default function MapPreview({
   pickupLocation,
   dropoffLocation,
+  pickupCoordinates,
+  dropoffCoordinates,
+  pickupLabel,
+  dropoffLabel,
+  onNavigate,
   showRoutePreview = true,
   isLoading = false,
   currentStatus,
@@ -29,63 +40,46 @@ export default function MapPreview({
 }: MapPreviewProps) {
   const [showNavigationSheet, setShowNavigationSheet] = useState(false);
 
-  const openInMaps = async (destination: string, mode: "directions" | "location" = "directions") => {
-    const encodedDestination = encodeURIComponent(destination);
-
-    if (Platform.OS === "ios") {
-      // Try Apple Maps first, then Google Maps
-      const appleMapsUrl = `maps://?daddr=${encodedDestination}`;
-      const googleMapsUrl = `comgooglemaps://?daddr=${encodedDestination}&directionsmode=driving`;
-      const webUrl = `https://maps.apple.com/?daddr=${encodedDestination}`;
-
-      try {
-        const canOpenGoogle = await Linking.canOpenURL(googleMapsUrl);
-        if (canOpenGoogle) {
-          await Linking.openURL(googleMapsUrl);
-        } else {
-          await Linking.openURL(appleMapsUrl);
-        }
-      } catch {
-        await Linking.openURL(webUrl);
-      }
-    } else {
-      // Android - Use Google Maps search URL for accurate address matching
-      const googleMapsUrl = `https://www.google.com/maps/search/?api=1&query=${encodedDestination}`;
-      await Linking.openURL(googleMapsUrl);
-    }
+  const dispatchNavigate = (target: NavigateTarget) => {
+    if (onNavigate) onNavigate(target);
+    else openExternalNavigation(target);
   };
 
-  const handleNavigatePress = () => {
-    if (dropoffLocation) {
-      openInMaps(dropoffLocation, "directions");
-    } else if (pickupLocation) {
-      openInMaps(pickupLocation, "directions");
-    }
-  };
+  const buildPickupTarget = (): NavigateTarget => ({
+    coordinates: pickupCoordinates ?? null,
+    address: pickupLocation,
+    label: pickupLabel || "Pickup",
+  });
+
+  const buildDropoffTarget = (): NavigateTarget => ({
+    coordinates: dropoffCoordinates ?? null,
+    address: dropoffLocation,
+    label: dropoffLabel || "Drop-off",
+  });
 
   const showNavigationOptions = () => {
-    if (!pickupLocation && !dropoffLocation) return;
+    if (!pickupLocation && !dropoffLocation && !pickupCoordinates && !dropoffCoordinates) return;
     setShowNavigationSheet(true);
   };
 
   const getNavigationOptions = () => {
     const options = [];
 
-    if (pickupLocation) {
+    if (pickupLocation || pickupCoordinates) {
       options.push({
         label: "Navigate to Pickup",
         icon: "package-variant",
         iconColor: "#10B981",
-        onPress: () => openInMaps(pickupLocation, "directions"),
+        onPress: () => dispatchNavigate(buildPickupTarget()),
       });
     }
 
-    if (dropoffLocation) {
+    if (dropoffLocation || dropoffCoordinates) {
       options.push({
         label: "Navigate to Drop-off",
         icon: "map-marker",
         iconColor: "#EF4444",
-        onPress: () => openInMaps(dropoffLocation, "directions"),
+        onPress: () => dispatchNavigate(buildDropoffTarget()),
       });
     }
 

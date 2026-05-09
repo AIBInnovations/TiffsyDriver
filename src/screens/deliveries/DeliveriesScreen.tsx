@@ -35,6 +35,9 @@ import CustomAlert from '../../components/common/CustomAlert';
 import { getMyBatch, getAvailableBatches, updateDeliveryStatus as apiUpdateDeliveryStatus, acceptBatch, getDriverOrders, getDriverBatchHistory, markBatchPickedUp, updateDeliverySequence } from '../../services/deliveryService';
 import { startLocationTracking, isLocationTrackingActive } from '../../services/locationService';
 import ReorderStopsModal, { type Stop } from './components/ReorderStopsModal';
+import MapsAppPicker from '../../components/common/MapsAppPicker';
+import { useMapsNavigation } from '../../hooks/useMapsNavigation';
+import { getCoordinates, type Coordinates, type NavigateTarget } from '../../utils/maps';
 import type { Batch, Order, OrderStatus, AvailableBatch, DriverOrder, HistoryBatch, HistorySingleOrder } from '../../types/api';
 
 type FilterStatus = 'all' | 'READY' | 'EN_ROUTE' | 'ARRIVED' | 'DELIVERED' | 'FAILED' | 'RETURNED' | 'PICKED_UP' | 'OUT_FOR_DELIVERY';
@@ -54,6 +57,9 @@ interface LocalDelivery {
   batchId?: string;
   distance?: string;
   sequenceNumber?: number;
+  pickupCoordinates?: Coordinates;
+  dropoffCoordinates?: Coordinates;
+  kitchenName?: string;
   deliveryAddress?: {
     latitude?: number;
     longitude?: number;
@@ -81,6 +87,9 @@ export default function DeliveriesScreen() {
     completedOrderId,
     completedOrderNumber,
   });
+
+  // Maps navigation hook (handles iOS Google Maps / Apple Maps picker)
+  const mapsNav = useMapsNavigation();
 
   // State
   const [activeTab, setActiveTab] = useState<'current' | 'history'>('current');
@@ -823,16 +832,11 @@ export default function DeliveriesScreen() {
       kitchen.address?.city,
     ].filter(Boolean).join(', ');
 
-    const encodedAddress = encodeURIComponent(address);
-
-    if (Platform.OS === 'ios') {
-      const appleMapsUrl = `maps://?daddr=${encodedAddress}`;
-      Linking.openURL(appleMapsUrl).catch(() => {
-        Linking.openURL(`https://www.google.com/maps/dir/?api=1&destination=${encodedAddress}`);
-      });
-    } else {
-      Linking.openURL(`https://www.google.com/maps/search/?api=1&query=${encodedAddress}`);
-    }
+    mapsNav.navigate({
+      coordinates: getCoordinates(kitchen.address),
+      address,
+      label: kitchen.name || 'Kitchen',
+    });
   };
 
   // Reorder stops state
@@ -911,62 +915,9 @@ export default function DeliveriesScreen() {
       .catch(err => console.error('Error opening phone dialer:', err));
   };
 
-  // Handle navigate to address
-  const handleNavigate = (latitude?: number, longitude?: number, address?: string) => {
-    // Prefer address-based navigation for better location recognition
-    if (address) {
-      const encodedAddress = encodeURIComponent(address);
-
-      if (Platform.OS === 'ios') {
-        // iOS - Use Apple Maps with address
-        const appleMapsUrl = `maps://?daddr=${encodedAddress}`;
-        Linking.canOpenURL(appleMapsUrl)
-          .then(supported => {
-            if (supported) {
-              return Linking.openURL(appleMapsUrl);
-            } else {
-              return Linking.openURL(`https://www.google.com/maps/dir/?api=1&destination=${encodedAddress}`);
-            }
-          })
-          .catch(err => console.error('Error opening maps:', err));
-      } else {
-        // Android - Use Google Maps navigation intent
-        const googleMapsUrl = `google.navigation:q=${encodedAddress}`;
-        Linking.canOpenURL(googleMapsUrl)
-          .then(supported => {
-            if (supported) {
-              return Linking.openURL(googleMapsUrl);
-            } else {
-              return Linking.openURL(`https://www.google.com/maps/dir/?api=1&destination=${encodedAddress}`);
-            }
-          })
-          .catch(() => {
-            Linking.openURL(`https://www.google.com/maps/dir/?api=1&destination=${encodedAddress}`);
-          });
-      }
-    } else if (latitude && longitude) {
-      // Fallback to coordinates if no address available
-      const coordQuery = `${latitude},${longitude}`;
-      if (Platform.OS === 'ios') {
-        const appleMapsUrl = `maps://?daddr=${coordQuery}`;
-        Linking.openURL(appleMapsUrl).catch(() => {
-          Linking.openURL(`https://www.google.com/maps/dir/?api=1&destination=${coordQuery}`);
-        });
-      } else {
-        const googleMapsUrl = `google.navigation:q=${coordQuery}`;
-        Linking.canOpenURL(googleMapsUrl)
-          .then(supported => {
-            if (supported) {
-              return Linking.openURL(googleMapsUrl);
-            } else {
-              return Linking.openURL(`https://www.google.com/maps/dir/?api=1&destination=${coordQuery}`);
-            }
-          })
-          .catch(() => {
-            Linking.openURL(`https://www.google.com/maps/dir/?api=1&destination=${coordQuery}`);
-          });
-      }
-    } else {
+  // Handle navigate to address — coordinates are used when present, address is the fallback.
+  const handleNavigate = (target: NavigateTarget) => {
+    if (!target.coordinates && !target.address) {
       setAlertConfig({
         visible: true,
         title: 'Error',
@@ -974,7 +925,9 @@ export default function DeliveriesScreen() {
         icon: 'map-marker-off',
         iconColor: '#EF4444',
       });
+      return;
     }
+    mapsNav.navigate(target);
   };
 
   // Convert API orders to local delivery format
@@ -992,17 +945,21 @@ export default function DeliveriesScreen() {
     const customerName = order.deliveryAddress?.contactName || order.deliveryAddress?.name || 'Customer';
     const customerPhone = order.deliveryAddress?.contactPhone || order.deliveryAddress?.phone || '';
 
+    const kitchen = currentBatch && typeof currentBatch.kitchenId === 'object' ? currentBatch.kitchenId : null;
+    const pickupCoordinates = getCoordinates(kitchen?.address) ?? undefined;
+    const dropoffCoordinates = getCoordinates(order.deliveryAddress) ?? undefined;
+
     return {
       id: order._id,
       orderId: order.orderNumber,
       customerName,
       customerPhone,
-      pickupLocation: currentBatch && typeof currentBatch.kitchenId === 'object' && currentBatch.kitchenId
+      pickupLocation: kitchen
         ? [
-            currentBatch.kitchenId.name || 'Kitchen',
-            currentBatch.kitchenId.address?.addressLine1,
-            currentBatch.kitchenId.address?.locality,
-            currentBatch.kitchenId.address?.city,
+            kitchen.name || 'Kitchen',
+            kitchen.address?.addressLine1,
+            kitchen.address?.locality,
+            kitchen.address?.city,
           ].filter(Boolean).join(', ')
         : 'Kitchen',
       dropoffLocation,
@@ -1012,6 +969,9 @@ export default function DeliveriesScreen() {
       batchId: batchId,
       distance: '5 km', // TODO: Calculate distance
       sequenceNumber: order.sequenceNumber,
+      pickupCoordinates,
+      dropoffCoordinates,
+      kitchenName: kitchen?.name,
       deliveryAddress: order.deliveryAddress ? {
         latitude: order.deliveryAddress.latitude,
         longitude: order.deliveryAddress.longitude,
@@ -1034,6 +994,7 @@ export default function DeliveriesScreen() {
     ].filter(Boolean);
 
     const dropoffLocation = addressParts.length > 0 ? addressParts.join(', ') : 'Address not available';
+    const dropoffCoordinates = getCoordinates(order.deliveryAddress) ?? undefined;
 
     return {
       id: order._id,
@@ -1046,6 +1007,7 @@ export default function DeliveriesScreen() {
       eta: '15 mins',
       deliveryWindow: 'LUNCH',
       distance: '5 km',
+      dropoffCoordinates,
       deliveryAddress: order.deliveryAddress ? {
         latitude: order.deliveryAddress.latitude,
         longitude: order.deliveryAddress.longitude,
@@ -1082,6 +1044,9 @@ export default function DeliveriesScreen() {
       }
       const pickupLocation = pickupParts.length > 0 ? pickupParts.join(', ') : 'Kitchen';
 
+      const pickupCoordinates = getCoordinates(batch?.kitchen?.address) ?? undefined;
+      const dropoffCoordinates = getCoordinates(order?.deliveryAddress) ?? undefined;
+
       return {
         id: order?._id || 'unknown',
         orderId: order?.orderNumber || 'N/A',
@@ -1095,6 +1060,9 @@ export default function DeliveriesScreen() {
         batchId: batch?._id || 'unknown',
         distance: '-',
         sequenceNumber: order?.sequenceNumber,
+        pickupCoordinates,
+        dropoffCoordinates,
+        kitchenName: batch?.kitchen?.name,
         deliveryAddress: order?.deliveryAddress ? {
           latitude: order.deliveryAddress.latitude,
           longitude: order.deliveryAddress.longitude,
@@ -1888,6 +1856,13 @@ export default function DeliveriesScreen() {
         batches={availableBatches}
         onClose={() => setShowAvailableBatchesModal(false)}
         onAcceptBatch={handleAcceptBatch}
+      />
+
+      {/* iOS Maps App Picker (Google Maps / Apple Maps) */}
+      <MapsAppPicker
+        visible={mapsNav.pickerOpen}
+        onClose={mapsNav.closePicker}
+        onSelect={mapsNav.onPickerSelect}
       />
 
       {/* New Batch Toast Notification */}

@@ -6,12 +6,13 @@ import type { OrderStatus } from "../../../types/api";
 import ActionSheet from "../../../components/common/ActionSheet";
 import CustomAlert from "../../../components/common/CustomAlert";
 import OrderSourceBadge from "../../../components/common/OrderSourceBadge";
+import { openExternalNavigation, type NavigateTarget } from "../../../utils/maps";
 
 interface DeliveryCardProps {
   delivery: Delivery | any; // Allow both old Delivery and API order types
   onStatusChange: (deliveryId: string, newStatus: any) => void;
   onCallCustomer?: (phone: string) => void;
-  onNavigate?: (latitude?: number, longitude?: number, address?: string) => void;
+  onNavigate?: (target: NavigateTarget) => void;
 }
 
 // Status config for both old context statuses and new API statuses
@@ -97,49 +98,54 @@ export default function DeliveryCard({ delivery, onStatusChange, onCallCustomer,
     }
   };
 
-  const openInMaps = (address: string) => {
-    const encodedAddress = encodeURIComponent(address);
-    if (Platform.OS === 'ios') {
-      const appleMapsUrl = `maps://?daddr=${encodedAddress}`;
-      const webUrl = `https://www.google.com/maps/dir/?api=1&destination=${encodedAddress}`;
-      Linking.canOpenURL(appleMapsUrl)
-        .then(supported => {
-          if (supported) {
-            return Linking.openURL(appleMapsUrl);
-          } else {
-            return Linking.openURL(webUrl);
-          }
-        })
-        .catch(() => {
-          Linking.openURL(webUrl);
-        });
-    } else {
-      // Android - Use Google Maps search URL for accurate address matching
-      const googleMapsUrl = `https://www.google.com/maps/search/?api=1&query=${encodedAddress}`;
-      Linking.openURL(googleMapsUrl);
-    }
-  };
-
   const handleNavigate = () => {
     // Show action sheet to choose destination
     setShowNavigationSheet(true);
   };
 
+  const buildPickupTarget = (): NavigateTarget => ({
+    coordinates: delivery.pickupCoordinates ?? null,
+    address: delivery.pickupLocation,
+    label: delivery.kitchenName || 'Pickup',
+  });
+
+  const buildDropoffTarget = (): NavigateTarget => {
+    // Prefer the coords already extracted by the screen-level converter; fall back to the
+    // raw deliveryAddress fields from the API for legacy mock objects.
+    const dropoffCoords =
+      delivery.dropoffCoordinates ??
+      (delivery.deliveryAddress
+        ? (() => {
+            const lat =
+              delivery.deliveryAddress.coordinates?.latitude ??
+              delivery.deliveryAddress.latitude;
+            const lng =
+              delivery.deliveryAddress.coordinates?.longitude ??
+              delivery.deliveryAddress.longitude;
+            return typeof lat === 'number' && typeof lng === 'number'
+              ? { latitude: lat, longitude: lng }
+              : null;
+          })()
+        : null);
+    return {
+      coordinates: dropoffCoords,
+      address: delivery.dropoffLocation,
+      label: delivery.customerName || 'Drop-off',
+    };
+  };
+
   const handleNavigateToPickup = () => {
-    if (delivery.pickupLocation) {
-      openInMaps(delivery.pickupLocation);
-    }
+    const target = buildPickupTarget();
+    if (!target.coordinates && !target.address) return;
+    if (onNavigateProp) onNavigateProp(target);
+    else openExternalNavigation(target);
   };
 
   const handleNavigateToDropoff = () => {
-    if (onNavigateProp) {
-      // Use enhanced navigation with coordinates if available
-      const latitude = delivery.deliveryAddress?.latitude || delivery.deliveryAddress?.coordinates?.latitude;
-      const longitude = delivery.deliveryAddress?.longitude || delivery.deliveryAddress?.coordinates?.longitude;
-      onNavigateProp(latitude, longitude, delivery.dropoffLocation);
-    } else {
-      openInMaps(delivery.dropoffLocation);
-    }
+    const target = buildDropoffTarget();
+    if (!target.coordinates && !target.address) return;
+    if (onNavigateProp) onNavigateProp(target);
+    else openExternalNavigation(target);
   };
 
   return (

@@ -24,6 +24,9 @@ import FailedDeliveryModal from "./components/FailedDeliveryModal";
 import DeliveryCompleteModal from "./components/DeliveryCompleteModal";
 import NotificationBanner, { NotificationType } from "./components/NotificationBanner";
 import CustomAlert from "../../components/common/CustomAlert";
+import MapsAppPicker from "../../components/common/MapsAppPicker";
+import { useMapsNavigation } from "../../hooks/useMapsNavigation";
+import { getCoordinates, type Coordinates } from "../../utils/maps";
 import { getMyBatch, updateDeliveryStatus as apiUpdateDeliveryStatus, completeBatch, getBatchTracking } from "../../services/deliveryService";
 import { stopLocationTracking } from "../../services/locationService";
 import type { Order, OrderStatus, OrderSource, BatchSummary, BatchTrackingData } from "../../types/api";
@@ -38,6 +41,9 @@ interface DeliveryData {
   customerPhone: string;
   pickupLocation: string;
   dropoffLocation: string;
+  pickupCoordinates?: Coordinates;
+  dropoffCoordinates?: Coordinates;
+  kitchenName?: string;
   deliveryWindow: string;
   specialInstructions: string;
   currentStatus: DeliveryStatusType;
@@ -102,6 +108,7 @@ export default function DeliveryStatusScreen() {
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [isUpdating, setIsUpdating] = useState(false);
   const [delivery, setDelivery] = useState<DeliveryData | null>(null);
+  const mapsNav = useMapsNavigation();
   const [showPODModal, setShowPODModal] = useState(false);
   const [showFailedModal, setShowFailedModal] = useState(false);
   const [showCompleteModal, setShowCompleteModal] = useState(false);
@@ -227,6 +234,13 @@ export default function DeliveryStatusScreen() {
           deliveryAddr.pincode,
         ].filter(Boolean).join(', ');
 
+        // Backend keeps `order.status = OUT_FOR_DELIVERY` across both the EN_ROUTE
+        // and ARRIVED stages — only `assignmentStatus` distinguishes them. Without
+        // this, after the driver taps "I've Arrived" the order status comes back
+        // unchanged on refresh and the button reverts to "I've Arrived" — looks
+        // like the button isn't working. Prefer assignmentStatus when present.
+        const lifecycleStatus = (targetOrder.assignmentStatus as OrderStatus) || targetOrder.status;
+
         setDelivery({
           deliveryId: targetOrder._id,
           orderId: targetOrder.orderNumber,
@@ -235,9 +249,12 @@ export default function DeliveryStatusScreen() {
           customerPhone: deliveryAddr.contactPhone || '',
           pickupLocation: kitchenAddress,
           dropoffLocation: dropoffAddr,
+          pickupCoordinates: getCoordinates(kitchenAddr) ?? undefined,
+          dropoffCoordinates: getCoordinates(deliveryAddr) ?? undefined,
+          kitchenName: batch.kitchenId?.name,
           deliveryWindow: batch.mealWindow,
           specialInstructions: targetOrder.specialInstructions || '',
-          currentStatus: mapOrderStatusToDeliveryStatus(targetOrder.status),
+          currentStatus: mapOrderStatusToDeliveryStatus(lifecycleStatus),
           batchId: batch._id,
           stopNumber: targetOrder.sequenceNumber,
           totalStops: orders.length,
@@ -701,14 +718,24 @@ export default function DeliveryStatusScreen() {
           customerPhone={delivery.customerPhone}
           pickupLocation={delivery.pickupLocation}
           dropoffLocation={delivery.dropoffLocation}
+          pickupCoordinates={delivery.pickupCoordinates}
+          dropoffCoordinates={delivery.dropoffCoordinates}
+          pickupLabel={delivery.kitchenName || 'Pickup'}
+          dropoffLabel={delivery.customerName || 'Drop-off'}
           deliveryWindow={delivery.deliveryWindow}
           specialInstructions={delivery.specialInstructions}
+          onNavigate={mapsNav.navigate}
         />
 
         {/* Map Preview */}
         <MapPreview
           pickupLocation={delivery.pickupLocation}
           dropoffLocation={delivery.dropoffLocation}
+          pickupCoordinates={delivery.pickupCoordinates}
+          dropoffCoordinates={delivery.dropoffCoordinates}
+          pickupLabel={delivery.kitchenName || 'Pickup'}
+          dropoffLabel={delivery.customerName || 'Drop-off'}
+          onNavigate={mapsNav.navigate}
           currentStatus={delivery.currentStatus}
           onStartDelivery={handleStartDelivery}
           isUpdating={isUpdating}
@@ -765,6 +792,13 @@ export default function DeliveryStatusScreen() {
         iconColor="#EF4444"
         buttons={[{ text: "OK", style: "default" }]}
         onClose={() => setErrorAlert({ visible: false, message: '' })}
+      />
+
+      {/* iOS Maps App Picker (Google Maps / Apple Maps) */}
+      <MapsAppPicker
+        visible={mapsNav.pickerOpen}
+        onClose={mapsNav.closePicker}
+        onSelect={mapsNav.onPickerSelect}
       />
     </SafeAreaView>
   );

@@ -596,7 +596,8 @@ export type NotificationType =
   | 'ORDER_PICKED_UP'
   | 'ORDER_OUT_FOR_DELIVERY'
   | 'ORDER_DELIVERED'
-  | 'ORDER_FAILED';
+  | 'ORDER_FAILED'
+  | 'ORDER_UPDATE';
 
 // Notification interface
 export interface Notification {

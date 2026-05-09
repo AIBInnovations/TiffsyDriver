@@ -1,8 +1,9 @@
-import { View, Text, StyleSheet, TouchableOpacity, Linking, Platform } from "react-native";
+import { View, Text, StyleSheet, TouchableOpacity, Linking } from "react-native";
 import { useState } from "react";
 import MaterialCommunityIcons from "react-native-vector-icons/MaterialCommunityIcons";
 import OrderSourceBadge from "../../../components/common/OrderSourceBadge";
 import type { OrderSource } from "../../../types/api";
+import { openExternalNavigation, type Coordinates, type NavigateTarget } from "../../../utils/maps";
 
 interface OrderDetailsCardProps {
   orderId: string;
@@ -11,8 +12,14 @@ interface OrderDetailsCardProps {
   customerPhone?: string;
   pickupLocation?: string;
   dropoffLocation?: string;
+  pickupCoordinates?: Coordinates;
+  dropoffCoordinates?: Coordinates;
+  pickupLabel?: string;
+  dropoffLabel?: string;
   deliveryWindow?: string;
   specialInstructions?: string;
+  onNavigate?: (target: NavigateTarget) => void;
+  /** @deprecated Prefer onNavigate which receives full target including coords. */
   onLocationPress?: (location: string, type: "pickup" | "dropoff") => void;
 }
 
@@ -23,8 +30,13 @@ export default function OrderDetailsCard({
   customerPhone,
   pickupLocation,
   dropoffLocation,
+  pickupCoordinates,
+  dropoffCoordinates,
+  pickupLabel,
+  dropoffLabel,
   deliveryWindow,
   specialInstructions,
+  onNavigate,
   onLocationPress,
 }: OrderDetailsCardProps) {
   const [showPhone, setShowPhone] = useState(false);
@@ -37,34 +49,27 @@ export default function OrderDetailsCard({
   };
 
   const handleLocationPress = (location: string | undefined, type: "pickup" | "dropoff") => {
-    if (location) {
-      if (onLocationPress) {
-        onLocationPress(location, type);
-      } else {
-        const encodedAddress = encodeURIComponent(location);
+    const coords = type === "pickup" ? pickupCoordinates : dropoffCoordinates;
+    const label =
+      type === "pickup" ? pickupLabel || "Pickup" : dropoffLabel || customerName || "Drop-off";
 
-        if (Platform.OS === 'ios') {
-          const appleMapsUrl = `maps://?daddr=${encodedAddress}`;
-          const webUrl = `https://www.google.com/maps/dir/?api=1&destination=${encodedAddress}`;
+    if (!coords && !location) return;
 
-          Linking.canOpenURL(appleMapsUrl)
-            .then(supported => {
-              if (supported) {
-                return Linking.openURL(appleMapsUrl);
-              } else {
-                return Linking.openURL(webUrl);
-              }
-            })
-            .catch(() => {
-              Linking.openURL(webUrl);
-            });
-        } else {
-          // Android - Use Google Maps search URL for accurate address matching
-          const googleMapsUrl = `https://www.google.com/maps/search/?api=1&query=${encodedAddress}`;
-          Linking.openURL(googleMapsUrl);
-        }
-      }
+    const target: NavigateTarget = {
+      coordinates: coords ?? null,
+      address: location,
+      label,
+    };
+
+    if (onNavigate) {
+      onNavigate(target);
+      return;
     }
+    if (onLocationPress && location) {
+      onLocationPress(location, type);
+      return;
+    }
+    openExternalNavigation(target);
   };
 
   return (

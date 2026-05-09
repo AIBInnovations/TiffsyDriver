@@ -9,6 +9,19 @@ const LOCATION_TRACKING_NOTIFICATION_ID = 'location-tracking';
 const LOCATION_TRACKING_ENABLED_KEY = '@tiffsy/location-tracking-enabled';
 const SEND_INTERVAL_MS = 15000;
 
+// FGS notification body strings. We keep this set tiny on purpose: every distinct
+// body causes a notification re-render, so timestamp/coords-style bodies trigger
+// a refresh every 15 seconds. The driver only needs to know whether sharing is
+// healthy — the actual GPS coords belong on the kitchen's tracker, not in the shade.
+const FGS_BODY = {
+  SHARING: 'Sharing your location with the kitchen',
+  SERVER_ERROR: "Couldn't reach server — retrying",
+  NETWORK_DOWN: 'Network unavailable — retrying',
+  GPS_OFF: 'Turn on Location Services to keep sharing',
+  GPS_TIMEOUT: 'Searching for GPS signal…',
+  GPS_ERROR: 'GPS error — will retry',
+} as const;
+
 export class LocationTrackingError extends Error {
   code: string;
   constructor(code: string, message: string) {
@@ -32,6 +45,7 @@ let lastLocation: DriverLocation | null = null;
 let isTracking = false;
 let foregroundServiceLoopRunning = false;
 let appStateSubscription: { remove: () => void } | null = null;
+let lastFgsBody: string | null = null;
 
 const sleep = (ms: number): Promise<void> => new Promise(resolve => setTimeout(resolve, ms));
 
@@ -113,14 +127,18 @@ export const openLocationSettings = async (): Promise<void> => {
   await Linking.openSettings();
 };
 
+// Re-renders the FGS notification only when the body actually changes. Without
+// this dedup, a steady stream of identical "Sharing…" updates would re-attach
+// the foreground service and (on some Android skins) re-peek the notification.
 const updateFgsNotificationBody = async (body: string): Promise<void> => {
+  if (body === lastFgsBody) return;
   try {
     await notifee.displayNotification({
       id: LOCATION_TRACKING_NOTIFICATION_ID,
       title: 'Delivery in Progress',
       body,
       android: {
-        channelId: NOTIFICATION_CHANNELS.DELIVERY,
+        channelId: NOTIFICATION_CHANNELS.LOCATION_TRACKING,
         asForegroundService: true,
         foregroundServiceTypes: [AndroidForegroundServiceType.FOREGROUND_SERVICE_TYPE_LOCATION],
         ongoing: true,
@@ -130,13 +148,14 @@ const updateFgsNotificationBody = async (body: string): Promise<void> => {
         importance: AndroidImportance.LOW,
       },
     });
+    lastFgsBody = body;
   } catch (error: any) {
     console.warn('Failed to update FGS notification body:', error?.message || error);
   }
 };
 
-// Send a single GPS fix and reflect the outcome on the FGS notification body
-// so the driver can SEE in real time whether pings are landing on the backend.
+// Send a single GPS fix. Only surface failures to the driver — successful pings
+// keep the static "Sharing…" body so the notification doesn't visibly thrash.
 const sendLocation = async (location: DriverLocation): Promise<void> => {
   lastLocation = location;
   const result = await sendDriverLocation({
@@ -147,16 +166,13 @@ const sendLocation = async (location: DriverLocation): Promise<void> => {
     accuracy: location.accuracy ?? undefined,
   });
 
-  const time = new Date().toLocaleTimeString();
-  let body: string;
   if (result.ok) {
-    body = `${time} ✓ ${result.coords}`;
+    await updateFgsNotificationBody(FGS_BODY.SHARING);
   } else if (result.kind === 'rejected') {
-    body = `${time} ✗ HTTP ${result.status}: ${result.detail.slice(0, 80)}`;
+    await updateFgsNotificationBody(FGS_BODY.SERVER_ERROR);
   } else {
-    body = `${time} ✗ NETWORK: ${result.detail.slice(0, 80)}`;
+    await updateFgsNotificationBody(FGS_BODY.NETWORK_DOWN);
   }
-  await updateFgsNotificationBody(body);
 };
 
 const waitForActiveAppState = async (timeoutMs = 4000): Promise<boolean> => {
@@ -339,9 +355,11 @@ export const runLocationForegroundService = async (): Promise<void> => {
     await sendLocation(location);
   } catch (error: any) {
     console.warn('Initial location fix failed:', error?.message || error);
-    const time = new Date().toLocaleTimeString();
-    const codeHint = error?.code === 2 ? 'GPS OFF' : error?.code === 3 ? 'GPS TIMEOUT' : 'GPS ERROR';
-    await updateFgsNotificationBody(`${time} ✗ ${codeHint}: ${(error?.message || '').slice(0, 60)}`);
+    const body =
+      error?.code === 2 ? FGS_BODY.GPS_OFF :
+      error?.code === 3 ? FGS_BODY.GPS_TIMEOUT :
+      FGS_BODY.GPS_ERROR;
+    await updateFgsNotificationBody(body);
   }
 
   try {
@@ -355,9 +373,11 @@ export const runLocationForegroundService = async (): Promise<void> => {
         await sendLocation(location);
       } catch (error: any) {
         console.warn('Background location update failed:', error?.message || error);
-        const time = new Date().toLocaleTimeString();
-        const codeHint = error?.code === 2 ? 'GPS OFF' : error?.code === 3 ? 'GPS TIMEOUT' : 'GPS ERROR';
-        await updateFgsNotificationBody(`${time} ✗ ${codeHint}: ${(error?.message || '').slice(0, 60)}`);
+        const body =
+          error?.code === 2 ? FGS_BODY.GPS_OFF :
+          error?.code === 3 ? FGS_BODY.GPS_TIMEOUT :
+          FGS_BODY.GPS_ERROR;
+        await updateFgsNotificationBody(body);
       }
     }
   } finally {
@@ -376,9 +396,9 @@ const startAndroidForegroundService = async (): Promise<void> => {
   await notifee.displayNotification({
     id: LOCATION_TRACKING_NOTIFICATION_ID,
     title: 'Delivery in Progress',
-    body: 'Tracking your location for active delivery',
+    body: FGS_BODY.SHARING,
     android: {
-      channelId: NOTIFICATION_CHANNELS.DELIVERY,
+      channelId: NOTIFICATION_CHANNELS.LOCATION_TRACKING,
       asForegroundService: true,
       // Required on Android 14+ (targetSdk 34+). Without this notifee passes -1 to
       // Service.startForeground(), which Android rejects with InvalidForegroundServiceTypeException.
@@ -391,6 +411,7 @@ const startAndroidForegroundService = async (): Promise<void> => {
       importance: AndroidImportance.LOW,
     },
   });
+  lastFgsBody = FGS_BODY.SHARING;
 };
 
 const ensureAppStateListener = (): void => {
@@ -505,6 +526,7 @@ export const stopLocationTracking = async (): Promise<void> => {
   }
 
   lastLocation = null;
+  lastFgsBody = null;
   isTracking = false;
   console.log('✅ Location tracking stopped');
 };

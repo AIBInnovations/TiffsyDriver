@@ -9,7 +9,6 @@ import {
   Switch,
   Animated,
   ActivityIndicator,
-  Linking,
   Platform,
 } from 'react-native';
 import { useState, useCallback, useEffect, useRef, useMemo } from 'react';
@@ -23,6 +22,8 @@ import type { DashboardStackParamList } from '../../navigation/types';
 const AnimatedLinearGradient = Animated.createAnimatedComponent(LinearGradient);
 import StatsCard from './components/StatsCard';
 import CustomAlert from '../../components/common/CustomAlert';
+import MapsAppPicker from '../../components/common/MapsAppPicker';
+import { useMapsNavigation } from '../../hooks/useMapsNavigation';
 import { useDriverProfileStore } from '../profile/useDriverProfileStore';
 import { getMyBatch, getAvailableBatches, markBatchPickedUp, acceptBatch, getDriverBatchHistory, completeBatch } from '../../services/deliveryService';
 import { startLocationTracking, stopLocationTracking, isLocationTrackingActive, openAppSettings, openLocationSettings, LocationTrackingError } from '../../services/locationService';
@@ -89,6 +90,9 @@ export default function DashboardScreen() {
   }>({ visible: false, title: '', message: '' });
 
   const [isTogglingOnline, setIsTogglingOnline] = useState(false);
+
+  // Maps navigation hook (handles iOS Google Maps / Apple Maps picker)
+  const mapsNav = useMapsNavigation();
 
   const isOnline = profile.availabilityStatus === 'ONLINE';
   const driverName = profile.fullName || 'Driver';
@@ -539,53 +543,19 @@ export default function DashboardScreen() {
     }
   }, [currentBatch, showToast, fetchCurrentBatch]);
 
-  // Handle navigation to kitchen
+  // Handle navigation to kitchen — coords first, address as fallback only.
   const handleNavigateToKitchen = useCallback(() => {
     if (!navigationKitchen) return;
     setShowNavigateConfirm(false);
 
-    const { coordinates, address } = navigationKitchen;
+    const { coordinates, address, name } = navigationKitchen;
+    const coords =
+      coordinates?.latitude != null && coordinates?.longitude != null
+        ? { latitude: coordinates.latitude, longitude: coordinates.longitude }
+        : null;
 
-    // Use coordinates for precise location when available
-    if (coordinates?.latitude && coordinates?.longitude) {
-      const lat = coordinates.latitude;
-      const lng = coordinates.longitude;
-
-      if (Platform.OS === 'ios') {
-        const appleMapsUrl = `maps://?daddr=${lat},${lng}`;
-        Linking.canOpenURL(appleMapsUrl)
-          .then(supported => {
-            if (supported) {
-              return Linking.openURL(appleMapsUrl);
-            } else {
-              return Linking.openURL(`https://www.google.com/maps/dir/?api=1&destination=${lat},${lng}`);
-            }
-          })
-          .catch(err => {
-            console.error('Error opening maps:', err);
-            showToast('Failed to open maps', 'error');
-          });
-      } else {
-        // Android - Use Google Maps search URL for accurate address matching
-        const encodedAddress = encodeURIComponent(address);
-        const googleMapsUrl = `https://www.google.com/maps/search/?api=1&query=${encodedAddress}`;
-        Linking.openURL(googleMapsUrl);
-      }
-    } else {
-      // Fallback to address if coordinates not available
-      const encodedAddress = encodeURIComponent(address);
-
-      if (Platform.OS === 'ios') {
-        const appleMapsUrl = `maps://?daddr=${encodedAddress}`;
-        Linking.openURL(appleMapsUrl).catch(() => {
-          Linking.openURL(`https://www.google.com/maps/dir/?api=1&destination=${encodedAddress}`);
-        });
-      } else {
-        const googleMapsUrl = `https://www.google.com/maps/search/?api=1&query=${encodedAddress}`;
-        Linking.openURL(googleMapsUrl);
-      }
-    }
-  }, [navigationKitchen, showToast]);
+    mapsNav.navigate({ coordinates: coords, address, label: name || 'Kitchen' });
+  }, [navigationKitchen, mapsNav]);
 
   // Navigate to kitchen or continue deliveries
   const handlePrimaryAction = useCallback(async () => {
@@ -1070,6 +1040,13 @@ export default function DashboardScreen() {
         iconColor={alertConfig.iconColor}
         buttons={alertConfig.buttons || [{ text: 'OK', style: 'default' }]}
         onClose={() => setAlertConfig({ visible: false, title: '', message: '' })}
+      />
+
+      {/* iOS Maps App Picker (Google Maps / Apple Maps) */}
+      <MapsAppPicker
+        visible={mapsNav.pickerOpen}
+        onClose={mapsNav.closePicker}
+        onSelect={mapsNav.onPickerSelect}
       />
     </SafeAreaView >
   );

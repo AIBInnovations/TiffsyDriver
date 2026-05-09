@@ -13,6 +13,7 @@ import DeliveryCard from "./DeliveryCard";
 import PODCapture from "../../delivery-status/components/PODCapture";
 import { Delivery } from "../../../context/DeliveryContext";
 import { updateDeliveryStatus } from "../../../services/deliveryService";
+import type { NavigateTarget } from "../../../utils/maps";
 
 const SCREEN_WIDTH = Dimensions.get("window").width;
 const SWIPE_THRESHOLD = SCREEN_WIDTH * 0.25;
@@ -21,7 +22,7 @@ interface SwipeableDeliveryCardProps {
   delivery: Delivery | any;
   onStatusChange: (deliveryId: string, newStatus: any) => void;
   onCallCustomer?: (phone: string) => void;
-  onNavigate?: (latitude?: number, longitude?: number, address?: string) => void;
+  onNavigate?: (target: NavigateTarget) => void;
   onMarkComplete?: (deliveryId: string) => void;
   onCardPress?: (delivery: any) => void;
   canSwipeToComplete?: boolean;

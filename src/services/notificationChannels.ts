@@ -7,6 +7,7 @@ export const NOTIFICATION_CHANNELS = {
   BATCH: 'batch_channel',
   GENERAL: 'general_channel',
   URGENT: 'urgent_channel',
+  LOCATION_TRACKING: 'location_tracking_channel',
 } as const;
 
 // Initialize notification channels for Android
@@ -73,6 +74,20 @@ export const createNotificationChannels = async (): Promise<void> => {
     });
     console.log('✅ Created General channel:', generalChannel);
 
+    // Location Tracking Channel - silent foreground-service channel for the GPS
+    // ping loop. Required by Android to keep the FGS visible, but should NEVER
+    // buzz, ding, or peek — the driver only sees it in the shade.
+    const locationTrackingChannel = await notifee.createChannel({
+      id: NOTIFICATION_CHANNELS.LOCATION_TRACKING,
+      name: 'Location Sharing',
+      description: 'Quietly shares your live location with the kitchen during deliveries',
+      importance: AndroidImportance.LOW,
+      vibration: false,
+      badge: false,
+      visibility: AndroidVisibility.SECRET,
+    });
+    console.log('✅ Created Location Tracking channel:', locationTrackingChannel);
+
     console.log('✅ All notification channels created successfully');
   } catch (error: any) {
     console.error('❌ Error creating notification channels:', error);
@@ -120,6 +135,7 @@ export const getChannelForNotificationType = (type?: string): string => {
     case 'ORDER_OUT_FOR_DELIVERY':
     case 'ORDER_DELIVERED':
     case 'ORDER_FAILED':
+    case 'ORDER_UPDATE':
       return NOTIFICATION_CHANNELS.DELIVERY;
 
     case 'URGENT_ALERT':
