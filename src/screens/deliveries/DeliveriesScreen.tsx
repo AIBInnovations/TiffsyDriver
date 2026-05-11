@@ -38,7 +38,7 @@ import ReorderStopsModal, { type Stop } from './components/ReorderStopsModal';
 import MapsAppPicker from '../../components/common/MapsAppPicker';
 import { useMapsNavigation } from '../../hooks/useMapsNavigation';
 import { getCoordinates, type Coordinates, type NavigateTarget } from '../../utils/maps';
-import type { Batch, Order, OrderStatus, AvailableBatch, DriverOrder, HistoryBatch, HistorySingleOrder } from '../../types/api';
+import type { Batch, Order, OrderItem, OrderStatus, AvailableBatch, DriverOrder, HistoryBatch, HistorySingleOrder } from '../../types/api';
 
 type FilterStatus = 'all' | 'READY' | 'EN_ROUTE' | 'ARRIVED' | 'DELIVERED' | 'FAILED' | 'RETURNED' | 'PICKED_UP' | 'OUT_FOR_DELIVERY';
 type SortOption = 'sequence' | 'distance' | 'status';
@@ -60,6 +60,7 @@ interface LocalDelivery {
   pickupCoordinates?: Coordinates;
   dropoffCoordinates?: Coordinates;
   kitchenName?: string;
+  items?: OrderItem[];
   deliveryAddress?: {
     latitude?: number;
     longitude?: number;
@@ -972,6 +973,7 @@ export default function DeliveriesScreen() {
       pickupCoordinates,
       dropoffCoordinates,
       kitchenName: kitchen?.name,
+      items: order.items,
       deliveryAddress: order.deliveryAddress ? {
         latitude: order.deliveryAddress.latitude,
         longitude: order.deliveryAddress.longitude,
@@ -1008,6 +1010,7 @@ export default function DeliveriesScreen() {
       deliveryWindow: 'LUNCH',
       distance: '5 km',
       dropoffCoordinates,
+      items: order.items,
       deliveryAddress: order.deliveryAddress ? {
         latitude: order.deliveryAddress.latitude,
         longitude: order.deliveryAddress.longitude,
@@ -1063,6 +1066,7 @@ export default function DeliveriesScreen() {
         pickupCoordinates,
         dropoffCoordinates,
         kitchenName: batch?.kitchen?.name,
+        items: order?.items,
         deliveryAddress: order?.deliveryAddress ? {
           latitude: order.deliveryAddress.latitude,
           longitude: order.deliveryAddress.longitude,

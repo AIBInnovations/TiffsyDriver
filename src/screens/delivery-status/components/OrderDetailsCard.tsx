@@ -18,6 +18,11 @@ interface OrderDetailsCardProps {
   dropoffLabel?: string;
   deliveryWindow?: string;
   specialInstructions?: string;
+  // Customer-side delivery preferences. Drive rider-facing UI changes:
+  //  - leaveAtDoor: show an info banner so the rider knows to leave + photo, not knock.
+  //  - doNotContact: hide the call button outright so the rider can't ring the customer.
+  leaveAtDoor?: boolean;
+  doNotContact?: boolean;
   onNavigate?: (target: NavigateTarget) => void;
   /** @deprecated Prefer onNavigate which receives full target including coords. */
   onLocationPress?: (location: string, type: "pickup" | "dropoff") => void;
@@ -36,6 +41,8 @@ export default function OrderDetailsCard({
   dropoffLabel,
   deliveryWindow,
   specialInstructions,
+  leaveAtDoor = false,
+  doNotContact = false,
   onNavigate,
   onLocationPress,
 }: OrderDetailsCardProps) {
@@ -98,7 +105,7 @@ export default function OrderDetailsCard({
             </View>
           </View>
           <View style={styles.customerActions}>
-            {customerPhone && (
+            {customerPhone && !doNotContact && (
               <>
                 <TouchableOpacity
                   style={styles.iconButton}
@@ -115,7 +122,41 @@ export default function OrderDetailsCard({
                 </TouchableOpacity>
               </>
             )}
+            {doNotContact && (
+              <View style={styles.doNotContactBadge}>
+                <MaterialCommunityIcons name="bell-off-outline" size={14} color="#DC2626" />
+                <Text style={styles.doNotContactBadgeText}>Do Not Contact</Text>
+              </View>
+            )}
           </View>
+        </View>
+      )}
+
+      {/* Delivery preferences banner — tells the rider what the customer chose at checkout */}
+      {(leaveAtDoor || doNotContact) && (
+        <View style={styles.prefsBanner}>
+          {leaveAtDoor && (
+            <View style={styles.prefsRow}>
+              <MaterialCommunityIcons name="door-open" size={18} color="#9A3412" />
+              <View style={styles.prefsTextContainer}>
+                <Text style={styles.prefsTitle}>Leave at Door</Text>
+                <Text style={styles.prefsBody}>
+                  No OTP. Place the order at the door and take a photo as proof.
+                </Text>
+              </View>
+            </View>
+          )}
+          {doNotContact && (
+            <View style={[styles.prefsRow, leaveAtDoor && styles.prefsRowSpacing]}>
+              <MaterialCommunityIcons name="bell-off-outline" size={18} color="#9A3412" />
+              <View style={styles.prefsTextContainer}>
+                <Text style={styles.prefsTitle}>Do Not Contact</Text>
+                <Text style={styles.prefsBody}>
+                  Don't call or message. Ring once and wait, or just drop and go.
+                </Text>
+              </View>
+            </View>
+          )}
         </View>
       )}
 
@@ -289,6 +330,53 @@ const styles = StyleSheet.create({
     backgroundColor: "#10B981",
     alignItems: "center",
     justifyContent: "center",
+  },
+  doNotContactBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "#FEE2E2",
+    borderRadius: 8,
+    paddingHorizontal: 8,
+    paddingVertical: 6,
+    gap: 4,
+  },
+  doNotContactBadgeText: {
+    fontSize: 11,
+    fontWeight: "600",
+    color: "#DC2626",
+  },
+  prefsBanner: {
+    backgroundColor: "#FFF7ED",
+    borderLeftWidth: 3,
+    borderLeftColor: "#FE8733",
+    borderRadius: 8,
+    padding: 12,
+    marginBottom: 16,
+  },
+  prefsRow: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: 10,
+  },
+  prefsRowSpacing: {
+    marginTop: 10,
+    paddingTop: 10,
+    borderTopWidth: 1,
+    borderTopColor: "#FED7AA",
+  },
+  prefsTextContainer: {
+    flex: 1,
+  },
+  prefsTitle: {
+    fontSize: 13,
+    fontWeight: "700",
+    color: "#9A3412",
+  },
+  prefsBody: {
+    fontSize: 12,
+    color: "#9A3412",
+    marginTop: 2,
+    lineHeight: 16,
   },
   deliveryWindowContainer: {
     flexDirection: "row",

@@ -17,6 +17,7 @@ import LinearGradient from "react-native-linear-gradient";
 import { DeliveryStatusType, MainTabsParamList } from "../../navigation/types";
 import ProgressTracker from "./components/ProgressTracker";
 import OrderDetailsCard from "./components/OrderDetailsCard";
+import OrderItemsCard from "./components/OrderItemsCard";
 import MapPreview from "./components/MapPreview";
 import ActionButtons from "./components/ActionButtons";
 import PODCapture from "./components/PODCapture";
@@ -27,9 +28,10 @@ import CustomAlert from "../../components/common/CustomAlert";
 import MapsAppPicker from "../../components/common/MapsAppPicker";
 import { useMapsNavigation } from "../../hooks/useMapsNavigation";
 import { getCoordinates, type Coordinates } from "../../utils/maps";
-import { getMyBatch, updateDeliveryStatus as apiUpdateDeliveryStatus, completeBatch, getBatchTracking } from "../../services/deliveryService";
+import { getMyBatch, updateDeliveryStatus as apiUpdateDeliveryStatus, completeBatch, getBatchTracking, uploadProofPhoto } from "../../services/deliveryService";
+import type { Asset } from "react-native-image-picker";
 import { stopLocationTracking } from "../../services/locationService";
-import type { Order, OrderStatus, OrderSource, BatchSummary, BatchTrackingData } from "../../types/api";
+import type { Order, OrderItem, OrderStatus, OrderSource, BatchSummary, BatchTrackingData } from "../../types/api";
 
 type DeliveryStatusScreenRouteProp = RouteProp<MainTabsParamList, "DeliveryStatus">;
 
@@ -50,6 +52,12 @@ interface DeliveryData {
   batchId?: string;
   stopNumber?: number;
   totalStops?: number;
+  // Customer-side delivery preferences (drive the POD flow + rider UI)
+  leaveAtDoor?: boolean;
+  doNotContact?: boolean;
+  requiresOTP?: boolean;
+  orderInternalId?: string; // MongoDB _id, needed for proof-photo upload endpoint
+  items?: OrderItem[];
 }
 
 interface Notification {
@@ -244,6 +252,7 @@ export default function DeliveryStatusScreen() {
         setDelivery({
           deliveryId: targetOrder._id,
           orderId: targetOrder.orderNumber,
+          orderInternalId: targetOrder._id,
           orderSource: targetOrder.orderSource,
           customerName: deliveryAddr.contactName || 'Customer',
           customerPhone: deliveryAddr.contactPhone || '',
@@ -258,6 +267,14 @@ export default function DeliveryStatusScreen() {
           batchId: batch._id,
           stopNumber: targetOrder.sequenceNumber,
           totalStops: orders.length,
+          // Delivery preferences from the customer — drive POD branching + UI.
+          leaveAtDoor: !!targetOrder.leaveAtDoor,
+          doNotContact: !!targetOrder.doNotContact,
+          // Fallback if backend hasn't shipped requiresOTP yet: derive locally from leaveAtDoor.
+          requiresOTP: typeof targetOrder.requiresOTP === 'boolean'
+            ? targetOrder.requiresOTP
+            : !targetOrder.leaveAtDoor,
+          items: targetOrder.items,
         });
 
         console.log('✅ Delivery data loaded:', targetOrder.orderNumber, 'Status:', targetOrder.status);
@@ -497,6 +514,40 @@ export default function DeliveryStatusScreen() {
     }
   };
 
+  // Handle photo-proof submission for Leave-at-Door orders. Uploads the captured asset
+  // to /orders/:id/proof-photo which atomically stores the URL, sets proofOfDelivery, and
+  // transitions the order to DELIVERED — no separate status update needed.
+  const handleSubmitProofPhoto = async (asset: Asset, notes?: string): Promise<boolean> => {
+    if (!delivery) {
+      throw new Error('No delivery data available');
+    }
+    setIsUpdating(true);
+    try {
+      const orderInternalId = delivery.orderInternalId || delivery.deliveryId;
+      await uploadProofPhoto(orderInternalId, {
+        uri: asset.uri,
+        type: asset.type,
+        fileName: asset.fileName,
+      });
+
+      // Note: `notes` are intentionally not sent yet — the proof-photo endpoint doesn't
+      // accept them. Wire through later if/when the backend adds support.
+      if (notes) {
+        console.log('📝 Notes captured but not sent (no endpoint support yet):', notes);
+      }
+
+      setDelivery({ ...delivery, currentStatus: "delivered" });
+      setShowPODModal(false);
+      setShowCompleteModal(true);
+      setIsUpdating(false);
+      return true;
+    } catch (error: any) {
+      console.error('❌ Error uploading proof photo:', error);
+      setIsUpdating(false);
+      throw new Error(error.message || 'Failed to upload proof photo. Please try again.');
+    }
+  };
+
   const handleMarkFailed = () => {
     setShowFailedModal(true);
   };
@@ -724,8 +775,13 @@ export default function DeliveryStatusScreen() {
           dropoffLabel={delivery.customerName || 'Drop-off'}
           deliveryWindow={delivery.deliveryWindow}
           specialInstructions={delivery.specialInstructions}
+          leaveAtDoor={delivery.leaveAtDoor}
+          doNotContact={delivery.doNotContact}
           onNavigate={mapsNav.navigate}
         />
+
+        {/* Order Items (thali count + breakdown) */}
+        <OrderItemsCard items={delivery.items} />
 
         {/* Map Preview */}
         <MapPreview
@@ -759,9 +815,12 @@ export default function DeliveryStatusScreen() {
         visible={showPODModal}
         onClose={() => setShowPODModal(false)}
         onVerifyOTP={handleVerifyOTP}
+        onSubmitPhoto={handleSubmitProofPhoto}
         customerPhone={delivery?.customerPhone}
         orderId={delivery?.orderId}
         isVerifying={isUpdating}
+        leaveAtDoor={delivery?.leaveAtDoor}
+        doNotContact={delivery?.doNotContact}
       />
 
       <FailedDeliveryModal

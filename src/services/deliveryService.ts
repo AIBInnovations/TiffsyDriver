@@ -165,6 +165,52 @@ export const markBatchPickedUp = async (batchId: string): Promise<ApiResponse<Ba
   }
 };
 
+// Upload proof-of-delivery photo for Leave-at-Door orders. The backend stores the URL on
+// the order, sets proofOfDelivery + proofPhotoUrl, transitions status to DELIVERED, and
+// pushes a notification to the customer with a deeplink to view the photo.
+//
+// `orderInternalId` must be the MongoDB _id of the order (not the human-readable
+// orderNumber). The endpoint is POST /orders/:id/proof-photo, field name `file`.
+export const uploadProofPhoto = async (
+  orderInternalId: string,
+  asset: { uri?: string; type?: string; fileName?: string }
+): Promise<ApiResponse<{ order: any; proofPhotoUrl: string }>> => {
+  try {
+    if (!asset.uri) throw new Error('Photo asset has no URI');
+    const token = await getStoredToken();
+    const url = `${API_CONFIG.BASE_URL}/api/orders/${orderInternalId}/proof-photo`;
+
+    const form = new FormData();
+    // React Native FormData accepts { uri, type, name } for native file references.
+    form.append('file', {
+      uri: asset.uri,
+      type: asset.type || 'image/jpeg',
+      name: asset.fileName || `pod_${orderInternalId}.jpg`,
+    } as any);
+
+    console.log('📡 Uploading proof photo to:', url);
+
+    const response = await fetch(url, {
+      method: 'POST',
+      headers: {
+        // Don't set Content-Type — let fetch infer the multipart boundary.
+        Authorization: `Bearer ${token}`,
+      },
+      body: form,
+    });
+
+    const data = await response.json();
+    if (!response.ok) {
+      throw new Error(data.error || data.message || 'Failed to upload proof photo');
+    }
+    console.log('✅ Proof photo uploaded:', data?.data?.proofPhotoUrl);
+    return data;
+  } catch (error: any) {
+    console.error('❌ Error uploading proof photo:', error);
+    throw error;
+  }
+};
+
 // Update delivery status (delivered, failed, etc.)
 export const updateDeliveryStatus = async (
   orderId: string,

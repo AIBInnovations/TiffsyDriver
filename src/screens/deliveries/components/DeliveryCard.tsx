@@ -176,6 +176,26 @@ export default function DeliveryCard({ delivery, onStatusChange, onCallCustomer,
         <Text style={styles.deliveryWindowText}>Delivery Window: {delivery.deliveryWindow}</Text>
       </View>
 
+      {/* Items summary (thali count + inline breakdown) */}
+      {Array.isArray(delivery.items) && delivery.items.length > 0 && (() => {
+        const totalQty = delivery.items.reduce((s: number, it: any) => s + (it?.quantity || 0), 0);
+        const breakdown = delivery.items
+          .map((it: any) => `${it?.quantity || 0}× ${it?.name || 'Item'}`)
+          .join(', ');
+        const thaliLabel = totalQty === 1 ? 'thali' : 'thalis';
+        return (
+          <View style={styles.itemsRow}>
+            <View style={styles.itemsCountPill}>
+              <MaterialCommunityIcons name="food-variant" size={14} color="#C2410C" />
+              <Text style={styles.itemsCountText}>{totalQty} {thaliLabel}</Text>
+            </View>
+            <Text style={styles.itemsBreakdownText} numberOfLines={2}>
+              {breakdown}
+            </Text>
+          </View>
+        );
+      })()}
+
       {/* Locations */}
       <View style={styles.locationsContainer}>
         <View style={styles.locationRow}>
@@ -350,6 +370,38 @@ const styles = StyleSheet.create({
     fontSize: 13,
     color: "#6B7280",
     flexShrink: 1,
+  },
+  itemsRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    marginBottom: 12,
+    paddingVertical: 8,
+    paddingHorizontal: 10,
+    backgroundColor: "#FFF7ED",
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: "#FED7AA",
+  },
+  itemsCountPill: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    backgroundColor: "#FFFFFF",
+    borderRadius: 8,
+  },
+  itemsCountText: {
+    fontSize: 12,
+    fontWeight: "700",
+    color: "#C2410C",
+  },
+  itemsBreakdownText: {
+    flex: 1,
+    fontSize: 12,
+    color: "#7C2D12",
+    fontWeight: "500",
   },
   locationsContainer: {
     marginBottom: 12,

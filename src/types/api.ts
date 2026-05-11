@@ -195,6 +195,18 @@ export interface Order {
   sequenceNumber?: number;
   assignmentStatus?: string;
   specialInstructions?: string;
+  // Delivery preferences chosen by the customer at checkout. Drive rider-side behavior:
+  //   - leaveAtDoor=true  -> skip OTP, capture photo proof instead
+  //   - doNotContact=true -> suppress the call button in OrderDetailsCard
+  leaveAtDoor?: boolean;
+  doNotContact?: boolean;
+  // Server-derived: !leaveAtDoor. Single flag the rider app reads to branch the POD flow.
+  requiresOTP?: boolean;
+  // Set after the rider uploads the proof-of-delivery photo.
+  proofPhotoUrl?: string | null;
+  // Set when the customer taps "I've Received It" in their app (doNotContact fallback).
+  customerConfirmedAt?: string | null;
+  deliveryConfirmedBy?: 'OTP' | 'PHOTO' | 'CUSTOMER_TAP' | 'AUTO' | null;
 }
 
 // Available Batch (simplified for list view)
