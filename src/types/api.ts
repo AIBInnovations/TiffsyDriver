@@ -7,7 +7,8 @@ export interface ApiResponse<T> {
 }
 
 // User roles
-export type UserRole = 'CUSTOMER' | 'KITCHEN_STAFF' | 'DRIVER' | 'ADMIN';
+// OWNER is a super-role (god-mode) that can access every app, including this one.
+export type UserRole = 'CUSTOMER' | 'KITCHEN_STAFF' | 'DRIVER' | 'ADMIN' | 'OWNER';
 
 // User status
 export type UserStatus = 'ACTIVE' | 'INACTIVE' | 'SUSPENDED';
@@ -266,12 +267,20 @@ export interface BatchDetailsData {
   assignments: DeliveryAssignment[];
 }
 
+// Multi-batch queue (when an admin assigns several batches to one driver in sequence)
+export interface BatchQueueInfo {
+  total: number;
+  position: number;
+  upcoming: Array<{ _id: string; batchNumber: string; orderCount: number; mealWindow: string }>;
+}
+
 // Current Batch Response
 export interface MyBatchData {
   batch: Batch | null;
   orders: Order[];
   pickupAddress?: Address;
   summary: BatchSummary;
+  queue?: BatchQueueInfo;
 }
 
 // Proof of Delivery
@@ -561,6 +570,14 @@ export interface BatchTrackingData {
   totalOrders: number;
   deliveredCount: number;
   failedCount: number;
+  /** Total real road distance driven so far (meters). */
+  distanceTraveledMeters?: number;
+  /** Ideal planned-route distance (kitchen → all stops) via Google (meters). */
+  idealDistanceMeters?: number | null;
+  idealDistanceSource?: 'google' | 'osrm' | 'haversine' | null;
+  /** driven − ideal; positive means more than planned. */
+  distanceDeviationMeters?: number | null;
+  distanceDeviationPercent?: number | null;
   deliveries: TrackingDelivery[];
 }
 

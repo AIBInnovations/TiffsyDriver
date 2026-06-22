@@ -1,14 +1,10 @@
 import { Linking, Platform } from 'react-native';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import type { Address } from '../types/api';
 
 export type Coordinates = { latitude: number; longitude: number };
-export type IosMapsApp = 'google' | 'apple';
 
-const PREF_KEY = '@tiffsy_driver/preferred_maps_app';
-
-// Backend serializes coords at address.coordinates.{lat,lng}; older / future
-// shapes may use flat fields, so we read both defensively.
+// Backend stores `address.coordinates: {latitude,longitude}`. Older code paths
+// may also use flat fields. Normalize defensively.
 export function getCoordinates(address?: Address | null): Coordinates | null {
   if (!address) return null;
   const lat = address.coordinates?.latitude ?? address.latitude;
@@ -24,50 +20,19 @@ export function getCoordinates(address?: Address | null): Coordinates | null {
   return null;
 }
 
-export async function getPreferredIosMapsApp(): Promise<IosMapsApp | null> {
-  try {
-    const v = await AsyncStorage.getItem(PREF_KEY);
-    return v === 'google' || v === 'apple' ? v : null;
-  } catch {
-    return null;
-  }
-}
-
-export async function setPreferredIosMapsApp(app: IosMapsApp): Promise<void> {
-  try {
-    await AsyncStorage.setItem(PREF_KEY, app);
-  } catch (error) {
-    console.error('Error saving preferred maps app:', error);
-  }
-}
-
-export async function clearPreferredIosMapsApp(): Promise<void> {
-  try {
-    await AsyncStorage.removeItem(PREF_KEY);
-  } catch (error) {
-    console.error('Error clearing preferred maps app:', error);
-  }
-}
-
-export async function isGoogleMapsAvailable(): Promise<boolean> {
-  if (Platform.OS === 'android') return true;
-  try {
-    return await Linking.canOpenURL('comgooglemaps://');
-  } catch {
-    return false;
-  }
-}
-
 export type NavigateTarget = {
   coordinates?: Coordinates | null;
   address?: string;
   label?: string;
 };
 
-// Open the destination in directions-PREVIEW mode — the maps app loads the route
-// to the destination but does NOT auto-start turn-by-turn navigation. The driver
-// taps "Start" / "GO" themselves once they're ready.
-function buildCandidateUrls(target: NavigateTarget, iosApp?: IosMapsApp): string[] {
+// Builds the prioritized URL list.
+// - Android: Google Maps directions URL (opens the Google Maps app directly
+//   when installed; otherwise falls through to geo: pin then to the browser).
+// - iOS: Google Maps app first (comgooglemaps://), then web Google Maps as
+//   the fallback. Apple Maps is intentionally NOT used — drivers should only
+//   ever see Google Maps.
+function buildCandidateUrls(target: NavigateTarget): string[] {
   const { coordinates, address, label } = target;
   const out: string[] = [];
   const labelPart = label ? `(${encodeURIComponent(label)})` : '';
@@ -75,23 +40,12 @@ function buildCandidateUrls(target: NavigateTarget, iosApp?: IosMapsApp): string
   if (coordinates) {
     const { latitude: lat, longitude: lng } = coordinates;
     if (Platform.OS === 'android') {
-      // Google's universal directions URL — opens Google Maps directly when installed,
-      // shows the route preview with a Start button (does NOT auto-start navigation).
       out.push(
         `https://www.google.com/maps/dir/?api=1&destination=${lat},${lng}&travelmode=driving`
       );
-      // Last-resort fallback: drop a pin in whichever maps app handles geo:
       out.push(`geo:${lat},${lng}?q=${lat},${lng}${labelPart}`);
-    } else if (iosApp === 'apple') {
-      // Apple Maps with driving directions; user taps GO to start.
-      out.push(`maps://?daddr=${lat},${lng}&dirflg=d`);
-      out.push(
-        `https://www.google.com/maps/dir/?api=1&destination=${lat},${lng}&travelmode=driving`
-      );
     } else {
-      // Google Maps on iOS — directions preview, user starts navigation manually.
       out.push(`comgooglemaps://?daddr=${lat},${lng}&directionsmode=driving`);
-      out.push(`maps://?daddr=${lat},${lng}&dirflg=d`);
       out.push(
         `https://www.google.com/maps/dir/?api=1&destination=${lat},${lng}&travelmode=driving`
       );
@@ -103,14 +57,8 @@ function buildCandidateUrls(target: NavigateTarget, iosApp?: IosMapsApp): string
         `https://www.google.com/maps/dir/?api=1&destination=${q}&travelmode=driving`
       );
       out.push(`geo:0,0?q=${q}`);
-    } else if (iosApp === 'apple') {
-      out.push(`maps://?daddr=${q}&dirflg=d`);
-      out.push(
-        `https://www.google.com/maps/dir/?api=1&destination=${q}&travelmode=driving`
-      );
     } else {
       out.push(`comgooglemaps://?daddr=${q}&directionsmode=driving`);
-      out.push(`maps://?daddr=${q}&dirflg=d`);
       out.push(
         `https://www.google.com/maps/dir/?api=1&destination=${q}&travelmode=driving`
       );
@@ -119,14 +67,11 @@ function buildCandidateUrls(target: NavigateTarget, iosApp?: IosMapsApp): string
   return out;
 }
 
-export async function openExternalNavigation(
-  target: NavigateTarget,
-  iosApp?: IosMapsApp
-): Promise<void> {
+export async function openExternalNavigation(target: NavigateTarget): Promise<void> {
   if (!target.coordinates && !target.address) {
     throw new Error('openExternalNavigation: no coordinates or address provided');
   }
-  const urls = buildCandidateUrls(target, iosApp);
+  const urls = buildCandidateUrls(target);
   for (const url of urls) {
     try {
       await Linking.openURL(url);

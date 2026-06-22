@@ -127,6 +127,10 @@ const OTPVerificationScreen = ({ navigation, route }: Props) => {
             phoneNumber,
             registrationToken: response.data.registrationToken,
           });
+        } else if (response.data.user?.role === 'OWNER') {
+          // OWNER super-role (god-mode): bypass the driver approval flow entirely
+          console.log('OWNER user detected, granting full access...');
+          navigation.getParent()?.navigate('Main');
         } else if (response.data.user?.role !== 'DRIVER') {
           // User exists but is not a driver
           setAlertConfig({

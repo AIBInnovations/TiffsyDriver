@@ -3,7 +3,6 @@ import { useState, useEffect } from "react";
 import MaterialCommunityIcons from "react-native-vector-icons/MaterialCommunityIcons";
 import { Delivery } from "../../../context/DeliveryContext";
 import type { OrderStatus } from "../../../types/api";
-import ActionSheet from "../../../components/common/ActionSheet";
 import CustomAlert from "../../../components/common/CustomAlert";
 import OrderSourceBadge from "../../../components/common/OrderSourceBadge";
 import { openExternalNavigation, type NavigateTarget } from "../../../utils/maps";
@@ -20,27 +19,26 @@ const statusConfig: Record<string, { bg: string; text: string; label: string; ic
   // Old context statuses
   pending: { bg: "#F3F4F6", text: "#6B7280", label: "Pending", icon: "clock-outline" },
   in_progress: { bg: "#DBEAFE", text: "#1E40AF", label: "In Progress", icon: "truck-fast" },
-  picked_up: { bg: "#FEF3C7", text: "#92400E", label: "Picked Up", icon: "package-variant" },
+  picked_up: { bg: "#FEF3C7", text: "#92400E", label: "Arrived", icon: "map-marker-check" },
   completed: { bg: "#D1FAE5", text: "#065F46", label: "Completed", icon: "check-circle" },
   failed: { bg: "#FEE2E2", text: "#991B1B", label: "Failed", icon: "close-circle" },
 
   // API statuses (new backend format)
   READY: { bg: "#F3F4F6", text: "#6B7280", label: "Ready", icon: "clock-outline" },
   EN_ROUTE: { bg: "#DBEAFE", text: "#1E40AF", label: "En Route", icon: "truck-fast" },
-  ARRIVED: { bg: "#FEF3C7", text: "#92400E", label: "Arrived", icon: "package-variant" },
+  ARRIVED: { bg: "#FEF3C7", text: "#92400E", label: "Arrived", icon: "map-marker-check" },
   DELIVERED: { bg: "#D1FAE5", text: "#065F46", label: "Delivered", icon: "check-circle" },
   FAILED: { bg: "#FEE2E2", text: "#991B1B", label: "Failed", icon: "close-circle" },
   RETURNED: { bg: "#FEE2E2", text: "#991B1B", label: "Returned", icon: "undo-variant" },
 
   // Legacy API statuses (for backward compatibility)
   OUT_FOR_DELIVERY: { bg: "#DBEAFE", text: "#1E40AF", label: "Out for Delivery", icon: "truck-fast" },
-  PICKED_UP: { bg: "#FEF3C7", text: "#92400E", label: "Picked Up", icon: "package-variant" },
+  PICKED_UP: { bg: "#FEF3C7", text: "#92400E", label: "Arrived", icon: "map-marker-check" },
 };
 
 export default function DeliveryCard({ delivery, onStatusChange, onCallCustomer, onNavigate: onNavigateProp }: DeliveryCardProps) {
   const [showPhone, setShowPhone] = useState(false);
   const [elapsedTime, setElapsedTime] = useState(0);
-  const [showNavigationSheet, setShowNavigationSheet] = useState(false);
   const [showPhoneError, setShowPhoneError] = useState(false);
 
   const status = statusConfig[delivery.status] || {
@@ -99,15 +97,10 @@ export default function DeliveryCard({ delivery, onStatusChange, onCallCustomer,
   };
 
   const handleNavigate = () => {
-    // Show action sheet to choose destination
-    setShowNavigationSheet(true);
+    // The order is already picked up with the batch, so the drop-off is the only
+    // per-order destination — navigate straight there instead of offering pickup.
+    handleNavigateToDropoff();
   };
-
-  const buildPickupTarget = (): NavigateTarget => ({
-    coordinates: delivery.pickupCoordinates ?? null,
-    address: delivery.pickupLocation,
-    label: delivery.kitchenName || 'Pickup',
-  });
 
   const buildDropoffTarget = (): NavigateTarget => {
     // Prefer the coords already extracted by the screen-level converter; fall back to the
@@ -132,13 +125,6 @@ export default function DeliveryCard({ delivery, onStatusChange, onCallCustomer,
       address: delivery.dropoffLocation,
       label: delivery.customerName || 'Drop-off',
     };
-  };
-
-  const handleNavigateToPickup = () => {
-    const target = buildPickupTarget();
-    if (!target.coordinates && !target.address) return;
-    if (onNavigateProp) onNavigateProp(target);
-    else openExternalNavigation(target);
   };
 
   const handleNavigateToDropoff = () => {
@@ -196,16 +182,9 @@ export default function DeliveryCard({ delivery, onStatusChange, onCallCustomer,
         );
       })()}
 
-      {/* Locations */}
+      {/* Drop-off only — the kitchen pickup happens once at the batch level, so a
+          per-order card never shows a pickup, just where the order is headed. */}
       <View style={styles.locationsContainer}>
-        <View style={styles.locationRow}>
-          <View style={[styles.locationDot, { backgroundColor: "#10B981" }]} />
-          <View style={styles.locationInfo}>
-            <Text style={styles.locationLabel}>Pickup</Text>
-            <Text style={styles.locationAddress} numberOfLines={2}>{delivery.pickupLocation}</Text>
-          </View>
-        </View>
-        <View style={styles.locationLine} />
         <View style={styles.locationRow}>
           <View style={[styles.locationDot, { backgroundColor: "#EF4444" }]} />
           <View style={styles.locationInfo}>
@@ -218,12 +197,13 @@ export default function DeliveryCard({ delivery, onStatusChange, onCallCustomer,
       {/* Route Preview */}
       <TouchableOpacity style={styles.routePreview} onPress={handleNavigate} activeOpacity={0.8}>
         <View style={styles.routeVisualization}>
-          {/* Pickup marker */}
+          {/* Start marker — route runs from the driver's current location to the
+              customer (order already picked up with the batch), not from the kitchen. */}
           <View style={styles.markerContainer}>
             <View style={[styles.marker, styles.pickupMarker]}>
-              <MaterialCommunityIcons name="package-variant" size={16} color="#FFFFFF" />
+              <MaterialCommunityIcons name="navigation" size={16} color="#FFFFFF" />
             </View>
-            <Text style={styles.markerLabel}>Pickup</Text>
+            <Text style={styles.markerLabel}>You</Text>
           </View>
 
           {/* Route line */}
@@ -271,28 +251,6 @@ export default function DeliveryCard({ delivery, onStatusChange, onCallCustomer,
       {showPhone && (
         <Text style={styles.phoneNumber}>{delivery.customerPhone}</Text>
       )}
-
-      {/* Navigation Action Sheet */}
-      <ActionSheet
-        visible={showNavigationSheet}
-        title="Open Navigation"
-        message="Choose a destination"
-        options={[
-          {
-            label: "Navigate to Pickup",
-            icon: "package-variant",
-            iconColor: "#10B981",
-            onPress: handleNavigateToPickup,
-          },
-          {
-            label: "Navigate to Drop-off",
-            icon: "map-marker",
-            iconColor: "#EF4444",
-            onPress: handleNavigateToDropoff,
-          },
-        ]}
-        onClose={() => setShowNavigationSheet(false)}
-      />
 
       {/* Phone Error Alert */}
       <CustomAlert

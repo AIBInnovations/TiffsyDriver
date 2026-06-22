@@ -1,51 +1,14 @@
-import { View, Text, ScrollView, StyleSheet, TouchableOpacity, StatusBar, Platform } from "react-native";
+import { View, Text, ScrollView, StyleSheet, TouchableOpacity, StatusBar } from "react-native";
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 import { useNavigation } from "@react-navigation/native";
-import { useCallback, useEffect, useState } from "react";
 import MaterialCommunityIcons from "react-native-vector-icons/MaterialCommunityIcons";
 import LinearGradient from "react-native-linear-gradient";
 import SettingsOption from "./components/SettingsOption";
 import NotificationPreferences from "./components/NotificationPreferences";
-import ActionSheet from "../../components/common/ActionSheet";
-import {
-  getPreferredIosMapsApp,
-  setPreferredIosMapsApp,
-  clearPreferredIosMapsApp,
-  type IosMapsApp,
-} from "../../utils/maps";
-
-const mapsAppLabel = (app: IosMapsApp | null): string => {
-  if (app === 'google') return 'Google Maps';
-  if (app === 'apple') return 'Apple Maps';
-  return 'Ask each time';
-};
 
 export default function SettingsScreen() {
   const insets = useSafeAreaInsets();
   const navigation = useNavigation();
-
-  const [preferredMapsApp, setPreferredMapsAppState] = useState<IosMapsApp | null>(null);
-  const [showMapsAppSheet, setShowMapsAppSheet] = useState(false);
-
-  useEffect(() => {
-    if (Platform.OS !== 'ios') return;
-    let active = true;
-    getPreferredIosMapsApp().then((value) => {
-      if (active) setPreferredMapsAppState(value);
-    });
-    return () => {
-      active = false;
-    };
-  }, []);
-
-  const choose = useCallback(async (app: IosMapsApp | null) => {
-    if (app === null) {
-      await clearPreferredIosMapsApp();
-    } else {
-      await setPreferredIosMapsApp(app);
-    }
-    setPreferredMapsAppState(app);
-  }, []);
 
   return (
     <SafeAreaView style={styles.container} edges={['bottom']}>
@@ -90,14 +53,6 @@ export default function SettingsScreen() {
               value="Always"
               onPress={() => { }}
             />
-            {Platform.OS === 'ios' && (
-              <SettingsOption
-                icon="🗺️"
-                label="Default Maps App"
-                value={mapsAppLabel(preferredMapsApp)}
-                onPress={() => setShowMapsAppSheet(true)}
-              />
-            )}
           </View>
         </View>
 
@@ -117,33 +72,6 @@ export default function SettingsScreen() {
           </View>
         </View>
       </ScrollView>
-
-      <ActionSheet
-        visible={showMapsAppSheet}
-        title="Default Maps App"
-        message="Choose how Tiffsy opens navigation"
-        options={[
-          {
-            label: 'Google Maps',
-            icon: 'google-maps',
-            iconColor: '#10B981',
-            onPress: () => choose('google'),
-          },
-          {
-            label: 'Apple Maps',
-            icon: 'map',
-            iconColor: '#3B82F6',
-            onPress: () => choose('apple'),
-          },
-          {
-            label: 'Ask each time',
-            icon: 'help-circle-outline',
-            iconColor: '#6B7280',
-            onPress: () => choose(null),
-          },
-        ]}
-        onClose={() => setShowMapsAppSheet(false)}
-      />
     </SafeAreaView>
   );
 }

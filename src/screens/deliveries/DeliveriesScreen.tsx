@@ -35,7 +35,6 @@ import CustomAlert from '../../components/common/CustomAlert';
 import { getMyBatch, getAvailableBatches, updateDeliveryStatus as apiUpdateDeliveryStatus, acceptBatch, getDriverOrders, getDriverBatchHistory, markBatchPickedUp, updateDeliverySequence } from '../../services/deliveryService';
 import { startLocationTracking, isLocationTrackingActive } from '../../services/locationService';
 import ReorderStopsModal, { type Stop } from './components/ReorderStopsModal';
-import MapsAppPicker from '../../components/common/MapsAppPicker';
 import { useMapsNavigation } from '../../hooks/useMapsNavigation';
 import { getCoordinates, type Coordinates, type NavigateTarget } from '../../utils/maps';
 import type { Batch, Order, OrderItem, OrderStatus, AvailableBatch, DriverOrder, HistoryBatch, HistorySingleOrder } from '../../types/api';
@@ -1860,13 +1859,6 @@ export default function DeliveriesScreen() {
         batches={availableBatches}
         onClose={() => setShowAvailableBatchesModal(false)}
         onAcceptBatch={handleAcceptBatch}
-      />
-
-      {/* iOS Maps App Picker (Google Maps / Apple Maps) */}
-      <MapsAppPicker
-        visible={mapsNav.pickerOpen}
-        onClose={mapsNav.closePicker}
-        onSelect={mapsNav.onPickerSelect}
       />
 
       {/* New Batch Toast Notification */}

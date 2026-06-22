@@ -22,14 +22,13 @@ import type { DashboardStackParamList } from '../../navigation/types';
 const AnimatedLinearGradient = Animated.createAnimatedComponent(LinearGradient);
 import StatsCard from './components/StatsCard';
 import CustomAlert from '../../components/common/CustomAlert';
-import MapsAppPicker from '../../components/common/MapsAppPicker';
 import { useMapsNavigation } from '../../hooks/useMapsNavigation';
 import { useDriverProfileStore } from '../profile/useDriverProfileStore';
 import { getMyBatch, getAvailableBatches, markBatchPickedUp, acceptBatch, getDriverBatchHistory, completeBatch } from '../../services/deliveryService';
 import { startLocationTracking, stopLocationTracking, isLocationTrackingActive, openAppSettings, openLocationSettings, LocationTrackingError } from '../../services/locationService';
 import { getDriverStats, updateDriverStatus, manageShift, getDriverProfile } from '../../services/driverProfileService';
 import { getNotifications } from '../../services/notificationService';
-import type { Batch, BatchSummary, AvailableBatch, DriverStats, HistoryBatch, HistorySingleOrder } from '../../types/api';
+import type { Batch, BatchSummary, BatchQueueInfo, AvailableBatch, DriverStats, HistoryBatch, HistorySingleOrder } from '../../types/api';
 import AvailableBatchItem from './components/AvailableBatchItem';
 
 
@@ -54,6 +53,7 @@ export default function DashboardScreen() {
 
   // Backend Data
   const [currentBatch, setCurrentBatch] = useState<Batch | null>(null);
+  const [queueInfo, setQueueInfo] = useState<BatchQueueInfo | null>(null);
   const [batchSummary, setBatchSummary] = useState<BatchSummary>({
     totalOrders: 0,
     delivered: 0,
@@ -196,6 +196,7 @@ export default function DashboardScreen() {
       if (response.data.batch) {
         setCurrentBatch(response.data.batch);
         setBatchSummary(response.data.summary);
+        setQueueInfo(response.data.queue || null);
         console.log('✅ Current batch loaded:', response.data.batch.batchNumber);
 
         // Auto-start GPS tracking if batch is active and not already tracking
@@ -205,6 +206,7 @@ export default function DashboardScreen() {
         }
       } else {
         setCurrentBatch(null);
+        setQueueInfo(null);
         setBatchSummary({
           totalOrders: 0,
           delivered: 0,
@@ -787,7 +789,14 @@ export default function DashboardScreen() {
               <View style={styles.currentBatchCard}>
                 <View style={styles.currentBatchHeader}>
                   <View style={styles.currentBatchHeaderLeft}>
-                    <Text style={styles.currentBatchLabel}>Current Batch</Text>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                      <Text style={styles.currentBatchLabel}>Current Batch</Text>
+                      {queueInfo && queueInfo.total > 1 && (
+                        <View style={styles.queueBadge}>
+                          <Text style={styles.queueBadgeText}>Batch {queueInfo.position} of {queueInfo.total}</Text>
+                        </View>
+                      )}
+                    </View>
                     <Text style={styles.currentBatchNumber} numberOfLines={1} ellipsizeMode="tail">
                       {currentBatch.batchNumber}
                     </Text>
@@ -834,6 +843,20 @@ export default function DashboardScreen() {
                         ].filter(Boolean).join(', ')}
                       </Text>
                     </View>
+                  </View>
+                )}
+
+                {/* Upcoming batches in the driver's queue */}
+                {queueInfo && queueInfo.upcoming.length > 0 && (
+                  <View style={styles.upNextSection}>
+                    <Text style={styles.upNextLabel}>Up next ({queueInfo.upcoming.length})</Text>
+                    {queueInfo.upcoming.map((b, i) => (
+                      <View key={b._id} style={styles.upNextRow}>
+                        <Text style={styles.upNextSeq}>{queueInfo.position + i + 1}</Text>
+                        <Text style={styles.upNextBatchNumber} numberOfLines={1}>{b.batchNumber}</Text>
+                        <Text style={styles.upNextOrders}>{b.orderCount} orders</Text>
+                      </View>
+                    ))}
                   </View>
                 )}
 
@@ -1042,12 +1065,6 @@ export default function DashboardScreen() {
         onClose={() => setAlertConfig({ visible: false, title: '', message: '' })}
       />
 
-      {/* iOS Maps App Picker (Google Maps / Apple Maps) */}
-      <MapsAppPicker
-        visible={mapsNav.pickerOpen}
-        onClose={mapsNav.closePicker}
-        onSelect={mapsNav.onPickerSelect}
-      />
     </SafeAreaView >
   );
 }
@@ -1212,6 +1229,58 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#6B7280',
     marginBottom: 4,
+  },
+  queueBadge: {
+    backgroundColor: '#FFF1E8',
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 10,
+    marginBottom: 4,
+  },
+  queueBadgeText: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#FE8733',
+  },
+  upNextSection: {
+    marginTop: 12,
+    paddingTop: 12,
+    borderTopWidth: 1,
+    borderTopColor: '#F3F4F6',
+  },
+  upNextLabel: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#6B7280',
+    marginBottom: 6,
+  },
+  upNextRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 4,
+  },
+  upNextSeq: {
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    backgroundColor: '#F3F4F6',
+    textAlign: 'center',
+    lineHeight: 20,
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#6B7280',
+    marginRight: 8,
+    overflow: 'hidden',
+  },
+  upNextBatchNumber: {
+    flex: 1,
+    fontSize: 13,
+    color: '#374151',
+  },
+  upNextOrders: {
+    fontSize: 12,
+    color: '#9CA3AF',
+    marginLeft: 8,
   },
   currentBatchNumber: {
     fontSize: 18,

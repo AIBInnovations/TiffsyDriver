@@ -40,6 +40,10 @@ export default function MapPreview({
 }: MapPreviewProps) {
   const [showNavigationSheet, setShowNavigationSheet] = useState(false);
 
+  // Once the batch is picked up the kitchen is irrelevant per order, so screens omit
+  // pickup data. When that happens the route starts from the driver, not the kitchen.
+  const hasPickup = !!(pickupLocation || pickupCoordinates);
+
   const dispatchNavigate = (target: NavigateTarget) => {
     if (onNavigate) onNavigate(target);
     else openExternalNavigation(target);
@@ -127,13 +131,14 @@ export default function MapPreview({
         <View style={styles.mapPlaceholder}>
           {/* Route visualization */}
           <View style={styles.routeVisualization}>
-            {/* Pickup marker */}
+            {/* Start marker — kitchen pickup if provided, otherwise the driver's own
+                location (order already picked up with the batch). */}
             <View style={styles.markerContainer}>
               <View style={[styles.marker, styles.pickupMarker]}>
-                <MaterialCommunityIcons name="package-variant" size={16} color="#FFFFFF" />
+                <MaterialCommunityIcons name={hasPickup ? "package-variant" : "navigation"} size={16} color="#FFFFFF" />
               </View>
               <Text style={styles.markerLabel} numberOfLines={1}>
-                Pickup
+                {hasPickup ? "Pickup" : "You"}
               </Text>
             </View>
 

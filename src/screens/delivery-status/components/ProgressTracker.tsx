@@ -45,6 +45,16 @@ const getStatusColor = (status: DeliveryStatusType): { bg: string; text: string;
   }
 };
 
+// The 3-step tracker collapses the "arrived" state into the journey, so it has no
+// step of its own. Resolve the bottom badge label/icon explicitly so an "arrived"
+// (picked_up) order reads as "Arrived" instead of leaking the raw status string.
+const getBadgeMeta = (status: DeliveryStatusType): { label: string; icon: string } => {
+  if (status === "failed") return { label: "Failed", icon: "close-circle" };
+  if (status === "picked_up") return { label: "Arrived", icon: "map-marker-check" };
+  const step = steps.find((s) => s.key === status);
+  return { label: step?.label || status, icon: step?.icon || "help-circle" };
+};
+
 export default function ProgressTracker({
   currentStatus,
   stopNumber,
@@ -52,6 +62,7 @@ export default function ProgressTracker({
 }: ProgressTrackerProps) {
   const currentIndex = statusOrder[currentStatus];
   const isFailed = currentStatus === "failed";
+  const badgeMeta = getBadgeMeta(currentStatus);
 
   return (
     <View style={styles.container}>
@@ -138,12 +149,12 @@ export default function ProgressTracker({
       {/* Current status badge */}
       <View style={[styles.statusBadge, { backgroundColor: getStatusColor(currentStatus).bg }]}>
         <MaterialCommunityIcons
-          name={isFailed ? "close-circle" : steps.find(s => s.key === currentStatus)?.icon || "help-circle"}
+          name={badgeMeta.icon}
           size={16}
           color={getStatusColor(currentStatus).text}
         />
         <Text style={[styles.statusBadgeText, { color: getStatusColor(currentStatus).text }]}>
-          {isFailed ? "Failed" : steps.find(s => s.key === currentStatus)?.label || currentStatus}
+          {badgeMeta.label}
         </Text>
       </View>
     </View>

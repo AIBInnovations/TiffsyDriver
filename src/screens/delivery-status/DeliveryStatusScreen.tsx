@@ -25,7 +25,6 @@ import FailedDeliveryModal from "./components/FailedDeliveryModal";
 import DeliveryCompleteModal from "./components/DeliveryCompleteModal";
 import NotificationBanner, { NotificationType } from "./components/NotificationBanner";
 import CustomAlert from "../../components/common/CustomAlert";
-import MapsAppPicker from "../../components/common/MapsAppPicker";
 import { useMapsNavigation } from "../../hooks/useMapsNavigation";
 import { getCoordinates, type Coordinates } from "../../utils/maps";
 import { getMyBatch, updateDeliveryStatus as apiUpdateDeliveryStatus, completeBatch, getBatchTracking, uploadProofPhoto } from "../../services/deliveryService";
@@ -127,6 +126,8 @@ export default function DeliveryStatusScreen() {
     batchId: string;
     batchNumber: string;
     summary: BatchSummary;
+    distanceTraveledMeters?: number;
+    idealDistanceMeters?: number | null;
   } | null>(null);
 
   // Tracking data for ETA display
@@ -209,11 +210,24 @@ export default function DeliveryStatusScreen() {
             console.log('🔍 Using active order:', targetOrder.orderNumber);
           } else {
             console.log('✅ All deliveries completed - no active orders');
+            // Pull final distance totals (ideal planned route vs actually driven)
+            // for the completion summary. Non-fatal if it fails.
+            let distanceTraveledMeters: number | undefined;
+            let idealDistanceMeters: number | null | undefined;
+            try {
+              const tracking = await getBatchTracking(batch._id);
+              distanceTraveledMeters = tracking.data?.distanceTraveledMeters;
+              idealDistanceMeters = tracking.data?.idealDistanceMeters;
+            } catch (e) {
+              console.warn('⚠️ Could not fetch final batch distances:', e);
+            }
             // Set batch completion data so driver can complete the batch
             setActiveBatchForCompletion({
               batchId: batch._id,
               batchNumber: batch.batchNumber,
               summary: response.data.summary,
+              distanceTraveledMeters,
+              idealDistanceMeters,
             });
             setDelivery(null);
             return;
@@ -371,7 +385,7 @@ export default function DeliveryStatusScreen() {
 
       const statusMessages: Record<DeliveryStatusType, string> = {
         pending: "Status reset to pending",
-        picked_up: "Package picked up successfully",
+        picked_up: "Arrived at delivery location",
         in_progress: "Delivery started",
         delivered: "Delivery completed!",
         failed: "Delivery marked as failed",
@@ -671,6 +685,29 @@ export default function DeliveryStatusScreen() {
                     <Text style={styles.batchSummaryLabel}>Failed</Text>
                   </View>
                 </View>
+
+                {/* Distance: ideal planned route vs actually driven */}
+                {(activeBatchForCompletion.idealDistanceMeters != null ||
+                  (activeBatchForCompletion.distanceTraveledMeters ?? 0) > 0) && (
+                  <View style={styles.distanceRow}>
+                    {activeBatchForCompletion.idealDistanceMeters != null && (
+                      <View style={styles.batchSummaryStat}>
+                        <Text style={styles.distanceValue}>
+                          {(activeBatchForCompletion.idealDistanceMeters / 1000).toFixed(1)} km
+                        </Text>
+                        <Text style={styles.batchSummaryLabel}>Ideal route</Text>
+                      </View>
+                    )}
+                    {(activeBatchForCompletion.distanceTraveledMeters ?? 0) > 0 && (
+                      <View style={styles.batchSummaryStat}>
+                        <Text style={styles.distanceValue}>
+                          {((activeBatchForCompletion.distanceTraveledMeters ?? 0) / 1000).toFixed(1)} km
+                        </Text>
+                        <Text style={styles.batchSummaryLabel}>You drove</Text>
+                      </View>
+                    )}
+                  </View>
+                )}
               </View>
 
               {/* Complete Batch Button */}
@@ -767,11 +804,10 @@ export default function DeliveryStatusScreen() {
           orderSource={delivery.orderSource}
           customerName={delivery.customerName}
           customerPhone={delivery.customerPhone}
-          pickupLocation={delivery.pickupLocation}
+          // Kitchen pickup is a one-time batch step — per-order details show only the
+          // drop-off, never a per-order pickup the driver would have to return for.
           dropoffLocation={delivery.dropoffLocation}
-          pickupCoordinates={delivery.pickupCoordinates}
           dropoffCoordinates={delivery.dropoffCoordinates}
-          pickupLabel={delivery.kitchenName || 'Pickup'}
           dropoffLabel={delivery.customerName || 'Drop-off'}
           deliveryWindow={delivery.deliveryWindow}
           specialInstructions={delivery.specialInstructions}
@@ -785,11 +821,10 @@ export default function DeliveryStatusScreen() {
 
         {/* Map Preview */}
         <MapPreview
-          pickupLocation={delivery.pickupLocation}
+          // No pickup props: the order is already collected with the batch, so the route
+          // preview runs from the driver's location to the drop-off only.
           dropoffLocation={delivery.dropoffLocation}
-          pickupCoordinates={delivery.pickupCoordinates}
           dropoffCoordinates={delivery.dropoffCoordinates}
-          pickupLabel={delivery.kitchenName || 'Pickup'}
           dropoffLabel={delivery.customerName || 'Drop-off'}
           onNavigate={mapsNav.navigate}
           currentStatus={delivery.currentStatus}
@@ -853,12 +888,6 @@ export default function DeliveryStatusScreen() {
         onClose={() => setErrorAlert({ visible: false, message: '' })}
       />
 
-      {/* iOS Maps App Picker (Google Maps / Apple Maps) */}
-      <MapsAppPicker
-        visible={mapsNav.pickerOpen}
-        onClose={mapsNav.closePicker}
-        onSelect={mapsNav.onPickerSelect}
-      />
     </SafeAreaView>
   );
 }
@@ -953,6 +982,21 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-around",
+  },
+  distanceRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-around",
+    marginTop: 16,
+    paddingTop: 16,
+    borderTopWidth: 1,
+    borderTopColor: "#E5E7EB",
+  },
+  distanceValue: {
+    fontSize: 18,
+    fontWeight: "700",
+    color: "#111827",
+    marginBottom: 4,
   },
   batchSummaryStat: {
     alignItems: "center",

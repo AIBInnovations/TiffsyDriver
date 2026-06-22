@@ -31,7 +31,9 @@ export default function RootNavigator() {
         const isProfileComplete: boolean | undefined =
           (me.data as any)?.isProfileComplete ?? user?.isProfileComplete;
 
-        if (user?.role && user.role !== "DRIVER") {
+        // OWNER super-role (god-mode) is allowed in alongside DRIVER; it falls
+        // through to the `default` case below and lands on Main.
+        if (user?.role && user.role !== "DRIVER" && user.role !== "OWNER") {
           await tokenStorage.clearAll();
           setAuthBootstrap({ initialRoute: "Login" });
           setInitialRoute("Auth");
