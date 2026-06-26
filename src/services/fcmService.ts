@@ -2,6 +2,7 @@ import { Platform, PermissionsAndroid, AppState } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import notifee, { EventType } from '@notifee/react-native';
 import { API_CONFIG } from '../config/api';
+import DeviceInfo from 'react-native-device-info';
 import { getStoredToken } from './authService';
 import { getChannelForNotificationType } from './notificationChannels';
 
@@ -319,6 +320,15 @@ export const registerFCMToken = async (): Promise<boolean> => {
           deviceType,
           deviceId,
           notificationPreferences, // Send preferences to backend
+          // App-version telemetry — backend records which app/version this user is on.
+          appVersion: (() => {
+            try {
+              return DeviceInfo.getVersion();
+            } catch {
+              return undefined;
+            }
+          })(),
+          appType: 'driver',
         }),
       }
     );

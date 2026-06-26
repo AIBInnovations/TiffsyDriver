@@ -1,6 +1,6 @@
 import "./global.css";
-import { useEffect, useRef } from "react";
-import { StatusBar } from "react-native";
+import { useEffect, useRef, useState } from "react";
+import { StatusBar, AppState } from "react-native";
 import { NavigationContainer } from "@react-navigation/native";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
@@ -8,9 +8,34 @@ import RootNavigator from "./src/navigation/RootNavigator";
 import { initializeFCMListeners, setupTokenRefreshListener } from "./src/services/fcmService";
 import { createNotificationChannels } from "./src/services/notificationChannels";
 import { clearStaleTrackingState } from "./src/services/locationService";
+import ForceUpdateModal from "./src/components/ForceUpdateModal";
+import { checkForUpdate, UpdateCheckResult } from "./src/services/appUpdate.service";
 
 export default function App() {
   const navigationRef = useRef<any>(null);
+
+  // Force/soft update gate. Fail-open: a backend error leaves the app usable.
+  const [updateInfo, setUpdateInfo] = useState<UpdateCheckResult | null>(null);
+  const [softDismissed, setSoftDismissed] = useState(false);
+
+  const runUpdateCheck = async () => {
+    try {
+      const result = await checkForUpdate();
+      setUpdateInfo(result);
+      if (result.status === "required") setSoftDismissed(false);
+    } catch (err: any) {
+      console.log("[App] update check failed (non-blocking):", err?.message);
+    }
+  };
+
+  // Run on launch and whenever the app returns to the foreground.
+  useEffect(() => {
+    runUpdateCheck();
+    const sub = AppState.addEventListener("change", (next) => {
+      if (next === "active") runUpdateCheck();
+    });
+    return () => sub.remove();
+  }, []);
 
   useEffect(() => {
     // Initialize notification system
@@ -62,6 +87,17 @@ export default function App() {
           <RootNavigator />
         </NavigationContainer>
       </SafeAreaProvider>
+      {updateInfo &&
+        updateInfo.status !== "none" &&
+        !(updateInfo.status === "available" && softDismissed) && (
+          <ForceUpdateModal
+            visible
+            mode={updateInfo.status === "required" ? "required" : "available"}
+            message={updateInfo.message}
+            storeUrl={updateInfo.storeUrl}
+            onDismiss={() => setSoftDismissed(true)}
+          />
+        )}
     </GestureHandlerRootView>
   );
 }
