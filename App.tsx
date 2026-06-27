@@ -10,6 +10,7 @@ import { createNotificationChannels } from "./src/services/notificationChannels"
 import { clearStaleTrackingState } from "./src/services/locationService";
 import ForceUpdateModal from "./src/components/ForceUpdateModal";
 import { checkForUpdate, UpdateCheckResult } from "./src/services/appUpdate.service";
+import { checkForOtaUpdate } from "./src/services/otaUpdate.service";
 
 export default function App() {
   const navigationRef = useRef<any>(null);
@@ -31,6 +32,8 @@ export default function App() {
   // Run on launch and whenever the app returns to the foreground.
   useEffect(() => {
     runUpdateCheck();
+    // OTA JS-bundle check (silent; applies on next launch). Fail-open.
+    checkForOtaUpdate();
     const sub = AppState.addEventListener("change", (next) => {
       if (next === "active") runUpdateCheck();
     });
