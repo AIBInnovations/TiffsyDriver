@@ -2,6 +2,7 @@ import UIKit
 import React
 import React_RCTAppDelegate
 import ReactAppDependencyProvider
+import react_native_ota_hot_update
 
 @main
 class AppDelegate: UIResponder, UIApplicationDelegate {
@@ -42,7 +43,9 @@ class ReactNativeDelegate: RCTDefaultReactNativeFactoryDelegate {
 #if DEBUG
     RCTBundleURLProvider.sharedSettings().jsBundleURL(forBundleRoot: "index")
 #else
-    Bundle.main.url(forResource: "main", withExtension: "jsbundle")
+    // react-native-ota-hot-update: load the OTA JS bundle when installed,
+    // otherwise the embedded bundle.
+    OtaHotUpdate.getBundle()
 #endif
   }
 }
