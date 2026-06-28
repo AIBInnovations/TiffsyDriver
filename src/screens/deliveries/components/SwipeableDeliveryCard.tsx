@@ -26,7 +26,10 @@ interface SwipeableDeliveryCardProps {
   onMarkComplete?: (deliveryId: string) => void;
   onCardPress?: (delivery: any) => void;
   canSwipeToComplete?: boolean;
-  onDeliveryCompleted?: () => void;
+  // Phase 11.1.x — accepts an optional batch-progress payload so the parent
+  // can detect "this was the last delivery" and auto-navigate to Dashboard
+  // instead of leaving the driver on a now-empty deliveries list.
+  onDeliveryCompleted?: (progress?: { isComplete?: boolean; batchStatus?: string; finalized?: boolean }) => void;
 }
 
 export default function SwipeableDeliveryCard({
@@ -127,13 +130,15 @@ export default function SwipeableDeliveryCard({
         requestBody.proofOfDelivery.recipientName = recipientName;
       }
 
-      await updateDeliveryStatus(deliveryId, requestBody);
+      const updateRes = await updateDeliveryStatus(deliveryId, requestBody);
 
       setShowOTPModal(false);
 
-      // Notify parent that delivery was completed
+      // Notify parent that delivery was completed. Forward the auto-complete
+      // signal so the parent can navigate to Dashboard when this OTP closed
+      // out the last order in the batch.
       if (onDeliveryCompleted) {
-        onDeliveryCompleted();
+        onDeliveryCompleted(updateRes?.data?.batchProgress);
       }
 
       // Also call onStatusChange to refresh the list

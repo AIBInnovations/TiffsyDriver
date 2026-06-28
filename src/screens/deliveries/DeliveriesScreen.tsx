@@ -12,6 +12,7 @@ import {
   StatusBar,
   Linking,
   Platform,
+  ToastAndroid,
   Dimensions,
 } from 'react-native';
 
@@ -252,6 +253,35 @@ export default function DeliveriesScreen() {
       setCurrentOrders([]);
     }
   }, [selectedBatchId]);
+
+  // Phase 11.1.x — fires after each OTP success. Refetches the batch
+  // (same as before) AND, when the backend signals the batch just
+  // finalized, surfaces a toast and switches to the Dashboard tab so
+  // the driver isn't stranded on an empty deliveries list. The
+  // backend's reconcileBatchCompletion has already freed the driver,
+  // closed the batch, and the dashboard's own useFocusEffect will
+  // refetch to show "No active batch".
+  const handleDeliveryCompleted = useCallback(
+    async (progress?: { isComplete?: boolean; batchStatus?: string; finalized?: boolean }) => {
+      await fetchCurrentBatch();
+      if (progress?.finalized) {
+        const label = progress.batchStatus === 'COMPLETED'
+          ? 'Batch completed — all deliveries done!'
+          : progress.batchStatus === 'PARTIAL_COMPLETE'
+            ? 'Batch closed — some deliveries did not succeed.'
+            : 'Batch closed.';
+        if (Platform.OS === 'android') {
+          ToastAndroid.show(label, ToastAndroid.LONG);
+        }
+        // Hop to the Dashboard tab. Its useFocusEffect will refetch.
+        const parent = navigation.getParent();
+        if (parent) {
+          parent.navigate('Dashboard' as never);
+        }
+      }
+    },
+    [fetchCurrentBatch, navigation],
+  );
 
   // Fetch driver orders (active orders not in batch)
   const fetchDriverOrders = useCallback(async () => {
@@ -1612,7 +1642,7 @@ export default function DeliveriesScreen() {
                               onCardPress={currentBatch?.status === 'DISPATCHED' ? undefined : handleCardPress}
                               onMarkComplete={currentBatch?.status === 'DISPATCHED' ? undefined : handleMarkComplete}
                               canSwipeToComplete={currentBatch?.status !== 'DISPATCHED'}
-                              onDeliveryCompleted={fetchCurrentBatch}
+                              onDeliveryCompleted={handleDeliveryCompleted}
                             />
                           ))}
                         </BatchGroup>

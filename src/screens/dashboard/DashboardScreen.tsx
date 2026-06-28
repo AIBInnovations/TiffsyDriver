@@ -379,6 +379,19 @@ export default function DashboardScreen() {
     }, [fetchUnreadNotificationCount])
   );
 
+  // Phase 11.1.x — refresh the current batch on focus. Backend already
+  // auto-finalizes a batch via reconcileBatchCompletion as soon as the
+  // last order goes terminal, so getMyBatch will return no active batch.
+  // Without this focus-refresh, returning from Deliveries after the
+  // final OTP keeps stale state on screen (pending=0, "Complete Batch"
+  // button) and the driver has to tap a redundant action that's already
+  // been done server-side.
+  useFocusEffect(
+    useCallback(() => {
+      fetchCurrentBatch();
+    }, [fetchCurrentBatch])
+  );
+
   // Toggle online/offline status with backend shift + status APIs
   const handleToggleOnline = useCallback(async (value: boolean) => {
     // Prevent going offline if there are active deliveries

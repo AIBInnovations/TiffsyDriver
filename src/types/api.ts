@@ -304,6 +304,11 @@ export interface BatchProgress {
   delivered: number;
   failed: number;
   total: number;
+  // Set by the backend's reconcileBatchCompletion. Lets the driver app
+  // detect "this was the last delivery" without polling getMyBatch.
+  isComplete?: boolean;
+  batchStatus?: 'DISPATCHED' | 'IN_PROGRESS' | 'COMPLETED' | 'PARTIAL_COMPLETE' | 'CANCELLED' | string;
+  finalized?: boolean; // true only on the update that flipped the batch terminal
 }
 
 // Delivery Assignment Details
