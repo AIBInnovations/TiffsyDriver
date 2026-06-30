@@ -45,11 +45,8 @@ export default function DashboardScreen() {
   const [toastType, setToastType] = useState<'success' | 'error'>('success');
   const toastOpacity = useRef(new Animated.Value(0)).current;
 
-  // Header animation
-  const headerTranslateY = useRef(new Animated.Value(0)).current;
-  const lastScrollY = useRef(0);
-  const headerVisible = useRef(true);
-  const HEADER_HEIGHT = 140;
+  // Header is fixed (always visible) — it stays pinned to the top and does not
+  // hide on scroll.
 
   // Backend Data
   const [currentBatch, setCurrentBatch] = useState<Batch | null>(null);
@@ -452,43 +449,6 @@ export default function DashboardScreen() {
     }
   }, [fetchCurrentBatch, fetchAvailableBatches, fetchDriverStats, fetchUserProfile, fetchHistory, fetchUnreadNotificationCount, showToast]);
 
-  // Handle scroll for header animation
-  const handleScroll = useCallback((event: any) => {
-    const currentScrollY = event.nativeEvent.contentOffset.y;
-    const scrollDiff = currentScrollY - lastScrollY.current;
-
-    // Only trigger animation after scrolling past a threshold
-    if (currentScrollY > 50) {
-      if (scrollDiff > 5 && headerVisible.current) {
-        // Scrolling down - hide header
-        headerVisible.current = false;
-        Animated.timing(headerTranslateY, {
-          toValue: -HEADER_HEIGHT,
-          duration: 200,
-          useNativeDriver: true,
-        }).start();
-      } else if (scrollDiff < -5 && !headerVisible.current) {
-        // Scrolling up - show header
-        headerVisible.current = true;
-        Animated.timing(headerTranslateY, {
-          toValue: 0,
-          duration: 200,
-          useNativeDriver: true,
-        }).start();
-      }
-    } else if (currentScrollY <= 50 && !headerVisible.current) {
-      // Near top - always show header
-      headerVisible.current = true;
-      Animated.timing(headerTranslateY, {
-        toValue: 0,
-        duration: 200,
-        useNativeDriver: true,
-      }).start();
-    }
-
-    lastScrollY.current = currentScrollY;
-  }, [headerTranslateY]);
-
   // Navigate to batch details
   const handleViewBatch = useCallback(() => {
     if (!currentBatch) return;
@@ -683,7 +643,7 @@ export default function DashboardScreen() {
       {/* Main Content Wrapper with Background */}
       <View style={styles.mainWrapper}>
         {/* Header Section - Animated */}
-        <AnimatedLinearGradient colors={['#FD9E2F', '#FF6636']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={[styles.headerGradient, { transform: [{ translateY: headerTranslateY }] }]}>
+        <AnimatedLinearGradient colors={['#FD9E2F', '#FF6636']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={styles.headerGradient}>
           <View style={[styles.headerContent, { paddingTop: insets.top + 16 }]}>
             <View style={styles.headerLeft}>
               <Text style={styles.greeting}>
@@ -735,8 +695,6 @@ export default function DashboardScreen() {
         <ScrollView
           style={styles.scrollView}
           contentContainerStyle={[styles.scrollContent, { paddingTop: insets.top + 165 }]}
-          onScroll={handleScroll}
-          scrollEventThrottle={16}
           refreshControl={
             <RefreshControl
               refreshing={refreshing}

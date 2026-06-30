@@ -12,6 +12,7 @@ prepare_react_native_project!
 use_frameworks! :linkage => :static
 
 target 'DriversApp' do
+  project 'DriversApp.xcodeproj'
   config = use_native_modules!
 
   use_react_native!(

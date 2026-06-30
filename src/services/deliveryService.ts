@@ -449,12 +449,26 @@ export const sendDriverLocation = async (
   try {
     const headers = await createHeaders();
 
+    // iOS CoreLocation reports speed/heading (and sometimes accuracy) as -1 when
+    // they can't be determined (e.g. stationary or no movement). The backend
+    // rejects negative values, so drop any non-finite or negative metric rather
+    // than send an invalid one.
+    const isValidMetric = (n: number | undefined): n is number =>
+      typeof n === 'number' && Number.isFinite(n) && n >= 0;
+    const payload: DriverLocationUpdate = {
+      latitude: locationData.latitude,
+      longitude: locationData.longitude,
+      ...(isValidMetric(locationData.speed) ? { speed: locationData.speed } : {}),
+      ...(isValidMetric(locationData.heading) ? { heading: locationData.heading } : {}),
+      ...(isValidMetric(locationData.accuracy) ? { accuracy: locationData.accuracy } : {}),
+    };
+
     const response = await fetch(
       `${API_CONFIG.BASE_URL}${API_CONFIG.ENDPOINTS.DRIVER_LOCATION}`,
       {
         method: 'POST',
         headers,
-        body: JSON.stringify(locationData),
+        body: JSON.stringify(payload),
       }
     );
 

@@ -2,15 +2,15 @@
 //
 // Mirrors the Consumer/Admin pattern (src/config/env.ts in those repos):
 // a TEST URL pointing at the Render backend used by rehearsal/test, plus
-// the prod CloudFront URL. FORCE_TEST_URL stays true while we're testing
-// against rehearsal; flip back to false before producing a real
-// production build for the Play Store.
+// the prod AWS CloudFront URL. FORCE_TEST_URL stays false so every build
+// (including debug/dev on-device) hits the AWS backend; flip it to true
+// only when you need to test against the Render rehearsal backend.
 const TEST_BASE_URL = 'https://tiffsy-backend-8ecm.onrender.com/api';
 const PROD_BASE_URL = 'https://d31od4t2t5epcb.cloudfront.net/api';
-const FORCE_TEST_URL = true;
+const FORCE_TEST_URL = false;
 
 export const API_CONFIG = {
-  BASE_URL: __DEV__ || FORCE_TEST_URL ? TEST_BASE_URL : PROD_BASE_URL,
+  BASE_URL: FORCE_TEST_URL ? TEST_BASE_URL : PROD_BASE_URL,
 
   // Timeouts
   TIMEOUT: 30000, // 30 seconds
